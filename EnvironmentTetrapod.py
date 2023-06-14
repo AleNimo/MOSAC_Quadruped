@@ -72,18 +72,19 @@ class Environment:
             else:
                 reward[i], end[i] = 100*(dist_ini[i]-dist_fin[i]), False if dist_fin[i] <= 1.5 else True
             
-            #Compute angular movement for the 3 angles in the back and every joint (3+12)
-            for j in range(3, 6):
+            #Get the 2 angles (x and y axes) of the back
+            for j in range(3, 5):
                 back_angle = np.abs(next_obs[i, j])    #angle of the back with respect to 0°
 
                 if back_angle > 1/9:  #if it exceeds 20°
-                    reward[i] += -0.1 * back_angle * 1/3
+                    reward[i] += -0.1 * back_angle * 1/2    #Mean multiplied by -0.1
 
+            #Get angular movement of the 12 joints
             for joint in range(6, 18):
                 delta_joint_angle = np.abs(obs[i, joint] - next_obs[i, joint])    #angle of every joint with respect to the previous one
 
                 if delta_joint_angle > 1/4: #if it exceeds 45°
-                    reward[i] += -0.5 * delta_joint_angle * 1/12
+                    reward[i] += -0.5 * delta_joint_angle * 1/12    #Mean multiplied by -0.5
             
                 
         return reward, end
