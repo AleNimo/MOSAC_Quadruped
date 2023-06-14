@@ -29,8 +29,8 @@ class SoftActorCritic:
 
         # Default hyper-parameters
         self.discount_factor = 0.95
-        self.update_factor = 0.005
-        self.replay_batch_size = 1000
+        self.update_factor = 0.005      #To update the target parameters
+        self.replay_batch_size = 1000   
         self.initial_alpha = 0.01
         self.entropy = environment.act_sp_shape[0]
         self.P_train_frequency, self.Q_train_frequency = 1, 1
@@ -48,18 +48,20 @@ class SoftActorCritic:
         # Policy estimators
         u, s = 0.0, 0.001
         self.__P_shape = P_shape
-        self.__P = [np.random.normal(u, s, size=(environment.obs_sp_shape[-1]+1, P_shape[0])).astype(data_type), ]
+        self.__P = [np.random.normal(u, s, size=(environment.obs_sp_shape[-1]+1, P_shape[0])).astype(data_type), ]  #We always add 1 to the first layer of the weight matrix to consider the bias
         self.__P = self.__P + [np.random.normal(u, s, size=(P_shape[i]+1, P_shape[i+1])).astype(data_type) for i in range(len(P_shape)-1)]
-        self.__P = self.__P + [np.random.normal(u, s, size=(P_shape[-1]+1, environment.act_sp_shape[-1])).astype(data_type), ]
-        self.__P = self.__P + [np.random.normal(u, s, size=(P_shape[-1]+1, environment.act_sp_shape[-1])).astype(data_type), ]
-        for w in self.__P: w[-1:, :] = np.zeros(w[-1:, :].shape, dtype=data_type)
+        self.__P = self.__P + [np.random.normal(u, s, size=(P_shape[-1]+1, environment.act_sp_shape[-1])).astype(data_type), ]  #One for the mean
+        self.__P = self.__P + [np.random.normal(u, s, size=(P_shape[-1]+1, environment.act_sp_shape[-1])).astype(data_type), ]  #Another for the standard deviation
+        for w in self.__P:
+            w[-1:, :] = np.zeros(w[-1:, :].shape, dtype=data_type)     #Bias in zero
 
         # Action-Value function estimator
         self.__Q_shape = Q_shape
         self.__Q = [np.random.normal(u, s, size=(2, environment.obs_sp_shape[-1]+environment.act_sp_shape[-1]+1, Q_shape[0])).astype(data_type), ]
         self.__Q = self.__Q + [np.random.normal(u, s, size=(2, Q_shape[i]+1, Q_shape[i+1])).astype(data_type) for i in range(len(Q_shape)-1)]
         self.__Q = self.__Q + [np.random.normal(u, s, size=(2, Q_shape[-1]+1, 1)).astype(data_type), ]
-        for w in self.__Q: w[:, -1:, :] = np.zeros(w[:, -1:, :].shape, dtype=data_type)
+        for w in self.__Q:
+            w[:, -1:, :] = np.zeros(w[:, -1:, :].shape, dtype=data_type)
 
         # Target networks
         self.__PT = [np.copy(weights) for weights in self.__P]
@@ -172,8 +174,8 @@ class SoftActorCritic:
             x = np.add(np.matmul(x, w[0:-1, :]), w[-1:, :])
             x = np.multiply(x, x > 0)
         # Compute the tanh layer (Flattened Gaussian mean)
-# OLD        x = np.tanh(np.add(np.matmul(x, self.__P[-2][0:-1, :]), self.__P[-2][-1:, :]))
-        x = np.tanh(np.add(np.matmul(x, self.__P[-2][0:-1, :]), self.__P[-2][-1:, :]))
+# OLD   x = np.tanh(np.add(np.matmul(x, self.__P[-2][0:-1, :]), self.__P[-2][-1:, :]))
+        x = np.add(np.matmul(x, self.__P[-2][0:-1, :]), self.__P[-2][-1:, :])
         # Compute the tanh layer (Flattened Gaussian without sampling)
         return np.tanh(x)
 
@@ -551,23 +553,29 @@ class SoftActorCritic:
             ep_ret[episode, 2] = np.sqrt(np.square(ep_ret[episode, 0] - ep_ret[episode, 1]))
 #            ep_ret[episode, :] = ep_ret[episode, :] / env.max_ret(ep_obs[0])
 
-            for i in range(int(np.ceil(ep_len/Q_freq))):
+            for i in range(ep_len):
                 # Sample the replay buffer
-                tr_obs, tr_act, tr_next_obs, tr_reward, tr_end = self.__sample_replay_buffer(replay_batch_size)
-                tr_reward += (1 - tr_end) * discount_factor * self.__VTcompute(tr_next_obs)
+                if (i % Q_freq == 0) or (i % P_freq == 0):
 
-                # Train the state-action value function estimator
-                ep_loss[episode, 0] = np.mean(self.__Qtrain([tr_obs, tr_act], tr_reward, 1, 1))
-#                print("Q:", self.__Q)
+                    tr_obs, tr_act, tr_next_obs, tr_reward, tr_end = self.__sample_replay_buffer(replay_batch_size)
+                    tr_reward += (1 - tr_end) * discount_factor * self.__VTcompute(tr_next_obs)
 
-                if i % P_freq == 0:
-                    # Train policy estimator
-                    ep_loss[episode, 1] = np.mean(self.__Ptrain(tr_obs, 1, 1))
-#                    print("P:", self.__P)
+                    if i % Q_freq == 0:
+                        # Train the state-action value function estimator
+                        ep_loss[episode, 0] = np.mean(self.__Qtrain([tr_obs, tr_act], tr_reward, 1, 1))
+    #                   print("Q:", self.__Q)
+                        
+                        # Update target model's weights
+                        for w, w_target in zip(self.__Q, self.__QT): np.add((1-update_factor) * w_target, update_factor * w, out=w_target)
 
-                    # Update target model's weights
-                    for w, w_target in zip(self.__P, self.__PT): np.add((1-update_factor) * w_target, update_factor * w, out=w_target)
-                    for w, w_target in zip(self.__Q, self.__QT): np.add((1-update_factor) * w_target, update_factor * w, out=w_target)
+                    if i % P_freq == 0:
+                        # Train policy estimator
+                        ep_loss[episode, 1] = np.mean(self.__Ptrain(tr_obs, 1, 1))
+    #                   print("P:", self.__P)
+
+                        # Update target model's weights
+                        for w, w_target in zip(self.__P, self.__PT): np.add((1-update_factor) * w_target, update_factor * w, out=w_target)
+                    
 
             # Increase the episode number
             episode += 1
@@ -892,7 +900,8 @@ class SoftActorCritic:
             Re_ax.plot(episodes, data_perc[-1], color=color, alpha=0.3, linewidth=1, linestyle='--')
             Re_ax.plot(episodes, data_perc[0], color=color, alpha=0.3, linewidth=1, linestyle='--')
             digits = int(np.floor(np.log10(np.max(np.abs([data_perc[0], data_perc[-1]])))) - 1)
-            Re_ax.set_yticks(np.logspace(round(np.min(data_perc[0])-0.5*pow(10,digits),-digits), round(np.max(data_perc[-1])+0.5*pow(10,digits),-digits), num=6, endpoint=True))
+            #Re_ax.set_yticks(np.logspace(round(np.min(data_perc[0])-0.5*pow(10,digits),-digits), round(np.max(data_perc[-1])+0.5*pow(10,digits),-digits), num=6, endpoint=True))
+            Re_ax.set_yticks(np.linspace(round(np.min(data_perc[0])-0.5*pow(10,digits),-digits), round(np.max(data_perc[-1])+0.5*pow(10,digits),-digits), num=6, endpoint=True))
 
         # Update plot
         plt.draw()

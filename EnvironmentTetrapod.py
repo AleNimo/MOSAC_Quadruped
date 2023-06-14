@@ -59,14 +59,33 @@ class Environment:
         return reward
 
     def __compute_reward_and_end(self, obs, next_obs):
+        #Compute initial and final distance to the target for every individual state
+
         dist_ini = np.sqrt(np.sum(np.square(obs[:,0:self.__pos_size]), axis=1, keepdims=True))
         dist_fin = np.sqrt(np.sum(np.square(next_obs[:,0:self.__pos_size]), axis=1, keepdims=True))
+        
         reward, end = np.zeros((dist_ini.shape[0], 1)), np.zeros((dist_ini.shape[0], 1))
+        
         for i in range(dist_fin.shape[0]):
             if dist_fin[i] <= self.__end_cond:
                 reward[i], end[i] = 100*(dist_ini[i]), True
             else:
                 reward[i], end[i] = 100*(dist_ini[i]-dist_fin[i]), False if dist_fin[i] <= 1.5 else True
+            
+            #Compute angular movement for the 3 angles in the back and every joint (3+12)
+            for j in range(3, 6):
+                back_angle = np.abs(next_obs[i, j])    #angle of the back with respect to 0°
+
+                if back_angle > 1/9:  #if it exceeds 20°
+                    reward[i] += -0.1 * back_angle * 1/3
+
+            for joint in range(6, 18):
+                delta_joint_angle = np.abs(obs[i, joint] - next_obs[i, joint])    #angle of every joint with respect to the previous one
+
+                if delta_joint_angle > 1/4: #if it exceeds 45°
+                    reward[i] += -0.5 * delta_joint_angle * 1/12
+            
+                
         return reward, end
 
     def max_ret(self, obs):
