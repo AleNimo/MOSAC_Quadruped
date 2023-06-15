@@ -564,9 +564,6 @@ class SoftActorCritic:
                         # Train the state-action value function estimator
                         ep_loss[episode, 0] = np.mean(self.__Qtrain([tr_obs, tr_act], tr_reward, 1, 1))
     #                   print("Q:", self.__Q)
-                        
-                        # Update target model's weights
-                        for w, w_target in zip(self.__Q, self.__QT): np.add((1-update_factor) * w_target, update_factor * w, out=w_target)
 
                     if i % P_freq == 0:
                         # Train policy estimator
@@ -575,7 +572,25 @@ class SoftActorCritic:
 
                         # Update target model's weights
                         for w, w_target in zip(self.__P, self.__PT): np.add((1-update_factor) * w_target, update_factor * w, out=w_target)
-                    
+                        for w, w_target in zip(self.__Q, self.__QT): np.add((1-update_factor) * w_target, update_factor * w, out=w_target)
+#version vieja comentada por las dudas
+#             for i in range(int(np.ceil(ep_len/Q_freq))):
+#                 # Sample the replay buffer
+#                 tr_obs, tr_act, tr_next_obs, tr_reward, tr_end = self.__sample_replay_buffer(replay_batch_size)
+#                 tr_reward += (1 - tr_end) * discount_factor * self.__VTcompute(tr_next_obs)
+
+#                 # Train the state-action value function estimator
+#                 ep_loss[episode, 0] = np.mean(self.__Qtrain([tr_obs, tr_act], tr_reward, 1, 1))
+# #                print("Q:", self.__Q)
+
+#                 if i % P_freq == 0:
+#                     # Train policy estimator
+#                     ep_loss[episode, 1] = np.mean(self.__Ptrain(tr_obs, 1, 1))
+# #                    print("P:", self.__P)
+
+#                     # Update target model's weights
+#                     for w, w_target in zip(self.__P, self.__PT): np.add((1-update_factor) * w_target, update_factor * w, out=w_target)
+#                     for w, w_target in zip(self.__Q, self.__QT): np.add((1-update_factor) * w_target, update_factor * w, out=w_target)
 
             # Increase the episode number
             episode += 1
