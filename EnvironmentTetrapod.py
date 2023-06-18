@@ -19,6 +19,12 @@ class Environment:
         self.__end_cond = 0.1                                   # End condition
         self.__obs = np.zeros((1,)+self.obs_sp_shape)           # Observed state
         self.__coppelia = CoppeliaSocket(obs_sp_shape[0])       # Socket to the simulated environment
+        
+        self.__step = 0                                         # Number of steps taken in the episode
+        self.__total_reward_mean = 0                            # Mean of all the rewards before adding penalization for moving violently
+        self.__reward_threshold = 1                             # Threshold at which penalization for moving violently begins (mean step of 0.01)
+        self.__K1 = -1.1                                        # To penalize proportionally to the excess of reward above the threshold if it moves violently
+        self.__K2 = -2.275                                      # To penalize a maximum amount if the excess of reward above the threshold is high enough
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -28,6 +34,7 @@ class Environment:
             pos = 2 * np.random.random_sample(self.__pos_size+1) - 1
 
         # Reset the simulation environment and obtain the new state
+        self.__step = 0
         self.__obs = self.__coppelia.reset(pos)
         return np.copy(self.__obs)
 
@@ -67,26 +74,41 @@ class Environment:
         reward, end = np.zeros((dist_ini.shape[0], 1)), np.zeros((dist_ini.shape[0], 1))
         
         for i in range(dist_fin.shape[0]):
+            
+            #First Compute the reward based only on distance traveled to the target
+            
             if dist_fin[i] <= self.__end_cond:
                 reward[i], end[i] = 100*(dist_ini[i]), True
             else:
                 reward[i], end[i] = 100*(dist_ini[i]-dist_fin[i]), False if dist_fin[i] <= 1.5 else True
             
-            # #Get the 2 angles (x and y axes) of the back
-            # for j in range(3, 5):
-            #     back_angle = np.abs(next_obs[i, j])    #angle of the back with respect to 0°
+            #increase number of steps taken
+            self.__step += 1
 
-            #     if back_angle > 1/9:  #if it exceeds 20°
-            #         reward[i] += -0.01 * back_angle * 1/2    #Mean multiplied by -0.1
-
-            # #Get angular movement of the 12 joints
-            # for joint in range(6, 18):
-            #     delta_joint_angle = np.abs(obs[i, joint] - next_obs[i, joint])    #angle of every joint with respect to the previous one
-
-            #     if delta_joint_angle > 1/4: #if it exceeds 45°
-            #         reward[i] += -0.05 * delta_joint_angle * 1/12    #Mean multiplied by -0.5
+            #compute reward mean of all steps taken
+            self.__total_reward_mean = (self.__total_reward_mean * (self.__step - 1) + reward[i]) / self.__step
             
-                
+            #If the mean of the last 4 rewards based only on distance traveled to the target is:
+                # <= the reward threshold, the agent is not penalized for moving violently
+                # > the reward threshold, the agent is penalized for moving violently proportionally to the the excess of reward above the threshold (K1 * (r-thr))
+                # >> the reward threshold, the agent is penalized for moving violently with a maximum constant multiplied (K2).
+            
+            if self.__total_reward_mean >= self.__reward_threshold:
+            
+                #Get the 2 angles (x and y axes) of the back
+                # for j in range(3, 5):
+                #     back_angle = np.abs(next_obs[i, j])    #angle of the back with respect to 0°
+    
+                #     if back_angle > 1/9:  #if it exceeds 20°
+                #         reward[i] += max(self.__K1*(self.__total_reward_mean-self.__reward_threshold), self.__K2) * back_angle * 1/2    #Mean multiplied by negative constant
+    
+                #Get angular movement of the 12 joints
+                for joint in range(6, 18):
+                    delta_joint_angle = np.abs(obs[i, joint] - next_obs[i, joint])    #angle of every joint with respect to the previous one
+    
+                    if delta_joint_angle > 1/9: #if it exceeds 20°
+                        reward[i] += max(self.__K1*(self.__total_reward_mean-self.__reward_threshold), self.__K2) * delta_joint_angle * 1/12    #Mean multiplied by negative constant
+
         return reward, end
 
     def max_ret(self, obs):

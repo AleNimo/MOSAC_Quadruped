@@ -710,8 +710,8 @@ class SoftActorCritic:
             replay_buffer_size = np.load(file)
             if seed is None:
                 seed = np.load(file)
-                with open('./{0:s}/branch_{0:07d}.txt'.format(name,episode), 'w') as file2:
-                    np.save(file2, "Branched on episode {0:d} with seed {1:d}".format(episode, seed))
+                # with open('./{0:s}/branch_{0:07d}.txt'.format(name,episode), 'w') as file2:
+                #     np.save(file2, "Branched on episode {0:d} with seed {1:d}".format(episode, seed))
             learning_process = cls(name, environment, Pshape, Qshape, replay_buffer_size, seed)
 
             # Load the hyper-parameters
