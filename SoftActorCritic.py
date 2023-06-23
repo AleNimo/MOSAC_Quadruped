@@ -21,7 +21,7 @@ class SoftActorCritic:
 
         # Initial random seed
         if seed is None: seed = np.random.randint(9999999, size=1)
-        self.seed = seed
+        self.seed = int(seed)
         np.random.seed(self.seed)
 
         # Environment
