@@ -107,7 +107,7 @@ class SoftActorCritic:
             os.mkdir("./{0:s}".format(name))
             os.chdir("./{0:s}".format(name))
             os.mkdir("./Train")
-            with open('./Train/Progress', 'wb') as file: np.save(file, 0)
+            with open('./Train/Progress.txt', 'w') as file: np.savetxt(file, np.array((0, )), fmt='%d')
         else:
             os.chdir("./{0:s}".format(name))
 
@@ -174,7 +174,6 @@ class SoftActorCritic:
             x = np.add(np.matmul(x, w[0:-1, :]), w[-1:, :])
             x = np.multiply(x, x > 0)
         # Compute the tanh layer (Flattened Gaussian mean)
-# OLD   x = np.tanh(np.add(np.matmul(x, self.__P[-2][0:-1, :]), self.__P[-2][-1:, :]))
         x = np.add(np.matmul(x, self.__P[-2][0:-1, :]), self.__P[-2][-1:, :])
         # Compute the tanh layer (Flattened Gaussian without sampling)
         return np.tanh(x)
@@ -215,7 +214,6 @@ class SoftActorCritic:
         # Compute the tanh layer (Flattened Gaussian mean)
         z = np.add(np.matmul(a, self.__P[-2][0:-1, :]), self.__P[-2][-1:, :])
         u = z
-#OLD        u = np.tanh(z)
         # Compute the exponential layer (Flattened Gaussian standard deviation)
         z = np.add(np.matmul(a, self.__P[-1][0:-1, :]), self.__P[-1][-1:, :])
         s = np.clip(np.exp(z), 1E-9, 10)
@@ -260,7 +258,6 @@ class SoftActorCritic:
         # Compute the tanh layer (Flattened Gaussian mean)
         z = np.add(np.matmul(a, self.__PT[-2][0:-1, :]), self.__PT[-2][-1:, :])
         u = z
-#OLD        u = np.tanh(z)
         # Compute the exponential layer (Flattened Gaussian standard deviation)
         z = np.add(np.matmul(a, self.__PT[-1][0:-1, :]), self.__PT[-1][-1:, :])
         s = np.clip(np.exp(z), 1E-9, 10)
@@ -322,7 +319,6 @@ class SoftActorCritic:
                 x, w = a, self.__P[-2]
                 z = np.add(np.matmul(x, w[0:-1, :]), w[-1:, :])
                 u = z
-#OLD                u = np.tanh(z)
                 k.append([x, u])
                 # Compute the exponential layer (Flattened Gaussian standard deviation)
                 x, w = a, self.__P[-1]
@@ -379,7 +375,6 @@ class SoftActorCritic:
                 x, u = k.pop()
                 w = self.__P[-2]
                 dl_dz = dl_du
-#OLD                dl_dz = np.multiply(dl_du, 1 - np.square(u))
                 dl_dw = np.concatenate([np.divide(np.matmul(x.T, dl_dz), batch_x.shape[0]), np.mean(dl_dz, axis=0, keepdims=True)], axis=0)
                 dl_da += np.matmul(dl_dz, w[0:-1, :].T)
                 if reg_L1: np.add(dl_dw, (reg_L1/batch_x.shape[0]) * np.sign(dl_dw), out=dl_dw)
@@ -514,6 +509,8 @@ class SoftActorCritic:
         if self.__episode == 0:
             self.__alpha = np.array(self.initial_alpha).reshape((1,))
             self.__ep_ret, self.__ep_loss = ep_ret, ep_loss
+            with open('./Train/Branch.txt', 'a') as file:
+                np.savetxt(file, ("Started training with seed {0:d}.".format(self.seed),), fmt='%s')
             self.__save(0)
         else:
             ep_ret[0:episode], ep_loss[0:episode] = self.__ep_ret, self.__ep_loss
@@ -667,12 +664,12 @@ class SoftActorCritic:
 
             # Generate, set and store a random seed
 #            print("rand save: ", np.random.normal(0.0, 1.0, 1))
-            seed = np.random.randint(9999999, size=1)
+            seed = int(np.random.randint(9999999, size=1))
             np.save(file, seed)
             np.random.seed(seed)
 
         # Update the progress file
-        with open('./Train/Progress', 'wb') as file: np.save(file, episode)
+        with open('./Train/Progress.txt', 'w') as file: np.savetxt(file, np.array((episode,)), fmt='%d')
 
     @classmethod
     def load(cls, name, environment, filename="", seed=None):
@@ -684,34 +681,44 @@ class SoftActorCritic:
         :param seed: The initial seed value. If None, then the last saved seed is used
         :return: The Soft Actor-Critic learning context object
         '''
-        # Access the requested directory
-        if not os.path.isdir('./{0:s}'.format(name)):
-            print('Project {0:s} could not be found'.format(name))
-            return None
-
         # If no filename was specified load the last training configuration
         if (filename is None) or (filename == ""):
-            if not os.path.isfile('./{0:s}/Train/Progress'.format(name)):
+            # Access the requested directory
+            if not os.path.isdir('./{0:s}'.format(name)):
+                print('Project {0:s} could not be found'.format(name))
+                return None
+            # Determine the appropriate load file from the progress file
+            if not os.path.isfile('./{0:s}/Train/Progress.txt'.format(name)):
                 print('Progress file could not be found'.format(filename))
                 return None
-            with open('./{0:s}/Train/Progress'.format(name), 'rb') as file: episode = np.load(file)
-            filename = 'Train/episode_{0:07d}.rlcd'.format(episode)
+            with open('./{0:s}/Train/Progress.txt'.format(name), 'r') as file: episode = int(np.loadtxt(file))
+            filename = '{0:s}/Train/episode_{1:07d}.rlcd'.format(name, episode)
 
-        # Verify the existance of the requested file
-        if not os.path.isfile('./{0:s}/{1:s}'.format(name,filename)):
-            print('File {0:s} could not be found'.format(filename))
-            return None
+        # Verify the existence of the requested file
+        if not os.path.isfile('./{0:s}'.format(filename)):
+            file = filename
+            filename = '{0:s}/Train/{1:s}'.format(name, filename)
+            if not os.path.isfile('./{0:s}'.format(filename)):
+                print('File {0:s} could not be found'.format(file))
+                return None
 
         # Load the reinforcement learning algorithm's context data
-        with open('./{0:s}/{1:s}'.format(name,filename), 'rb') as file:
+        with open('./{0:s}'.format(filename), 'rb') as file:
             # Run the default constructor
             Pshape = np.load(file)
             Qshape = np.load(file)
             replay_buffer_size = np.load(file)
             if seed is None:
                 seed = np.load(file)
-                #with open('./{0:s}/branch_{0:07d}.txt'.format(name,episode), 'w') as file2:
-                    #np.save(file2, "Branched on episode {0:d} with seed {1:d}".format(episode, seed))
+            else:
+                _ = np.load(file)   # Discard the stored seed
+                if os.path.isfile('./{0:s}/Train/Progress.txt'.format(name)):
+                    episode = int(np.loadtxt('./{0:s}/Train/Progress.txt'.format(name)))
+                    with open('./{0:s}/Train/Branch.txt'.format(name), 'a') as file2:
+                        np.savetxt(file2, ("Trained up to episode {0:d}.".format(episode),), fmt='%s')
+                with open('./{0:s}/Train/Branch.txt'.format(name), 'a') as file2:
+                    episode = int(filename[-12:-5])
+                    np.savetxt(file2, ("Branched on episode {0:d} with seed {1:d}.".format(episode, seed),), fmt='%s')
             learning_process = cls(name, environment, Pshape, Qshape, replay_buffer_size, seed)
 
             # Load the hyper-parameters
@@ -780,6 +787,11 @@ class SoftActorCritic:
         # Initialize algorithm variables
         env = self.environment
         ep_obs = np.zeros((ep_steps+1,) + env.obs_sp_shape)   # Episode's observed states
+
+        # Initialize plot related variables
+        self.__axis_1D = np.linspace(-1, 1, num=self.plot_resolution)
+        self.__mx, self.__my = np.meshgrid(self.__axis_1D, self.__axis_1D)
+        self.__axis_2D = np.concatenate((np.array(self.__mx).reshape(-1,1), np.array(self.__my).reshape(-1,1)), axis=1)
 
         # Set the initial position click callback
         self.__fig.canvas.mpl_connect("button_press_event", self._trajectory_click_CB)
