@@ -23,8 +23,8 @@ class Environment:
         self.__step = 0                                         # Number of steps taken in the episode
         self.__total_reward_mean = 0                            # Mean of all the rewards before adding penalization for moving violently
         self.__reward_threshold = 1                             # Threshold at which penalization for moving violently begins (mean step of 0.01)
-        self.__K1 = -1.1                                        # To penalize proportionally to the excess of reward above the threshold if it moves violently
-        self.__K2 = -2.275                                      # To penalize a maximum amount if the excess of reward above the threshold is high enough
+        self.__K1 = -3.4                                        # To penalize proportionally to the excess of reward above the threshold if it moves violently
+        self.__K2 = -6.8                                        # To penalize a maximum amount if the excess of reward above the threshold is high enough
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -93,6 +93,9 @@ class Environment:
                 # > the reward threshold, the agent is penalized for moving violently proportionally to the the excess of reward above the threshold (K1 * (r-thr))
                 # >> the reward threshold, the agent is penalized for moving violently with a maximum constant multiplied (K2).
             
+            if end[i]:
+                print(self.__total_reward_mean)
+            
             if self.__total_reward_mean >= self.__reward_threshold:
             
                 #Get the 2 angles (x and y axes) of the back
@@ -106,7 +109,7 @@ class Environment:
                 for joint in range(6, 18):
                     delta_joint_angle = np.abs(obs[i, joint] - next_obs[i, joint])    #angle of every joint with respect to the previous one
     
-                    if delta_joint_angle > 1/9: #if it exceeds 20°
+                    if delta_joint_angle > 1/18: #if it exceeds 10°
                         reward[i] += max(self.__K1*(self.__total_reward_mean-self.__reward_threshold), self.__K2) * delta_joint_angle * 1/12    #Mean multiplied by negative constant
 
         return reward, end
