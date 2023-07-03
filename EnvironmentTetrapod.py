@@ -20,6 +20,8 @@ class Environment:
         self.__obs = np.zeros((1,)+self.obs_sp_shape)           # Observed state
         self.__coppelia = CoppeliaSocket(obs_sp_shape[0])       # Socket to the simulated environment
         
+        self.__maxBackAngle = 1/6
+        self.__maxRelativeIncrease = 0.5
         # self.__step = 0                                         # Number of steps taken in the episode
         # self.__total_reward_mean = 0                            # Mean of all the rewards before adding penalization for moving violently
         # self.__reward_threshold = 1                             # Threshold at which penalization for moving violently begins (mean step of 0.01)
@@ -99,9 +101,9 @@ class Environment:
                 for j in range(3, 5):
                     back_angle = np.abs(next_obs[i, j])    #angle of the back with respect to 0° (horizontal position)
                     
-                    #if the angle is 0° the reward increases 50%, if it is 30° or more it is not increased (The mean of the X,Y angles is computed)
-                    if back_angle < 1/6:
-                        reward[i] += (1/6-back_angle)*3 * reward[i] * 1/2
+                    #if the angle is 0° the reward increases a maximumRelativeValue, if it is __maxBackAngle° or more it is not increased (The mean of the X,Y angles is computed)
+                    if back_angle < self.__maxBackAngle:
+                        reward[i] += (self.__maxBackAngle-back_angle)* self.__maxRelativeIncrease/self.__maxBackAngle * reward[i] * 1/2
     
                 #Get angular movement of the 12 joints
                 # for joint in range(6, 18):
@@ -129,8 +131,8 @@ if __name__ == '__main__':
 
     # Create the model
 #    model = SoftActorCritic("Tetrapod", env, (13, 5), (11, 7, 3), replay_buffer_size=1000000)
-    model = SoftActorCritic("Tetrapod", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
-#    model = SoftActorCritic.load("Tetrapod", env)
+#    model = SoftActorCritic("Tetrapod", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
+    model = SoftActorCritic.load("Tetrapod", env)
 
     # Set training hyper-parameters
     model.discount_factor = 0.95
