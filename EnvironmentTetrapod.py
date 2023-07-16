@@ -22,6 +22,8 @@ class Environment:
         
         self.__maxBackAngle = 1/6
         self.__maxRelativeIncrease = 0.5
+
+        self.__maxJointAngle = 4/9
         # self.__step = 0                                         # Number of steps taken in the episode
         # self.__total_reward_mean = 0                            # Mean of all the rewards before adding penalization for moving violently
         # self.__reward_threshold = 1                             # Threshold at which penalization for moving violently begins (mean step of 0.01)
@@ -77,40 +79,31 @@ class Environment:
         
         for i in range(dist_fin.shape[0]):
             
-            #First Compute the reward based only on distance traveled to the target
+            #First Compute the reward based only on distance traveled to the target ("Base reward")
             
             if dist_fin[i] <= self.__end_cond:
                 reward[i], end[i] = 100*(dist_ini[i]), True
             else:
                 reward[i], end[i] = 100*(dist_ini[i]-dist_fin[i]), False if dist_fin[i] <= 1.5 else True
             
-            # #increase number of steps taken
-            # self.__step += 1
-
-            # #compute reward mean of all steps taken
-            # self.__total_reward_mean = (self.__total_reward_mean * (self.__step - 1) + reward[i]) / self.__step
-            
-            # #If the mean of the last 4 rewards based only on distance traveled to the target is:
-            #     # <= the reward threshold, the agent is not penalized for moving violently
-            #     # > the reward threshold, the agent is penalized for moving violently proportionally to the the excess of reward above the threshold (K1 * (r-thr))
-            #     # >> the reward threshold, the agent is penalized for moving violently with a maximum constant multiplied (K2).
-            
-            # if self.__total_reward_mean >= self.__reward_threshold:
             if reward[i] > 0:
-                #Get the 2 angles (x and y axes) of the back
+                #For the 2 angles (x and y axes) of the back
                 for j in range(3, 5):
                     back_angle = np.abs(next_obs[i, j])    #angle of the back with respect to 0° (horizontal position)
                     
-                    #if the angle is 0° the reward increases a maximumRelativeValue, if it is __maxBackAngle° or more it is not increased (The mean of the X,Y angles is computed)
+                    #if the angle is 0° the reward increases a maximumRelativeValue of the base reward
+                    #if it is __maxBackAngle° or more it is not increased (The mean of the X,Y angles is computed)
                     if back_angle < self.__maxBackAngle:
                         reward[i] += (self.__maxBackAngle-back_angle)* self.__maxRelativeIncrease/self.__maxBackAngle * reward[i] * 1/2
     
-                #Get angular movement of the 12 joints
-                # for joint in range(6, 18):
-                #     delta_joint_angle = np.abs(obs[i, joint] - next_obs[i, joint])    #angle of every joint with respect to the previous one
-    
-                #     if delta_joint_angle > 1/9: #if it exceeds 10°
-                #         reward[i] += max(self.__K1*(self.__total_reward_mean-self.__reward_threshold), self.__K2) * delta_joint_angle * 1/12    #Mean multiplied by negative constant
+                #For the angular movement of the 12 joints
+                for joint in range(6, 18):
+                    joint_angle = np.abs(obs[i, joint] - next_obs[i, joint])    #angle of every joint with respect to the previous one
+
+                    #if the joint movement is lower than 20°, the reward increases up to maximumRelativeValue of the base reward
+                    #else it is not increased (The mean of the 12 joints movements is computed)
+                    if joint_angle < self.__maxJointAngle:
+                        reward[i] += (self.__maxJointAngle-joint_angle)* self.__maxRelativeIncrease/self.__maxJointAngle * reward[i] * 1/12
             
             #If the robot flips downwards the episode ends (absolute value of X or Y angle greater than 90°)
             if abs(next_obs[i, 3]) >= 0.5 or abs(next_obs[i, 4]) >= 0.5:
@@ -131,8 +124,8 @@ if __name__ == '__main__':
 
     # Create the model
 #    model = SoftActorCritic("Tetrapod", env, (13, 5), (11, 7, 3), replay_buffer_size=1000000)
-#    model = SoftActorCritic("Tetrapod", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
-    model = SoftActorCritic.load("Tetrapod", env)
+    model = SoftActorCritic("Tetrapod", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
+#    model = SoftActorCritic.load("Tetrapod", env)
 
     # Set training hyper-parameters
     model.discount_factor = 0.95
