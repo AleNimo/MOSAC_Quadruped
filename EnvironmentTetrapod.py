@@ -23,7 +23,7 @@ class Environment:
         self.__maxBackAngle = 1/6   #30°
         self.__maxJointAngle = 1    #45°
         
-        self.__maxRelativeIncreaseBack = 0.5
+        self.__maxRelativeIncreaseBack = 1
         self.__maxRelativeIncreaseJoint = 0.5
 
     def reset(self):
@@ -95,7 +95,7 @@ class Environment:
             
             biggest_joint = 0
             #Find the biggest joint movement of the agent
-            for joint in range(6, 18):
+            for joint in range(7, 19):
                 joint_angle = np.abs(obs[i, joint] - next_obs[i, joint])    #angle of every joint with respect to the previous one
          
                 if joint_angle > biggest_joint:
@@ -121,7 +121,7 @@ if __name__ == '__main__':
     from SoftActorCritic import SoftActorCritic
 
     # Get the environment
-    env = Environment(obs_sp_shape=(18,), act_sp_shape=(12,), dest_pos=(0,0))
+    env = Environment(obs_sp_shape=(19,), act_sp_shape=(12,), dest_pos=(0,0))
 
     # Create the model
 #    model = SoftActorCritic("Tetrapod", env, (13, 5), (11, 7, 3), replay_buffer_size=1000000)
