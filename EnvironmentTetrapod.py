@@ -90,7 +90,9 @@ class Environment:
                 
                 #if the angle is 0° the reward increases a maximumRelativeValue of the base reward
                 #if it is __maxBackAngle° or more it is not increased (The mean of the X,Y angles is computed)
-                if back_angle < self.__maxBackAngle:
+                if base_reward[i] < 0 and back_angle > self.__maxBackAngle:
+                    reward[i] -= (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * base_reward[i] * 1/2
+                else:
                     reward[i] += (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * base_reward[i] * 1/2
             
             # biggest_joint = 0
@@ -125,8 +127,8 @@ if __name__ == '__main__':
 
     # Create the model
 #    model = SoftActorCritic("Tetrapod", env, (13, 5), (11, 7, 3), replay_buffer_size=1000000)
-    model = SoftActorCritic("Tetrapod", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
-#    model = SoftActorCritic.load("Tetrapod", env)
+#    model = SoftActorCritic("Tetrapod", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
+    model = SoftActorCritic.load("Tetrapod", env)
 
     # Set training hyper-parameters
     model.discount_factor = 0.95
