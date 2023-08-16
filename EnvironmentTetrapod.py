@@ -93,18 +93,18 @@ class Environment:
                 if back_angle < self.__maxBackAngle:
                     reward[i] += (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * base_reward[i] * 1/2
             
-            biggest_joint = 0
-            #Find the biggest joint movement of the agent
-            for joint in range(7, 19):
-                joint_angle = np.abs(obs[i, joint] - next_obs[i, joint])    #angle of every joint with respect to the previous one
+            # biggest_joint = 0
+            # #Find the biggest joint movement of the agent
+            # for joint in range(7, 19):
+            #     joint_angle = np.abs(obs[i, joint] - next_obs[i, joint])    #angle of every joint with respect to the previous one
          
-                if joint_angle > biggest_joint:
-                    biggest_joint = joint_angle
+            #     if joint_angle > biggest_joint:
+            #         biggest_joint = joint_angle
             
-            #if the joint movement is lower than maxJointAngle, the reward increases up to maximumRelativeValue of the base reward
-            #else it is not increased
-            if biggest_joint < self.__maxJointAngle:
-                reward[i] += (self.__maxJointAngle-biggest_joint)* self.__maxRelativeIncreaseJoint/self.__maxJointAngle * base_reward[i]
+            # #if the joint movement is lower than maxJointAngle, the reward increases up to maximumRelativeValue of the base reward
+            # #else it is not increased
+            # if biggest_joint < self.__maxJointAngle:
+            #     reward[i] += (self.__maxJointAngle-biggest_joint)* self.__maxRelativeIncreaseJoint/self.__maxJointAngle * base_reward[i]
             
             #If the robot flips downwards the episode ends (absolute value of X or Y angle greater than 90°)
             if abs(next_obs[i, 3]) >= 0.5 or abs(next_obs[i, 4]) >= 0.5:
@@ -129,7 +129,7 @@ if __name__ == '__main__':
 #    model = SoftActorCritic.load("Tetrapod", env)
 
     # Set training hyper-parameters
-    model.discount_factor = 0.8
+    model.discount_factor = 0.95
     model.update_factor = 0.005
     model.replay_batch_size = 1000 #2
     model.entropy = env.act_sp_shape[0]
@@ -140,6 +140,6 @@ if __name__ == '__main__':
     model.plot_resolution = 10
 
     # Start training
-    model.train(episodes=70000, ep_steps=100, save_period=1000, plot_period=50)
+    model.train(episodes=100000, ep_steps=100, save_period=1000, plot_period=50)
 
     model.test(ep_steps=100)
