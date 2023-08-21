@@ -264,7 +264,20 @@ class SoftActorCritic:
         # Sample the Flattened Gaussian distribution
         z = np.random.normal(size=s.shape).astype(data_type)
         a = u + np.multiply(s, z)
-        h = np.sum(0.5*np.square(z) + np.log(np.sqrt(2*np.pi)*s) - 2*(a+np.log(0.5+0.5*np.exp(-2*a))), axis=-1, keepdims=True)
+        
+        #Posible solution to exponential's overflow in h calculation
+        if np.min(a) <= -350:   #If any of the elements is lower than -350, we go through each element (slower)
+            h = np.zeros((a.shape[0],1))
+            
+            for row in range(0,a.shape[0]):
+                for column in range(0,a.shape[1]):
+                    if a[row,column] <= -350: #If a is lower than -350, we aproximate the log(0.5 + 0.5*exp(-2*a)) to -2*a - log(2)
+                        print("aproximacion usada")
+                        h[row] += 0.5*np.square(z[row,column]) + np.log(np.sqrt(2*np.pi)*s[row,column]) + 2*(a[row,column]+np.log(2))
+                    else:
+                        h[row] += 0.5*np.square(z[row,column]) + np.log(np.sqrt(2*np.pi)*s[row,column]) - 2*(a[row,column]+np.log(0.5+0.5*np.exp(-2*a[row,column])))
+        else:
+            h = np.sum(0.5*np.square(z) + np.log(np.sqrt(2*np.pi)*s) - 2*(a+np.log(0.5+0.5*np.exp(-2*a))), axis=-1, keepdims=True)
         a = np.tanh(a)
 
         ## State-action value function
