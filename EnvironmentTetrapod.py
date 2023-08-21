@@ -20,8 +20,19 @@ class Environment:
         self.__obs = np.zeros((1,)+self.obs_sp_shape)           # Observed state
         self.__coppelia = CoppeliaSocket(obs_sp_shape[0])       # Socket to the simulated environment
         
-        self.__maxBackAngle = 1/6   #30°
-        self.__maxJointAngle = 1    #45°
+        self.__maxBackAngle = 15    #deg
+        #For Tetrapod:
+        #self.__joint_midpoint = 0
+        #self.__joint_range = 45 #+/-
+        #self.__maxJointAngle = 45
+        
+        #For cuadruped (angles in deg):
+
+        #                                 Body, leg, Paw
+        self.__joint_midpoint = np.array([22.5, 45, -30])
+        self.__joint_range =    np.array([37.5, 85, 60])    #(+/-)
+        
+        self.__maxJointAngle = 15
         
         self.__maxRelativeIncreaseBack = 1
         self.__maxRelativeIncreaseJoint = 0.5
@@ -86,27 +97,31 @@ class Environment:
             
             #For the 2 angles (x and y axes) of the back
             for j in range(3, 5):
-                back_angle = np.abs(next_obs[i, j])    #angle of the back with respect to 0° (horizontal position)
+                back_angle = np.abs(next_obs[i, j])*180    #angle (in deg) of the back with respect to 0° (horizontal position)
                 
                 #if the angle is 0° the reward increases a maximumRelativeValue of the base reward
-                #if it is __maxBackAngle° or more it is not increased (The mean of the X,Y angles is computed)
+                #if it is __maxBackAngle° or more, base reward is decreased (The mean of the X,Y angles is computed)
                 if base_reward[i] < 0 and back_angle > self.__maxBackAngle:
                     reward[i] -= (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * base_reward[i] * 1/2
                 else:
                     reward[i] += (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * base_reward[i] * 1/2
             
-            # biggest_joint = 0
-            # #Find the biggest joint movement of the agent
-            # for joint in range(7, 19):
-            #     joint_angle = np.abs(obs[i, joint] - next_obs[i, joint])    #angle of every joint with respect to the previous one
+            biggest_joint = 0
+            #Find the biggest joint movement of the agent
+            for joint in range(7, 19):
+                #Convert coppelia output angle from -1 to 1, to value in deg
+                joint_angle = np.abs(next_obs[i, joint]*self.__joint_range[(joint-7)%3] + self.__joint_midpoint[(joint-7)%3]) #abs angle of every joint in deg
          
-            #     if joint_angle > biggest_joint:
-            #         biggest_joint = joint_angle
+                if joint_angle > biggest_joint:
+                    biggest_joint = joint_angle
             
-            # #if the joint movement is lower than maxJointAngle, the reward increases up to maximumRelativeValue of the base reward
-            # #else it is not increased
-            # if biggest_joint < self.__maxJointAngle:
-            #     reward[i] += (self.__maxJointAngle-biggest_joint)* self.__maxRelativeIncreaseJoint/self.__maxJointAngle * base_reward[i]
+            #if the joint movement is lower than maxJointAngle, the reward increases up to maximumRelativeValue of the base reward
+            #else it is decreased
+            if base_reward[i] < 0 and biggest_joint > self.__maxJointAngle:
+                reward[i] -= (self.__maxJointAngle-biggest_joint)* self.__maxRelativeIncreaseJoint/self.__maxJointAngle * base_reward[i]
+            else:
+                reward[i] += (self.__maxJointAngle-biggest_joint)* self.__maxRelativeIncreaseJoint/self.__maxJointAngle * base_reward[i]
+            
             
             #If the robot flips downwards the episode ends (absolute value of X or Y angle greater than 90°)
             if abs(next_obs[i, 3]) >= 0.5 or abs(next_obs[i, 4]) >= 0.5:
@@ -127,8 +142,8 @@ if __name__ == '__main__':
 
     # Create the model
 #    model = SoftActorCritic("Tetrapod", env, (13, 5), (11, 7, 3), replay_buffer_size=1000000)
-#    model = SoftActorCritic("Tetrapod", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
-    model = SoftActorCritic.load("Tetrapod", env)
+    model = SoftActorCritic("Tetrapod", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
+#    model = SoftActorCritic.load("Tetrapod", env)
 
     # Set training hyper-parameters
     model.discount_factor = 0.95
