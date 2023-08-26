@@ -7,9 +7,9 @@ from CoppeliaSocket import CoppeliaSocket
 # paw_llim, paw_ulim = -90,  30
 
 #Cuadruped preferred joint limits for training:
-bod_min, bod_max = -15,  15
-leg_min, leg_max = -15, 100
-paw_min, paw_max = -45,  10
+bod_min, bod_max = -15,  30
+leg_min, leg_max = -15, 35
+paw_min, paw_max = -45,  0
 
 class Environment:
     def __init__(self, obs_sp_shape, act_sp_shape, dest_pos):
@@ -104,7 +104,7 @@ class Environment:
             if dist_fin[i] <= self.__end_cond:
                 base_reward[i], end[i] = 100*(dist_ini[i]), True
             else:
-                base_reward[i], end[i] = 100*(dist_ini[i]-dist_fin[i]), False if dist_fin[i] <= 1.5 else True
+                base_reward[i], end[i] = 100*(dist_ini[i]-dist_fin[i]), False if dist_fin[i] <= 3 else True
             
             reward[i] = base_reward[i]
             
@@ -174,6 +174,6 @@ if __name__ == '__main__':
     model.plot_resolution = 10
 
     # Start training
-    model.train(episodes=100000, ep_steps=100, save_period=1000, plot_period=50)
+    model.train(episodes=100000, ep_steps=200, save_period=1000, plot_period=50)
 
     model.test(ep_steps=100)
