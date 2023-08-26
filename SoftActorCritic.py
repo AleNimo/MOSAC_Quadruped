@@ -853,12 +853,12 @@ class SoftActorCritic:
 
         # Plot trajectory
         T_ax.set_title('Last Trajectory')
-        T_ax.set_xlim(-1.5, 1.5)
-        T_ax.set_ylim(-1.5, 1.5)
-        T_ax.set_xticks(np.linspace(-1.5, 1.5, num=7, endpoint=True))
-        T_ax.set_yticks(np.linspace(-1.5, 1.5, num=7, endpoint=True))
+        T_ax.set_xlim(-3, 3)
+        T_ax.set_ylim(-3, 3)
+        T_ax.set_xticks(np.linspace(-3, 3, num=7, endpoint=True))
+        T_ax.set_yticks(np.linspace(-3, 3, num=7, endpoint=True))
         T_ax.add_patch(plt.Circle((0, 0), 0.1, color='orange', fill=False))
-        T_ax.add_patch(plt.Circle((0, 0), 1.5, color='orange', fill=False))
+        T_ax.add_patch(plt.Circle((0, 0), 3, color='orange', fill=False))
         if (len(env.dest_pos) <= 1) or (len(trajectory) <= 1): return;
         T_ax.scatter(env.dest_pos[0], env.dest_pos[1], color='blue', alpha=0.8, linewidth=2, linestyle='solid')
         T_ax.scatter(trajectory[0, 0], trajectory[0, 1], color='black', alpha=0.8, linewidth=2, linestyle='solid')
