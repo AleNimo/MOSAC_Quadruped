@@ -1,6 +1,16 @@
 import numpy as np
 from CoppeliaSocket import CoppeliaSocket
 
+#Cuadruped absolute joint limits:
+# bod_llim, bod_ulim = -15,  60
+# leg_llim, leg_ulim = -40, 130
+# paw_llim, paw_ulim = -90,  30
+
+#Cuadruped preferred joint limits for training:
+bod_min, bod_max = -15,  15
+leg_min, leg_max = -15, 100
+paw_min, paw_max = -45,  10
+
 class Environment:
     def __init__(self, obs_sp_shape, act_sp_shape, dest_pos):
         '''
@@ -20,33 +30,36 @@ class Environment:
         self.__obs = np.zeros((1,)+self.obs_sp_shape)           # Observed state
         self.__coppelia = CoppeliaSocket(obs_sp_shape[0])       # Socket to the simulated environment
         
-        self.__maxBackAngle = 15    #deg
+        self.__maxBackAngle = 30    #deg
         #For Tetrapod:
         #self.__joint_midpoint = 0
         #self.__joint_range = 45 #+/-
-        #self.__maxJointAngle = 45
         
         #For cuadruped (angles in deg):
-
-        #                                 Body, leg, Paw
-        self.__joint_midpoint = np.array([22.5, 45, -30])
-        self.__joint_range =    np.array([37.5, 85, 60])    #(+/-)
+        self.__joint_midpoint = np.array([(bod_max + bod_min)/2, (leg_max + leg_min)/2, (paw_max + paw_min)/2])
+        self.__joint_range =    np.array([(bod_max - bod_min)/2, (leg_max - leg_min)/2, (paw_max - paw_min)/2]) #(+/-)
         
-        self.__maxJointAngle = 15
+        self.__maxJointAngle = 40
         
         self.__maxRelativeIncreaseBack = 1
         self.__maxRelativeIncreaseJoint = 0.5
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
-        # Generate a new random starting position
-        pos = 2 * np.random.rand(self.__pos_size+1) - 1
-        while np.sqrt(np.sum(np.square(pos[0:2]))) < self.__end_cond:
-            pos = 2 * np.random.random_sample(self.__pos_size+1) - 1
+        # Generate a new random starting position (x and y) and orientation (in z axis)
+        pos = 4 * np.random.rand(self.__pos_size) - 2   #vector of 2 rand between -2 and 2
+        z_ang = 2*np.random.rand(1) - 1 #vector of 1 rand between -1 and 1, later multiplied by pi
+        
+        #Make sure the start position is outside the center of the map (end condition)
+        while np.sqrt(np.sum(np.square(pos))) < self.__end_cond:
+            pos = 4 * np.random.random_sample(self.__pos_size) - 2
 
+        # Join position and angle in one vector
+        pos_angle = np.concatenate((pos,z_ang))
+        
         # Reset the simulation environment and obtain the new state
         self.__step = 0
-        self.__obs = self.__coppelia.reset(pos)
+        self.__obs = self.__coppelia.reset(pos_angle)
         return np.copy(self.__obs)
 
     def set_pos(self, pos):
@@ -96,32 +109,36 @@ class Environment:
             reward[i] = base_reward[i]
             
             #For the 2 angles (x and y axes) of the back
+#            print("reward before back analysis: ", reward[i])
             for j in range(3, 5):
                 back_angle = np.abs(next_obs[i, j])*180    #angle (in deg) of the back with respect to 0° (horizontal position)
-                
+#                print(f"back_angle {j-2}: {back_angle}")
                 #if the angle is 0° the reward increases a maximumRelativeValue of the base reward
                 #if it is __maxBackAngle° or more, base reward is decreased (The mean of the X,Y angles is computed)
                 if base_reward[i] < 0 and back_angle > self.__maxBackAngle:
                     reward[i] -= (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * base_reward[i] * 1/2
                 else:
                     reward[i] += (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * base_reward[i] * 1/2
-            
+#            print("reward after back analysis: ", reward[i])
             biggest_joint = 0
             #Find the biggest joint movement of the agent
+#            print("Separación")
             for joint in range(7, 19):
                 #Convert coppelia output angle from -1 to 1, to value in deg
                 joint_angle = np.abs(next_obs[i, joint]*self.__joint_range[(joint-7)%3] + self.__joint_midpoint[(joint-7)%3]) #abs angle of every joint in deg
-         
+#                print(f"Joint {joint-6}: {joint_angle}")
                 if joint_angle > biggest_joint:
                     biggest_joint = joint_angle
             
             #if the joint movement is lower than maxJointAngle, the reward increases up to maximumRelativeValue of the base reward
             #else it is decreased
+            
+#            print("reward before biggest joint analysis: ", reward[i])
             if base_reward[i] < 0 and biggest_joint > self.__maxJointAngle:
                 reward[i] -= (self.__maxJointAngle-biggest_joint)* self.__maxRelativeIncreaseJoint/self.__maxJointAngle * base_reward[i]
             else:
                 reward[i] += (self.__maxJointAngle-biggest_joint)* self.__maxRelativeIncreaseJoint/self.__maxJointAngle * base_reward[i]
-            
+#            print("reward after biggest joint analysis: ", reward[i])
             
             #If the robot flips downwards the episode ends (absolute value of X or Y angle greater than 90°)
             if abs(next_obs[i, 3]) >= 0.5 or abs(next_obs[i, 4]) >= 0.5:
@@ -142,8 +159,8 @@ if __name__ == '__main__':
 
     # Create the model
 #    model = SoftActorCritic("Tetrapod", env, (13, 5), (11, 7, 3), replay_buffer_size=1000000)
-    model = SoftActorCritic("Tetrapod", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
-#    model = SoftActorCritic.load("Tetrapod", env)
+#    model = SoftActorCritic("Tetrapod", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
+    model = SoftActorCritic.load("Tetrapod", env)
 
     # Set training hyper-parameters
     model.discount_factor = 0.95
