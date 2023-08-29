@@ -685,7 +685,7 @@ class SoftActorCritic:
         with open('./Train/Progress.txt', 'w') as file: np.savetxt(file, np.array((episode,)), fmt='%d')
 
     @classmethod
-    def load(cls, name, environment, filename="", seed=None):
+    def load(cls, name, environment, filename="", emptyReplayBuffer = False, seed=None):
         '''
         Restores a Soft Actor-Critic learning context object from a save file
         :param name: The name of the root folder in which the model is saved
@@ -770,12 +770,14 @@ class SoftActorCritic:
             for i in range(4): learning_process.__H_adam_aux[i] = np.load(file)
             learning_process.__ep_ret = np.load(file)
             learning_process.__ep_loss = np.load(file)
-            learning_process.__rb_entries = np.load(file)
-            learning_process.__rb_obs[0:learning_process.__rb_entries] = np.load(file)
-            learning_process.__rb_act[0:learning_process.__rb_entries] = np.load(file)
-            learning_process.__rb_nobs[0:learning_process.__rb_entries] = np.load(file)
-            learning_process.__rb_rwd[0:learning_process.__rb_entries] = np.load(file)
-            learning_process.__rb_end[0:learning_process.__rb_entries] = np.load(file)
+            
+            if emptyReplayBuffer == False:
+                learning_process.__rb_entries = np.load(file)
+                learning_process.__rb_obs[0:learning_process.__rb_entries] = np.load(file)
+                learning_process.__rb_act[0:learning_process.__rb_entries] = np.load(file)
+                learning_process.__rb_nobs[0:learning_process.__rb_entries] = np.load(file)
+                learning_process.__rb_rwd[0:learning_process.__rb_entries] = np.load(file)
+                learning_process.__rb_end[0:learning_process.__rb_entries] = np.load(file)
 
             # Recover the random seed
             np.random.seed(np.load(file))
