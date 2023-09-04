@@ -7,9 +7,9 @@ from CoppeliaSocket import CoppeliaSocket
 # paw_llim, paw_ulim = -90,  30
 
 #Cuadruped preferred joint limits for training:
-bod_min, bod_max = -15, 30
-leg_min, leg_max = -15, 35
-paw_min, paw_max = -45, 0
+bod_min, bod_max = -15, 20
+leg_min, leg_max = 0, 60
+paw_min, paw_max = -60, -30
 
 class Environment:
     def __init__(self, obs_sp_shape, act_sp_shape, dest_pos):
@@ -51,6 +51,10 @@ class Environment:
         
         self.A = self.maxRelativeIncreaseOrientation/(1-np.cos(self.max_disorientation*np.pi/180))
         self.B = self.A-self.maxRelativeIncreaseOrientation
+        
+        #Parameters for not jumping reward
+        self.__maxRelativeDecreaseJumping = 1
+        self.__maxRelativeIncrease_notJumping = 0.3
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -107,7 +111,7 @@ class Environment:
         
         for i in range(dist_fin.shape[0]):
             
-            #First Compute the reward based only on distance traveled to the target ("Base reward")
+            '''First Compute the reward based only on distance traveled to the target ("Base reward")'''
             
             if dist_fin[i] <= self.__end_cond:
                 base_reward[i], end[i] = 100*(dist_ini[i]), True
@@ -116,7 +120,7 @@ class Environment:
             
             reward[i] = base_reward[i]
             
-            #For the 2 angles (x and y axes) of the back
+            '''Extra Reward for the 2 angles (x and y axes) of the back close to 0°'''
 #            print("reward before back analysis: ", reward[i])
             for j in range(3, 5):
                 back_angle = np.abs(next_obs[i, j])*180    #angle (in deg) of the back with respect to 0° (horizontal position)
@@ -128,6 +132,8 @@ class Environment:
                 else:
                     reward[i] += (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * base_reward[i] * 1/2
 #            print("reward after back analysis: ", reward[i])
+            
+            '''Extra Reward analizing the biggest joint movement of the agent'''
             # biggest_joint = 0
             #Find the biggest joint movement of the agent
 #            print("Separación")
@@ -148,7 +154,7 @@ class Environment:
             #     reward[i] += (self.__maxJointAngle-biggest_joint)* self.__maxRelativeIncreaseJoint/self.__maxJointAngle * base_reward[i]
 #            print("reward after biggest joint analysis: ", reward[i])
 
-            ''' '''
+            '''Extra Reward for the agent looking to the center'''
             if base_reward[i] > 0:
                 #Agent's orientation vector:
                 Agent = np.array([next_obs[i,5], next_obs[i,6]])
@@ -162,8 +168,42 @@ class Environment:
       
                 reward[i] += (self.A*dot_product-self.B) * base_reward[i]
 
-            #If the robot flips downwards the episode ends (absolute value of X or Y angle greater than 90°)
-            if abs(next_obs[i, 3]) >= 0.5 or abs(next_obs[i, 4]) >= 0.5:
+            '''Extra Reward for the agent moving the legs in different directions (to avoid moving jumping forward)'''
+            if base_reward[i] > 0:
+                #Compare leg joints of the back:
+                delta_back_right = (next_obs[i,14] - obs[i,14]) * self.__joint_range[1]
+                delta_back_left = (next_obs[i,17] - obs[i,17]) * self.__joint_range[1]
+                
+                mod_delta_back_right = np.abs(delta_back_right)
+                mod_delta_back_left = np.abs(delta_back_left)
+                mod_greater_delta = np.maximum(mod_delta_back_right, mod_delta_back_left)
+                
+                # print("delta BR: ", delta_back_right)
+                # print("delta BL: ", delta_back_left)
+                # print("mayor modulo: ", mod_greater_delta)
+                # print('\n')
+                
+                
+                if mod_greater_delta != 0:
+                
+
+                    
+                    if delta_back_left * delta_back_right > 0:  #Same direction of movement, punishment for jumping
+                        
+                        punishment = np.abs(delta_back_right - delta_back_left) / mod_greater_delta - 1
+                        #print("punishment: ", punishment)
+                        reward[i] += self.__maxRelativeDecreaseJumping * punishment * base_reward[i]
+                        
+                    else:   #Diferent direction of movement, reward for not jumping and moving simetrically with respect to 0° (less important)
+                        
+                        #frac_reward = 1 - np.abs(mod_delta_back_right - mod_delta_back_left) / mod_greater_delta
+                        #print("frac_reward: ", frac_reward)
+                        #reward[i] += self.__maxRelativeIncrease_notJumping * frac_reward * base_reward[i]
+                        reward[i] += self.__maxRelativeIncrease_notJumping * base_reward[i]
+
+                    #print('\n')
+            #If the robot flips downwards the episode ends (absolute value of X or Y angle greater than 50°)
+            if abs(next_obs[i, 3]) >= 0.278 or abs(next_obs[i, 4]) >= 0.278:
                 end[i] = True
 
         return reward, end
@@ -180,9 +220,9 @@ if __name__ == '__main__':
     env = Environment(obs_sp_shape=(19,), act_sp_shape=(12,), dest_pos=(0,0))
 
     # Create the model
-#    model = SoftActorCritic("Tetrapod", env, (13, 5), (11, 7, 3), replay_buffer_size=1000000)
-#    model = SoftActorCritic("Tetrapod", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
-    model = SoftActorCritic.load("Tetrapod", env, emptyReplayBuffer = True)
+#    model = SoftActorCritic("Cuadruped", env, (13, 5), (11, 7, 3), replay_buffer_size=1000000)
+#    model = SoftActorCritic("Cuadruped", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
+    model = SoftActorCritic.load("Cuadruped", env, emptyReplayBuffer = True)
 
     # Set training hyper-parameters
     model.discount_factor = 0.95
