@@ -30,7 +30,7 @@ class Environment:
         self.__obs = np.zeros((1,)+self.obs_sp_shape)           # Observed state
         self.__coppelia = CoppeliaSocket(obs_sp_shape[0])       # Socket to the simulated environment
         
-        self.__maxBackAngle = 30    #deg
+        self.__maxBackAngle = 10    #deg
         #For Tetrapod:
         #self.__joint_midpoint = 0
         #self.__joint_range = 45 #+/-
@@ -39,14 +39,14 @@ class Environment:
         self.__joint_midpoint = np.array([(bod_max + bod_min)/2, (leg_max + leg_min)/2, (paw_max + paw_min)/2])
         self.__joint_range =    np.array([(bod_max - bod_min)/2, (leg_max - leg_min)/2, (paw_max - paw_min)/2]) #(+/-)
         
-        self.__maxJointAngle = 40
+        #self.__maxJointAngle = 40
         
         self.__maxRelativeIncreaseBack = 1
         self.__maxRelativeIncreaseJoint = 0.5
         
         
         #Calculation of parameters for orientation reward
-        self.maxRelativeIncreaseOrientation = 1
+        self.maxRelativeIncreaseOrientation = 1.3
         self.max_disorientation = 90    #CAUTION: if the angle is near 0, the function punishes very hard the agent
         
         self.A = self.maxRelativeIncreaseOrientation/(1-np.cos(self.max_disorientation*np.pi/180))
@@ -155,53 +155,76 @@ class Environment:
 #            print("reward after biggest joint analysis: ", reward[i])
 
             '''Extra Reward for the agent looking to the center'''
-            if base_reward[i] > 0:
-                #Agent's orientation vector:
-                Agent = np.array([next_obs[i,5], next_obs[i,6]])
-                
-                #Vector to the center:
-                x = next_obs[i,0]
-                y = next_obs[i,1]
-                Center = -np.array([x,y])/np.sqrt(x**2 + y**2)
-                
-                dot_product = np.dot(Agent, Center) #Equal to cosine of angle between Agent and Center
-      
-                reward[i] += (self.A*dot_product-self.B) * base_reward[i]
+
+            #Agent's orientation vector:
+            Agent = np.array([next_obs[i,5], next_obs[i,6]])
+            
+            #Vector to the center:
+            x = next_obs[i,0]
+            y = next_obs[i,1]
+            Center = -np.array([x,y])/np.sqrt(x**2 + y**2)
+            
+            dot_product = np.dot(Agent, Center) #Equal to cosine of angle between Agent and Center
+  
+            K = (self.A*dot_product-self.B)
+            
+            if base_reward[i] < 0 and K < 0:    
+                reward[i] -= K * base_reward[i]
+            
+            else:   
+                reward[i] += K * base_reward[i]
 
             '''Extra Reward for the agent moving the legs in different directions (to avoid moving jumping forward)'''
-            if base_reward[i] > 0:
-                #Compare leg joints of the back:
-                delta_back_right = (next_obs[i,14] - obs[i,14]) * self.__joint_range[1]
-                delta_back_left = (next_obs[i,17] - obs[i,17]) * self.__joint_range[1]
-                
-                mod_delta_back_right = np.abs(delta_back_right)
-                mod_delta_back_left = np.abs(delta_back_left)
-                mod_greater_delta = np.maximum(mod_delta_back_right, mod_delta_back_left)
-                
-                # print("delta BR: ", delta_back_right)
-                # print("delta BL: ", delta_back_left)
-                # print("mayor modulo: ", mod_greater_delta)
-                # print('\n')
-                
-                
-                if mod_greater_delta != 0:
-                
+            #Read movement of the front leg joints:
+            delta_front_right = (next_obs[i,8] - obs[i,8]) * self.__joint_range[1]
+            delta_front_left = (next_obs[i,11] - obs[i,11]) * self.__joint_range[1]
+            
+            mod_delta_front_right = np.abs(delta_front_right)
+            mod_delta_front_left = np.abs(delta_front_left)
+            mod_greater_delta_front = np.maximum(mod_delta_front_right, mod_delta_front_left)
+            
+            #Read movement of the back leg joints:
+            delta_back_right = (next_obs[i,14] - obs[i,14]) * self.__joint_range[1]
+            delta_back_left = (next_obs[i,17] - obs[i,17]) * self.__joint_range[1]
+            
+            mod_delta_back_right = np.abs(delta_back_right)
+            mod_delta_back_left = np.abs(delta_back_left)
+            mod_greater_delta_back = np.maximum(mod_delta_back_right, mod_delta_back_left)
 
+            if mod_greater_delta_front != 0:
+                
+                if delta_front_left * delta_front_right > 0:  #Same direction of movement, punishment for jumping
                     
-                    if delta_back_left * delta_back_right > 0:  #Same direction of movement, punishment for jumping
-                        
-                        punishment = np.abs(delta_back_right - delta_back_left) / mod_greater_delta - 1
-                        #print("punishment: ", punishment)
-                        reward[i] += self.__maxRelativeDecreaseJumping * punishment * base_reward[i]
-                        
-                    else:   #Diferent direction of movement, reward for not jumping and moving simetrically with respect to 0° (less important)
-                        
-                        #frac_reward = 1 - np.abs(mod_delta_back_right - mod_delta_back_left) / mod_greater_delta
-                        #print("frac_reward: ", frac_reward)
-                        #reward[i] += self.__maxRelativeIncrease_notJumping * frac_reward * base_reward[i]
-                        reward[i] += self.__maxRelativeIncrease_notJumping * base_reward[i]
+                    punishment_front = np.abs(delta_front_right - delta_front_left) / mod_greater_delta_front - 1
+                    
+                    if base_reward[i] < 0:
+                        reward[i] -= self.__maxRelativeDecreaseJumping * punishment_front * base_reward[i]
+                    else:
+                        reward[i] += self.__maxRelativeDecreaseJumping * punishment_front * base_reward[i]
+                    
+                else:   #Diferent direction of movement, reward for not jumping and moving simetrically with respect to 0° (less important)
+                    
+                    reward_front = 1 - np.abs(mod_delta_front_right - mod_delta_front_left) / mod_greater_delta_front
+                    reward[i] += self.__maxRelativeIncrease_notJumping * reward_front * base_reward[i]
 
-                    #print('\n')
+                
+            #Apply punishment or reward to back legs
+            if mod_greater_delta_back != 0:
+                
+                if delta_back_left * delta_back_right > 0:  #Same direction of movement, punishment for jumping
+                    
+                    punishment_back = np.abs(delta_back_right - delta_back_left) / mod_greater_delta_back - 1
+                    
+                    if base_reward[i] < 0:
+                        reward[i] -= self.__maxRelativeDecreaseJumping * punishment_back * base_reward[i]
+                    else:
+                        reward[i] += self.__maxRelativeDecreaseJumping * punishment_back * base_reward[i]
+                    
+                else:   #Diferent direction of movement, reward for not jumping and moving simetrically with respect to 0° (less important)
+                    
+                    reward_back = 1 - np.abs(mod_delta_back_right - mod_delta_back_left) / mod_greater_delta_back
+                    reward[i] += self.__maxRelativeIncrease_notJumping * reward_back * base_reward[i]
+                
             #If the robot flips downwards the episode ends (absolute value of X or Y angle greater than 50°)
             if abs(next_obs[i, 3]) >= 0.278 or abs(next_obs[i, 4]) >= 0.278:
                 end[i] = True
@@ -225,7 +248,7 @@ if __name__ == '__main__':
     model = SoftActorCritic.load("Cuadruped", env, emptyReplayBuffer = True)
 
     # Set training hyper-parameters
-    model.discount_factor = 0.95
+    model.discount_factor = 0.94
     model.update_factor = 0.005
     model.replay_batch_size = 1000 #2
     model.entropy = env.act_sp_shape[0]
