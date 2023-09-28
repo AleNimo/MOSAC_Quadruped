@@ -7,9 +7,14 @@ from CoppeliaSocket import CoppeliaSocket
 # paw_llim, paw_ulim = -90,  30
 
 #Cuadruped preferred joint limits for training:
-bod_min, bod_max = -15, 20
-leg_min, leg_max = 0, 60
-paw_min, paw_max = -60, -30
+bod_min, bod_max = -10, 15 #inicial 0
+leg_min, leg_max = -10, 40 #inicial 0
+paw_min, paw_max = -15, 5  #inicial 0
+
+# piñe puso:                    inicial
+# bod_min, bod_max = -15, 10    (0)
+# leg_min, leg_max = -40, -10  (-10)
+# paw_min, paw_max = 10, 20     (20)
 
 class Environment:
     def __init__(self, obs_sp_shape, act_sp_shape, dest_pos):
@@ -30,7 +35,7 @@ class Environment:
         self.__obs = np.zeros((1,)+self.obs_sp_shape)           # Observed state
         self.__coppelia = CoppeliaSocket(obs_sp_shape[0])       # Socket to the simulated environment
         
-        self.__maxBackAngle = 15    #deg
+        self.__maxBackAngle = 10    #deg
         #For Tetrapod:
         #self.__joint_midpoint = 0
         #self.__joint_range = 45 #+/-
@@ -41,18 +46,21 @@ class Environment:
         
         #self.__maxJointAngle = 40
         
-        self.__maxRelativeIncreaseBack = 1
+        self.__maxRelativeIncreaseBack = 1.5
         #self.__maxRelativeIncreaseJoint = 0.5
         
         
         #Calculation of parameter for orientation reward
         self.__maxRelativeIncreaseOrientation = 1
-        self.__maxRelativeDecreaseOrientation = 1
-        self.__max_disorientation = 15 * np.pi / 180
+        self.__maxRelativeDecreaseOrientation = -2
+        self.__maxDisorientation = 10 * np.pi / 180
         
         #Parameters for not jumping reward
-        # self.__maxRelativeDecreaseJumping = 1
-        # self.__maxRelativeIncrease_notJumping = 0.3
+        self.__maxRelativeIncrease_notJumping = 0.5
+        self.__maxRelativeDecrease_Jumping = -1
+        
+        self.__maxRelativeIncrease_crossWalking = 0.5
+        self.__maxRelativeDecrease_notCrossWalking = -1
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -171,10 +179,10 @@ class Environment:
             else:
                 angle_agent_center = np.arccos(dotproduct) #Angle between Agent and Center
             
-            if angle_agent_center < self.__max_disorientation: 
-                K = self.__maxRelativeIncreaseOrientation * np.cos(angle_agent_center * np.pi/(2*self.__max_disorientation))
+            if angle_agent_center < self.__maxDisorientation: 
+                K = self.__maxRelativeIncreaseOrientation * np.cos(angle_agent_center * np.pi/(2*self.__maxDisorientation))
             else:
-                K = -self.__maxRelativeDecreaseOrientation * np.cos((angle_agent_center - np.pi) * np.pi/(2*(np.pi-self.__max_disorientation) ) )
+                K = self.__maxRelativeDecreaseOrientation * np.cos((angle_agent_center - np.pi) * np.pi/(2*(np.pi-self.__maxDisorientation) ) )
             
             if base_reward[i] < 0 and K < 0:    
                 reward[i] -= K * base_reward[i]
@@ -182,56 +190,134 @@ class Environment:
             else:   
                 reward[i] += K * base_reward[i]
 
-            # '''Extra Reward for the agent moving the legs in different directions (to avoid moving jumping forward)'''
-            # #Read movement of the front leg joints:
-            # delta_front_right = (next_obs[i,8] - obs[i,8]) * self.__joint_range[1]
-            # delta_front_left = (next_obs[i,11] - obs[i,11]) * self.__joint_range[1]
+            '''Extra Reward for the agent moving the legs in different directions (to avoid moving jumping forward)'''
+            #Read movement of the front leg joints:                
+            delta_front_right = (next_obs[i,8] - obs[i,8]) * self.__joint_range[1]
+            delta_front_left = (next_obs[i,11] - obs[i,11]) * self.__joint_range[1]
             
-            # mod_delta_front_right = np.abs(delta_front_right)
-            # mod_delta_front_left = np.abs(delta_front_left)
-            # mod_greater_delta_front = np.maximum(mod_delta_front_right, mod_delta_front_left)
+            mod_delta_front_right = np.abs(delta_front_right)
+            mod_delta_front_left = np.abs(delta_front_left)
+            mod_greater_delta_front = np.maximum(mod_delta_front_right, mod_delta_front_left)
             
-            # #Read movement of the back leg joints:
-            # delta_back_right = (next_obs[i,14] - obs[i,14]) * self.__joint_range[1]
-            # delta_back_left = (next_obs[i,17] - obs[i,17]) * self.__joint_range[1]
+            #Read movement of the back leg joints:
+            delta_back_right = (next_obs[i,14] - obs[i,14]) * self.__joint_range[1]
+            delta_back_left = (next_obs[i,17] - obs[i,17]) * self.__joint_range[1]
             
-            # mod_delta_back_right = np.abs(delta_back_right)
-            # mod_delta_back_left = np.abs(delta_back_left)
-            # mod_greater_delta_back = np.maximum(mod_delta_back_right, mod_delta_back_left)
+            mod_delta_back_right = np.abs(delta_back_right)
+            mod_delta_back_left = np.abs(delta_back_left)
+            mod_greater_delta_back = np.maximum(mod_delta_back_right, mod_delta_back_left)
 
-            # if mod_greater_delta_front != 0:
+            if mod_greater_delta_front != 0:
                 
-            #     if delta_front_left * delta_front_right > 0:  #Same direction of movement, punishment for jumping
+                if delta_front_left * delta_front_right > 0:  #Same direction of movement, punishment for jumping
                     
-            #         punishment_front = np.abs(delta_front_right - delta_front_left) / mod_greater_delta_front - 1
+                    punishment_front = 1 - np.abs(delta_front_right - delta_front_left) / mod_greater_delta_front
                     
-            #         if base_reward[i] < 0:
-            #             reward[i] -= self.__maxRelativeDecreaseJumping * punishment_front * base_reward[i]
-            #         else:
-            #             reward[i] += self.__maxRelativeDecreaseJumping * punishment_front * base_reward[i]
+                    if base_reward[i] < 0:
+                        reward[i] -= self.__maxRelativeDecrease_Jumping * punishment_front * base_reward[i]
+                    else:
+                        reward[i] += self.__maxRelativeDecrease_Jumping * punishment_front * base_reward[i]
                     
-            #     else:   #Diferent direction of movement, reward for not jumping and moving simetrically with respect to 0° (less important)
+                else:   #Different direction of movement, reward for not jumping and moving simetrically with respect to 0° (less important)
                     
-            #         reward_front = 1 - np.abs(mod_delta_front_right - mod_delta_front_left) / mod_greater_delta_front
-            #         reward[i] += self.__maxRelativeIncrease_notJumping * reward_front * base_reward[i]
+                    reward_front = 1 - np.abs(mod_delta_front_right - mod_delta_front_left) / mod_greater_delta_front
+                    reward[i] += self.__maxRelativeIncrease_notJumping * reward_front * base_reward[i]
 
                 
-            # #Apply punishment or reward to back legs
-            # if mod_greater_delta_back != 0:
+            #Apply punishment or reward to back legs
+            if mod_greater_delta_back != 0:
                 
-            #     if delta_back_left * delta_back_right > 0:  #Same direction of movement, punishment for jumping
+                if delta_back_left * delta_back_right > 0:  #Same direction of movement, punishment for jumping
                     
-            #         punishment_back = np.abs(delta_back_right - delta_back_left) / mod_greater_delta_back - 1
+                    punishment_back = 1 - np.abs(delta_back_right - delta_back_left) / mod_greater_delta_back
                     
-            #         if base_reward[i] < 0:
-            #             reward[i] -= self.__maxRelativeDecreaseJumping * punishment_back * base_reward[i]
-            #         else:
-            #             reward[i] += self.__maxRelativeDecreaseJumping * punishment_back * base_reward[i]
+                    if base_reward[i] < 0:
+                        reward[i] -= self.__maxRelativeDecrease_Jumping * punishment_back * base_reward[i]
+                    else:
+                        reward[i] += self.__maxRelativeDecrease_Jumping * punishment_back * base_reward[i]
                     
-            #     else:   #Diferent direction of movement, reward for not jumping and moving simetrically with respect to 0° (less important)
+                else:   #Different direction of movement, reward for not jumping and moving simetrically with respect to 0° (less important)
                     
-            #         reward_back = 1 - np.abs(mod_delta_back_right - mod_delta_back_left) / mod_greater_delta_back
-            #         reward[i] += self.__maxRelativeIncrease_notJumping * reward_back * base_reward[i]
+                    reward_back = 1 - np.abs(mod_delta_back_right - mod_delta_back_left) / mod_greater_delta_back
+                    reward[i] += self.__maxRelativeIncrease_notJumping * reward_back * base_reward[i]
+                
+            '''Extra Reward for the agent moving the crossed legs and paws in the same way'''
+            #version 2 con deltas
+            mod_greater_delta_crossed_1 = np.maximum(mod_delta_front_right, mod_delta_back_left)
+            mod_greater_delta_crossed_2 = np.maximum(mod_delta_front_left, mod_delta_back_right)
+            
+            if mod_greater_delta_crossed_1 != 0:
+                if delta_front_right * delta_back_left < 0: #different direction of crossed legs 1, punishment
+                
+                    punishment_crossed_1 = 1 - np.abs(mod_delta_front_right - mod_delta_back_left)/mod_greater_delta_crossed_1
+                    
+                    if base_reward[i] < 0:
+                        reward[i] -= self.__maxRelativeDecrease_notCrossWalking * punishment_crossed_1 * base_reward[i]
+                    else:
+                        reward[i] += self.__maxRelativeDecrease_notCrossWalking * punishment_crossed_1 * base_reward[i]
+                
+                else:   #Same direction of crossed legs 1, reward
+                    
+                    reward_crossed_1 = 1 - np.abs(delta_front_right - delta_back_left)/mod_greater_delta_crossed_1
+                    reward[i] += self.__maxRelativeIncrease_crossWalking * reward_crossed_1 * base_reward[i]
+            
+            if mod_greater_delta_crossed_2 != 0:
+                if delta_front_left * delta_back_right < 0: #different direction of crossed legs 2, punishment
+                
+                    punishment_crossed_2 = 1 - np.abs(mod_delta_front_left - mod_delta_back_right)/mod_greater_delta_crossed_2
+                    
+                    if base_reward[i] < 0:
+                        reward[i] -= self.__maxRelativeDecrease_notCrossWalking * punishment_crossed_2 * base_reward[i]
+                    else:
+                        reward[i] += self.__maxRelativeDecrease_notCrossWalking * punishment_crossed_2 * base_reward[i]
+                
+                else:   #Same direction of crossed legs 2, reward
+                    
+                    reward_crossed_2 = 1 - np.abs(delta_front_left - delta_back_right)/mod_greater_delta_crossed_2
+                    reward[i] += self.__maxRelativeIncrease_crossWalking * reward_crossed_2 * base_reward[i]
+            #Read leg angles:
+            # front_right_leg = (next_obs[i,8] - self.__joint_midpoint[1]) * self.__joint_range[1]
+            # front_left_leg = (next_obs[i,11] - self.__joint_midpoint[1]) * self.__joint_range[1]
+            # back_right_leg = (next_obs[i,14] - self.__joint_midpoint[1]) * self.__joint_range[1]
+            # back_left_leg  = (next_obs[i,17] - self.__joint_midpoint[1]) * self.__joint_range[1]
+            
+            # #greater absolute angle bewteen crossed legs
+            # mod_greater_cross_legs_1 = np.maximum(np.abs(front_right_leg), np.abs(back_left_leg))
+            # mod_greater_cross_legs_2 = np.maximum(np.abs(front_left_leg), np.abs(back_right_leg))
+            
+            # #Read paw angles:
+            # front_right_paw = (next_obs[i,9] - self.__joint_midpoint[2]) * self.__joint_range[2]
+            # front_left_paw = (next_obs[i,12] - self.__joint_midpoint[2]) * self.__joint_range[2]
+            # back_right_paw = (next_obs[i,15] - self.__joint_midpoint[2]) * self.__joint_range[2]
+            # back_left_paw  = (next_obs[i,18] - self.__joint_midpoint[2]) * self.__joint_range[2]
+            
+            # #greater absolute angle bewteen crossed paws
+            # mod_greater_cross_paws_1 = np.maximum(np.abs(front_right_paw), np.abs(back_left_paw))
+            # mod_greater_cross_paws_2 = np.maximum(np.abs(front_left_paw), np.abs(back_right_paw))
+                    
+            # #Reward if cross side pair of legs move identically
+            # if mod_greater_cross_legs_1 !=0:
+
+            #     reward_cross_legs_1 = 1-np.abs(front_right_leg-back_left_leg)/(2*mod_greater_cross_legs_1)
+            #     reward[i] += self.__maxRelativeIncrease_crossWalking * reward_cross_legs_1 * base_reward[i]
+
+
+            # if mod_greater_cross_legs_2 !=0:
+
+            #     reward_cross_legs_2 = 1-np.abs(front_left_leg-back_right_leg)/(2*mod_greater_cross_legs_2)
+            #     reward[i] += self.__maxRelativeIncrease_crossWalking * reward_cross_legs_2 * base_reward[i]
+                
+            # #Reward if cross side pair of paws move identically
+            # if mod_greater_cross_paws_1 !=0:
+
+            #     reward_cross_paws_1 = 1-np.abs(front_right_paw-back_left_paw)/(2*mod_greater_cross_paws_1)
+            #     reward[i] += self.__maxRelativeIncrease_crossWalking * reward_cross_paws_1 * base_reward[i]
+
+
+            # if mod_greater_cross_paws_2 !=0:
+
+            #     reward_cross_paws_2 = 1-np.abs(front_left_paw-back_right_paw)/(2*mod_greater_cross_paws_2)
+            #     reward[i] += self.__maxRelativeIncrease_crossWalking * reward_cross_paws_2 * base_reward[i]
                 
             #If the robot flips downwards the episode ends (absolute value of X or Y angle greater than 50°)
             if abs(next_obs[i, 3]) >= 0.278 or abs(next_obs[i, 4]) >= 0.278:
@@ -252,8 +338,8 @@ if __name__ == '__main__':
 
     # Create the model
 #    model = SoftActorCritic("Cuadruped", env, (13, 5), (11, 7, 3), replay_buffer_size=1000000)
-#    model = SoftActorCritic("Cuadruped", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
-    model = SoftActorCritic.load("Cuadruped", env, emptyReplayBuffer = False)
+    model = SoftActorCritic("Cuadruped", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
+#    model = SoftActorCritic.load("Cuadruped", env, emptyReplayBuffer = False)
 
     # Set training hyper-parameters
     model.discount_factor = 0.94
