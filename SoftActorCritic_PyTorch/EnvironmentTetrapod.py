@@ -333,31 +333,3 @@ class Environment:
     def max_ret(self, obs):
         ''' Computes and returns the maximum return for the state '''
         return 100*np.sqrt(np.sum(np.square(obs.reshape(1,-1)[:,0:self.__pos_size]), axis=1, keepdims=True))
-
-
-if __name__ == '__main__':
-    from SoftActorCritic import SoftActorCritic
-
-    # Get the environment
-    env = Environment(obs_sp_shape=(19,), act_sp_shape=(12,), dest_pos=(0,0))
-
-    # Create the model
-#    model = SoftActorCritic("Cuadruped", env, (13, 5), (11, 7, 3), replay_buffer_size=1000000)
-#    model = SoftActorCritic("Cuadruped", env, (64, 32), (128, 64, 32), replay_buffer_size=1000000)
-    model = SoftActorCritic.load("Cuadruped", env, emptyReplayBuffer = False)
-
-    # Set training hyper-parameters
-    model.discount_factor = 0.94
-    model.update_factor = 0.005
-    model.replay_batch_size = 1000 #2
-    model.entropy = env.act_sp_shape[0]
-    model.initial_alpha = 0.01
-    model.H_adam_alpha = 0.001
-    model.P_adam_alpha, model.P_train_frequency = 0.001, 3
-    model.Q_adam_alpha, model.Q_train_frequency = 0.001, 3
-    model.plot_resolution = 10
-
-    # Start training
-    model.train(episodes=100000, ep_steps=200, save_period=1000, plot_period=50)
-
-    model.test(ep_steps=100)

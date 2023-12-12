@@ -559,7 +559,9 @@ class SoftActorCritic:
             if not end: ep_rwd[s] += discount_factor * self.__Qcompute(ep_obs[s+1], self.__Pcompute(ep_obs[s+1]))
             for i in range(ep_len-2, -1, -1): ep_rwd[i] = ep_rwd[i] + discount_factor * ep_rwd[i + 1]
             ep_ret[episode, 0] = ep_rwd[0]
+            print("Retorno real = ", ep_rwd[0])
             ep_ret[episode, 1] = self.__Qcompute(ep_obs[0], ep_act[0])
+            print("Retorno esperado = ", ep_ret[episode, 1])
             ep_ret[episode, 2] = np.sqrt(np.square(ep_ret[episode, 0] - ep_ret[episode, 1]))
 #            ep_ret[episode, :] = ep_ret[episode, :] / env.max_ret(ep_obs[0])
 
