@@ -20,12 +20,16 @@ class SAC_Agent():
 
         self.P_net = P_Network(obs_dim, actions_dim, hidden1_dim=64, hidden2_dim=32,
                                alfa=0.001, beta1=0.9, beta2=0.999)
+        
+        self.P_loss = torch.tensor(0, dtype=torch.float).to(self.P_net.device)
 
         self.Q1_net = Q_Network(obs_dim, actions_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
                                   alfa=0.001, beta1=0.9, beta2=0.999, name='Q1_net')
         
         self.Q2_net = Q_Network(obs_dim, actions_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
                                   alfa=0.001, beta1=0.9, beta2=0.999, name='Q2_net')
+        
+        self.Q_loss = torch.tensor(0, dtype=torch.float).to(self.P_net.device)
         
         self.P_target_net = copy.deepcopy(self.P_net)
         self.P_target_net.name = 'P_target_net'
@@ -139,9 +143,9 @@ class SAC_Agent():
         
         Q = self.minimal_Q(state, action).view(-1)
 
-        Q_loss = F.mse_loss(Q, Q_hat)
+        self.Q_loss = F.mse_loss(Q, Q_hat)
 
-        Q_loss.backward()
+        self.Q_loss.backward()
 
         self.Q1_net.optimizer.step()
         self.Q2_net.optimizer.step()
@@ -154,9 +158,9 @@ class SAC_Agent():
 
         Q = self.minimal_Q(state, action).view(-1)
 
-        P_loss = torch.mean(self.alpha * log_prob - Q)
+        self.P_loss = torch.mean(self.alpha * log_prob - Q)
 
-        P_loss.backward()
+        self.P_loss.backward()
 
         self.P_net.optimizer.step()
 
@@ -170,5 +174,3 @@ class SAC_Agent():
         self.alpha_optimizer.step()
 
         self.update_target_net_parameters()
-
-        return Q_loss.item(), P_loss.item(), self.alpha.item()

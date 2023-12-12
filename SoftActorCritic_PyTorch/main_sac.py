@@ -6,18 +6,23 @@ from EnvironmentTetrapod import Environment
 
 import multiprocessing
 import pyqtgraph as pg
-import sys
-from PyQt5.QtWidgets import QApplication
+#import sys
+#from PyQt5.QtWidgets import QApplication
 import time
+from threading import Timer
+
+from dvg_pyqtgraph_threadsafe import HistoryChartCurve
+
+
 
 data_type = np.float64
 
 def SAC_Agent_Training(q):
     env = Environment(obs_sp_shape=(19,), act_sp_shape=(12,), dest_pos=(0,0))
 
-    load_agent = True
+    load_agent = False
     load_replay_buffer = True
-    load_train_history = True
+    load_train_history = False
     episodes = 10000
     episode = 0
     episode_steps = 200 #Maximum steps allowed per episode
@@ -38,7 +43,7 @@ def SAC_Agent_Training(q):
     ep_rwd = np.zeros((episode_steps, 1), dtype=data_type)                          # Episode's rewards
     ep_ret = np.zeros((episodes, 3), dtype=data_type)                       # Returns for each episode (real, expected and RMSE)
     ep_loss = np.zeros((episodes, 2), dtype=data_type)                       # Training loss for each episode (Q and P)
-    ep_alpha = np.zeros((episode_steps, 1), dtype=data_type)                # Alpha for each episode
+    ep_alpha = np.zeros((episodes, 1), dtype=data_type)                # Alpha for each episode
 
     if load_train_history:
         # Check the last episode saved in Progress.txt
@@ -99,14 +104,18 @@ def SAC_Agent_Training(q):
         ep_ret[episode, 2] = np.sqrt(np.square(ep_ret[episode,0] - ep_ret[episode, 1]))
 
         for i in range(ep_len):
-            ep_loss[episode, 0], ep_loss[episode, 1], ep_alpha[episode] = agent.learn()
+            agent.learn()
+        
+        ep_loss[episode, 0] = agent.P_loss.item()
+        ep_loss[episode, 1] = agent.Q_loss.item()
+        ep_alpha[episode] = agent.alpha.item()
         
         print("Episode: ", episode)
         print("Q_loss: ", ep_loss[episode, 0])
         print("P_loss: ", ep_loss[episode, 1])
         print("Alpha: ", ep_alpha[episode])
 
-        q.put((episode, ep_ret[episode], ep_loss[episode], ep_alpha[episode]))
+        q.put((episode, ep_ret, ep_loss, ep_alpha))
         
         episode += 1
         
@@ -118,16 +127,48 @@ def SAC_Agent_Training(q):
             np.savez_compressed(filename, returns = ep_ret[0:episode], loss = ep_loss[0:episode], alpha = ep_alpha)
     
 
-# def updateplot(q):
-#     while True:
-
-#         results=q.get()  #Blocked until it gets a tuple
 
 
 
+def updateplot(q):   
+    global curve_P_Loss,curve_Q_Loss,curve_Returns,curve_Return_Error,curve_Alpha,t
+
+    try:  
+        results=q.get_nowait()  #Blocked until it gets a tuple
+        
+        episode_linspace = np.arange(0,results[0]+1,1,dtype=int)
+
+        RealReturn_data = results[1][:,0]
+
+        EstimatedReturn_data = results[1][:,1]
+        
+        Return_loss_data = results[1][:,2]
+        
+        P_loss_data = results[2][:,1]
+
+        Q_loss_data = results[2][:,0]
+     
+        Alpha_data = results[3]      
+
+        curve_P_Loss.setData(episode_linspace,P_loss_data[0:results[0]+1])
+        curve_Q_Loss.setData(episode_linspace,Q_loss_data[0:results[0]+1])
+        curve_Returns.setData(episode_linspace,RealReturn_data[0:results[0]+1])
+        curve_Return_Error.setData(episode_linspace,Return_loss_data[0:results[0]+1])
+        curve_Alpha.setData(episode_linspace,Alpha_data[0:results[0]+1])
+        
+        print("Try")
+    except:
+        print("except")        
+
+class RepeatTimer(Timer):  
+    def run(self):  
+        while not self.finished.wait(self.interval):  
+            self.function(*self.args,**self.kwargs) 
             
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
+    
+    global curve_P_Loss,curve_Q_Loss,curve_Returns,curve_Return_Error,curve_Alpha
+    #app = QApplication(sys.argv)
 
     #Create a queue to share data between process
     q = multiprocessing.Queue()
@@ -136,34 +177,37 @@ if __name__ == '__main__':
     SAC_process=multiprocessing.Process(None,SAC_Agent_Training,args=(q,))
     SAC_process.start()
 
-    # Create layout to hold multiple subplots
+    # Create layout
     pg_layout = pg.GraphicsLayoutWidget()
 
     # Create plot widgets (canvas)
-    canvas_P_Loss = pg.PlotWidget(title="Policy Loss")
-    canvas_Q_Loss = pg.PlotWidget(title="State-Value Loss")
-    canvas_Returns = pg.PlotWidget(title="Real return vs Estimated return")
-    canvas_Return_Error = pg.PlotWidget(title="RMSD of Real and Estimated")
-   
-    # Add subplots
-    pg_layout.add_subplot(canvas_P_Loss, row=0, col=0)
-    pg_layout.addWidget(canvas_Q_Loss, row=0, col=1)
-    pg_layout.addWidget(canvas_Returns, row=1, col=0)
-    pg_layout.addWidget(canvas_Return_Error, row=1, col=1)
+    plot_P_Loss = pg_layout.addPlot(title="Policy Loss")
+    
+    plot_Q_Loss = pg_layout.addPlot(title="State-Value Loss")
+    
+    plot_Returns = pg_layout.addPlot(title="Real return vs Estimated return")
+    
+    pg_layout.nextRow();
+    
+    plot_Return_Error = pg_layout.addPlot(title="RMSD of Real and Estimated")
+    
+    plot_Alpha = pg_layout.addPlot(title="Alpha")
 
-    # Create plot of canvas
-    P_Loss_plot = canvas_P_Loss.plot()
-    Q_Loss_plot = canvas_Q_Loss.plot()
-    Returns_plot = canvas_Returns.plot()
-    Return_Error_plot = canvas_Return_Error.plot()
-
-    canvas_P_Loss.showGrid(x=True, y=True, alpha=0.5)
-    canvas_Q_Loss.showGrid(x=True, y=True, alpha=0.5)
-
+       
+    # Add Curves
+    curve_P_Loss=plot_P_Loss.plot()
+    curve_Q_Loss=plot_Q_Loss.plot()
+    curve_Returns=plot_Returns.plot()
+    curve_Return_Error=plot_Return_Error.plot()    
+    curve_Alpha=plot_Alpha.plot()
+    
     # Show our layout holding multiple subplots
-    pg_layout.show()
-    #Call a function to update the plot when there is new data
-    # updateplot(q)
+   
 
-    # status = app.exec_()
-    # sys.exit(status)
+    t = RepeatTimer(5, updateplot,(q,))
+    t.start() # truth will be called after a 15 second interval  
+    
+    pg_layout.show()
+
+    #status = app.exec_()
+    #sys.exit(status)
