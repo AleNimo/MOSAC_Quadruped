@@ -31,18 +31,23 @@ class SAC_Agent():
         
         self.Q_loss = torch.tensor(0, dtype=torch.float).to(self.P_net.device)
         
+        # Create target networks with different names and directories
         self.P_target_net = copy.deepcopy(self.P_net)
         self.P_target_net.name = 'P_target_net'
+        self.P_target_net.checkpoint_file = self.P_target_net.checkpoint_dir + '/' + self.P_target_net.name
 
         self.Q1_target_net = copy.deepcopy(self.Q1_net)
         self.Q1_target_net.name = 'Q1_target_net'
+        self.Q1_target_net.checkpoint_file = self.Q1_target_net.checkpoint_dir + '/' + self.Q1_target_net.name
 
         self.Q2_target_net = copy.deepcopy(self.Q2_net)
         self.Q2_target_net.name = 'Q2_target_net'
+        self.Q2_target_net.checkpoint_file = self.Q2_target_net.checkpoint_dir + '/' + self.Q2_target_net.name
         
         self.target_entropy = actions_dim
 
-        self.alpha = torch.tensor(0.01, dtype=torch.float).to(self.P_net.device)
+        # Create entropy temperature coefficient 
+        self.alpha = torch.tensor(0.01, dtype=torch.float64).to(self.P_net.device)
         self.alpha.requires_grad = True
 
         self.alpha_optimizer = optim.Adam([self.alpha], lr=0.001, betas=(0.9, 0.999))
