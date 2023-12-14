@@ -7,42 +7,20 @@ from EnvironmentTetrapod import Environment
 import multiprocessing
 import queue
 import threading
+from threading import Timer
 import pyqtgraph as pg
 from dvg_pyqtgraph_threadsafe import PlotCurve
-import matplotlib.pyplot as plt
+
 import sys
 
-from PyQt5.QtWidgets import QApplication, QGridLayout, QGraphicsEllipseItem
-
+from PyQt5.QtWidgets import QApplication, QGraphicsEllipseItem, QGraphicsRectItem
 from PyQt5 import QtCore
-
-from threading import Timer
-
-import pyqtgraph.opengl as gl
 
 data_type = np.float64
 
-obs_dim = 19
-act_dim = 12
-
-# Variables for 3D plotting (shared between processes)
-# Create mesh-grid
-axis_1D = np.linspace(-2, 2, num=30)
-mesh_x, mesh_y = np.meshgrid(axis_1D, axis_1D)
-axis_2D = np.concatenate((np.array(mesh_x).reshape(-1,1), np.array(mesh_y).reshape(-1,1)), axis=1)
-
-# Define obs and act variables to compute Q later
-# obs = initial state (joints in zero) in every posible position with 30x30 points of resolution
-# act = no initial action (all zeros in every state evaluated)
-obs_plot = np.zeros((len(axis_2D),)+(obs_dim,), dtype=data_type)
-obs_plot[:, 0:2] = axis_2D[:, 0:2]
-act_plot = np.zeros((len(axis_2D),)+(12,), dtype=data_type)
-
-cmap = plt.get_cmap('jet')
-
 def SAC_Agent_Training(q):
     global obs_plot, act_plot
-    env = Environment(obs_sp_shape=(obs_dim,), act_sp_shape=(act_dim,), dest_pos=(0,0))
+    env = Environment(obs_sp_shape=(19,), act_sp_shape=(12,), dest_pos=(0,0))
 
     load_agent = True
     load_train_history = True
@@ -68,9 +46,6 @@ def SAC_Agent_Training(q):
     ep_ret = np.zeros((episodes, 3), dtype=data_type)                       # Returns for each episode (real, expected and RMSE)
     ep_loss = np.zeros((episodes, 2), dtype=data_type)                       # Training loss for each episode (Q and P)
     ep_alpha = np.zeros((episodes,), dtype=data_type)                # Alpha for each episode
-
-    obs_plot_tensor = torch.tensor(obs_plot, dtype=torch.float64).to(agent.P_net.device)
-    act_plot_tensor = torch.tensor(act_plot, dtype=torch.float64).to(agent.P_net.device)
 
     if load_train_history:
         # Check the last episode saved in Progress.txt
@@ -143,9 +118,7 @@ def SAC_Agent_Training(q):
         print("P_loss: ", ep_loss[episode, 1])
         print("Alpha: ", ep_alpha[episode])
 
-        # Q_evaluated = agent.minimal_Q(obs_plot_tensor, act_plot_tensor).numpy(force=True).reshape((30,30))
-
-        q.put((episode, ep_ret, ep_loss, ep_alpha, ep_obs[0:ep_len+1, 0], ep_obs[0:ep_len+1, 1]))#, Q_evaluated))
+        q.put((episode, ep_ret, ep_loss, ep_alpha, ep_obs[0:ep_len+1, 0], ep_obs[0:ep_len+1, 1]))
         
         if episode % save_period == 0:
             agent.save_models()
@@ -181,12 +154,6 @@ def updateplot(q):
         Trajectory_x_data = results[4]
         Trajectory_y_data = results[5]
 
-        # Q_evaluated = results[6]
-
-        # minZ=np.min(Q_evaluated)
-        # maxZ=np.max(Q_evaluated)
-        # rgba_img = cmap((Q_evaluated - minZ)/(maxZ - minZ))
-
         curve_Trajectory.setData(Trajectory_x_data,Trajectory_y_data)
         curve_P_Loss.setData(episode_linspace,P_loss_data[0:last_episode+1])
         curve_Q_Loss.setData(episode_linspace,Q_loss_data[0:last_episode+1])
@@ -206,12 +173,10 @@ def updateplot(q):
     except queue.Empty:
         #print("Empty Queue")
         pass
-
-
-            
+         
 if __name__ == '__main__':
-    global curve_Trajectory, curve_P_Loss, curve_Q_Loss, curve_Returns, curve_Return_Error, curve_Alpha, surface_Q_function, signalComm
-    print('Thread ={}          Function = main()'.format(threading.currentThread().getName()))
+    global curve_Trajectory, curve_P_Loss, curve_Q_Loss, curve_Returns, curve_Return_Error, curve_Alpha
+    # print('Thread ={}          Function = main()'.format(threading.currentThread().getName()))
     app = QApplication(sys.argv)
 
     #Create a queue to share data between process
@@ -223,68 +188,42 @@ if __name__ == '__main__':
 
     # Create window
     
-    window = pg.GraphicsLayoutWidget(title="Cuadruped - Training information")
-    window.resize(1500,800)
+    grid_layout = pg.GraphicsLayoutWidget(title="Cuadruped - Training information")
+    grid_layout.resize(1080,800)
     
     pg.setConfigOptions(antialias=True)
 
-    grid_layout = QGridLayout()
-
-    window.setLayout(grid_layout)
-
-    plot_Trajectory = pg.PlotWidget(title="Last Trajectory")
-    plot_Trajectory.setXRange(-3,3)
-    plot_Trajectory.setYRange(-3,3)
-    grid_layout.addWidget(plot_Trajectory, 0, 0)
+    plot_Trajectory = grid_layout.addPlot(title="Last Trajectory", row=0, col=0)
+    plot_Trajectory.plot([0], [0], pen=None, symbol='o', symbolPen=None, symbolSize=5, symbolBrush=(255, 255, 255, 200))
     
-    plot_Q_Loss = pg.PlotWidget(title="State-Value Loss")
+    plot_Q_Loss = grid_layout.addPlot(title="State-Value Loss", row=0, col=1)
     plot_Q_Loss.showGrid(x=True, y=True)
-    grid_layout.addWidget(plot_Q_Loss, 0, 1)
     
-    plot_P_Loss = pg.PlotWidget(title="Policy Loss")
+    plot_P_Loss = grid_layout.addPlot(title="Policy Loss", row=0, col=2)
     plot_P_Loss.showGrid(x=True, y=True)
-    grid_layout.addWidget(plot_P_Loss, 0, 2)
 
-    plot_Returns = pg.PlotWidget(title="Real return vs Predicted return")
+    plot_Returns = grid_layout.addPlot(title="Real return vs Predicted return", row=1, col=0)
     plot_Returns.addLegend()
     plot_Returns.showGrid(x=True, y=True)
-    grid_layout.addWidget(plot_Returns, 1, 0)
     
-    plot_Return_Error = pg.PlotWidget(title="RMSD of Real and Estimated")
+    plot_Return_Error = grid_layout.addPlot(title="RMSD of Real and Estimated", row=1, col=1)
     plot_Return_Error.showGrid(x=True, y=True)
-    grid_layout.addWidget(plot_Return_Error, 1, 1)
     
-    plot_Alpha = pg.PlotWidget(title="Alpha")
+    plot_Alpha = grid_layout.addPlot(title="Alpha", row=1, col=2)
     plot_Alpha.showGrid(x=True, y=True)
-    grid_layout.addWidget(plot_Alpha, 1, 2)
-
-    N = 11
-    M = 11
-
-    x = np.linspace(0, 10, N)
-    y = np.linspace(0, 10, M)
-
-    z = np.random.random((N, M))
-
-    gl_view_widget = gl.GLViewWidget()
-    surface_Q_function = gl.GLSurfacePlotItem(x=x, y=y, z=z, colors=None)
-    gl_view_widget.addItem(surface_Q_function)
-    grid_layout.addWidget(gl_view_widget, 0, 3, 1, 1)
-
-    gl_view_widget.sizeHint = lambda: pg.QtCore.QSize(100, 100)
-    plot_Trajectory.sizeHint = lambda: pg.QtCore.QSize(100, 100)
-    plot_Q_Loss.sizeHint = lambda: pg.QtCore.QSize(100, 100)
-    plot_P_Loss.sizeHint = lambda: pg.QtCore.QSize(100, 100)
-    plot_Returns.sizeHint = lambda: pg.QtCore.QSize(100, 100)
-    plot_Return_Error.sizeHint = lambda: pg.QtCore.QSize(100, 100)
-    plot_Alpha.sizeHint = lambda: pg.QtCore.QSize(100, 100)
-    gl_view_widget.setSizePolicy(plot_Trajectory.sizePolicy())
 
     # Add circule to delimitate scene of trajectory plot
-    p_ellipse = QGraphicsEllipseItem(0, 0, 3, 3)  # x, y, width, height
-    # p_ellipse.setPen(pg.mkPen((0, 0, 0, 100)))
-    # p_ellipse.setBrush(pg.mkBrush((50, 50, 200)))
-    plot_Trajectory.addItem(p_ellipse)
+    circle = QGraphicsEllipseItem(-3, -3, 6, 6)  # x, y, width, height
+    circle.setPen(pg.mkPen((255, 255, 255, 255), width=2))
+    circle.setBrush(pg.mkBrush(None))
+
+    square = QGraphicsRectItem(-2, -2, 4, 4)
+    square.setPen(pg.mkPen((255,255,255,100), width=1, style=QtCore.Qt.DashLine))
+    square.setBrush(pg.mkBrush(None))
+
+    plot_Trajectory.addItem(circle)
+    plot_Trajectory.addItem(square)
+    plot_Trajectory.setRange(xRange=(-3,3), yRange=(-3,3), padding=None, update=True, disableAutoRange=True)
 
     #Curves using dvg_pyqtgraph_threadsafe to update them in another thread
     curve_Trajectory = PlotCurve(linked_curve=plot_Trajectory.plot())
@@ -299,7 +238,7 @@ if __name__ == '__main__':
     t = RepeatTimer(1, updateplot,(q,))
     t.start() 
     
-    window.show()
+    grid_layout.show()
 
     status = app.exec_()
     sys.exit(status)
