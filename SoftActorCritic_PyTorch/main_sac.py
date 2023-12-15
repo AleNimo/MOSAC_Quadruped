@@ -19,9 +19,9 @@ def SAC_Agent_Training(q):
     global obs_plot, act_plot
     env = Environment(obs_sp_shape=(19,), act_sp_shape=(12,), dest_pos=(0,0))
 
-    load_agent = True
-    load_train_history = True
-    load_replay_buffer = True   #(if load_train_history == false, the replay buffer is never loaded)
+    load_agent = False
+    load_train_history = False
+    load_replay_buffer = False   #(if load_train_history == false, the replay buffer is never loaded)
     
     episodes = 20000
     episode = 0
@@ -38,12 +38,13 @@ def SAC_Agent_Training(q):
     if load_agent:
         agent.load_models()
 
-    ep_obs = np.zeros((episode_steps+1,) + env.obs_sp_shape, dtype=data_type)     # Episode's observed states
-    ep_act = np.zeros((episode_steps,) + env.act_sp_shape, dtype=data_type)       # Episode's actions
-    ep_rwd = np.zeros((episode_steps, 1), dtype=data_type)                          # Episode's rewards
-    ep_ret = np.zeros((episodes, 3), dtype=data_type)                       # Returns for each episode (real, expected and RMSE)
-    ep_loss = np.zeros((episodes, 2), dtype=data_type)                       # Training loss for each episode (Q and P)
-    ep_alpha = np.zeros((episodes,), dtype=data_type)                # Alpha for each episode
+    ep_obs = np.zeros((episode_steps+1,) + env.obs_sp_shape, dtype=data_type)   # Episode's observed states
+    ep_act = np.zeros((episode_steps,) + env.act_sp_shape, dtype=data_type)     # Episode's actions
+    ep_rwd = np.zeros((episode_steps, 1), dtype=data_type)                      # Episode's rewards
+    ep_ret = np.zeros((episodes, 3), dtype=data_type)                           # Returns for each episode (real, expected and RMSE)
+    ep_loss = np.zeros((episodes, 2), dtype=data_type)                          # Training loss for each episode (Q and P)
+    ep_alpha = np.zeros((episodes,), dtype=data_type)                           # Alpha for each episode
+    ep_entropy = np.zeros((episodes,), dtype=data_type)                         # Entropy of the policy for each episode
 
     if load_train_history:
         # Check the last episode saved in Progress.txt
@@ -58,6 +59,7 @@ def SAC_Agent_Training(q):
         ep_ret[0:last_episode+1] = loaded_arrays['returns']
         ep_loss[0:last_episode+1] = loaded_arrays['loss']
         ep_alpha[0:last_episode+1] = loaded_arrays['alpha']
+        ep_entropy[0:last_episode+1] = loaded_arrays['entropy']
 
         if load_replay_buffer:
             agent.replay_buffer.load(last_episode)
@@ -111,25 +113,27 @@ def SAC_Agent_Training(q):
         ep_loss[episode, 0] = agent.P_loss.item()
         ep_loss[episode, 1] = agent.Q_loss.item()
         ep_alpha[episode] = agent.alpha.item()
+        ep_entropy[episode] = agent.entropy.item()
         
         print("Episode: ", episode)
         print("Q_loss: ", ep_loss[episode, 0])
         print("P_loss: ", ep_loss[episode, 1])
         print("Alpha: ", ep_alpha[episode])
+        print("Policy's Entropy: ", ep_entropy[episode])
 
-        q.put((episode, ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_obs[0:ep_len+1, 0], ep_obs[0:ep_len+1, 1]))
+        q.put((episode, ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_obs[0:ep_len+1, 0], ep_obs[0:ep_len+1, 1]), ep_entropy[0:episode+1])
         
         if episode % save_period == 0:
             agent.save_models()
             agent.replay_buffer.save(episode)
             
             filename = './Train/Train_History_episode_{0:07d}'.format(episode)
-            np.savez_compressed(filename, returns = ep_ret[0:episode+1], loss = ep_loss[0:episode+1], alpha = ep_alpha[0:episode+1])
+            np.savez_compressed(filename, returns = ep_ret[0:episode+1], loss = ep_loss[0:episode+1], alpha = ep_alpha[0:episode+1], entropy = ep_entropy[0:episode+1])
         
         episode += 1
 
 def updateplot():   
-    global q, curve_Trajectory, curve_P_Loss,curve_Q_Loss,curve_Real_Return, curve_Predicted_Return,curve_Return_Error,curve_Alpha
+    global q, curve_Trajectory, curve_P_Loss,curve_Q_Loss,curve_Real_Return, curve_Predicted_Return,curve_Return_Error,curve_Alpha, curve_Entropy
     # print('Thread ={}          Function = updateplot()'.format(threading.currentThread().getName()))
     try:  
         results=q.get_nowait()
@@ -143,6 +147,7 @@ def updateplot():
         Alpha_data = results[3]
         Trajectory_x_data = results[4]
         Trajectory_y_data = results[5]
+        Entropy_data = results[6]
 
         curve_Trajectory.setData(Trajectory_x_data,Trajectory_y_data)
         curve_P_Loss.setData(episode_linspace,P_loss_data)
@@ -151,21 +156,14 @@ def updateplot():
         curve_Predicted_Return.setData(episode_linspace, Predicted_Return_data)
         curve_Return_Error.setData(episode_linspace,Return_loss_data)
         curve_Alpha.setData(episode_linspace,Alpha_data)
-
-        curve_Trajectory.update()
-        curve_P_Loss.update()
-        curve_Q_Loss.update()
-        curve_Real_Return.update()
-        curve_Predicted_Return.update()
-        curve_Return_Error.update()
-        curve_Alpha.update()
+        curve_Entropy.setData(episode_linspace, Entropy_data)
 
     except queue.Empty:
         #print("Empty Queue")
         pass
 
 if __name__ == '__main__':
-    global q, curve_Trajectory, curve_P_Loss, curve_Q_Loss, curve_Returns, curve_Return_Error, curve_Alpha
+    global q, curve_Trajectory, curve_P_Loss, curve_Q_Loss, curve_Returns, curve_Return_Error, curve_Alpha, curve_Entropy
     # print('Thread ={}          Function = main()'.format(threading.currentThread().getName()))
     app = QApplication(sys.argv)
 
@@ -200,8 +198,8 @@ if __name__ == '__main__':
     plot_Return_Error = grid_layout.addPlot(title="RMSD of Real and Estimated", row=1, col=1)
     plot_Return_Error.showGrid(x=True, y=True)
     
-    plot_Alpha = grid_layout.addPlot(title="Alpha", row=1, col=2)
-    plot_Alpha.showGrid(x=True, y=True)
+    plot_Alpha_Entropy = grid_layout.addPlot(title="Alpha and Policy's Entropy", row=1, col=2)
+    plot_Alpha_Entropy.showGrid(x=True, y=True)
 
     # Add circule to delimitate scene of trajectory plot
     circle = QGraphicsEllipseItem(-3, -3, 6, 6)  # x, y, width, height
@@ -224,7 +222,8 @@ if __name__ == '__main__':
     curve_Real_Return = plot_Returns.plot(pen=(255,0,0), name='Real')
     curve_Predicted_Return = plot_Returns.plot(pen=(0,255,0), name='Predicted')
     curve_Return_Error = plot_Return_Error.plot()
-    curve_Alpha = plot_Alpha.plot()
+    curve_Alpha = plot_Alpha_Entropy.plot(pen=(255,0,0), name='Alpha')
+    curve_Entropy = plot_Alpha_Entropy.plot(pen=(0,255,0), name='Entropy')
     
     #Timer to update plots every 1 second (if there is new data) in another thread
     timer = QtCore.QTimer()

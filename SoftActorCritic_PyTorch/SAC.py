@@ -29,7 +29,7 @@ class SAC_Agent():
         self.Q2_net = Q_Network(obs_dim, actions_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
                                   alfa=0.001, beta1=0.9, beta2=0.999, name='Q2_net')
         
-        self.Q_loss = torch.tensor(0, dtype=torch.float).to(self.P_net.device)
+        self.Q_loss = torch.tensor(0, dtype=torch.float).to(self.Q1_net.device)
         
         # Create target networks with different names and directories
         self.P_target_net = copy.deepcopy(self.P_net)
@@ -45,6 +45,8 @@ class SAC_Agent():
         self.Q2_target_net.checkpoint_file = self.Q2_target_net.checkpoint_dir + '/' + self.Q2_target_net.name
         
         self.target_entropy = actions_dim
+
+        self.entropy = torch.tensor(0, dtype=torch.float).to(self.P_net.device)
 
         # Create entropy temperature coefficient 
         self.alpha = torch.tensor(0.01, dtype=torch.float64).to(self.P_net.device)
@@ -164,6 +166,8 @@ class SAC_Agent():
         self.P_net.optimizer.zero_grad()
 
         action, log_prob = self.P_net.sample_normal(state, reparameterize=True)
+
+        self.entropy = -log_prob
 
         Q = self.minimal_Q(state, action).view(-1)
 
