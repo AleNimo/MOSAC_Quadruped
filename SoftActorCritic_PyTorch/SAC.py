@@ -116,6 +116,7 @@ class SAC_Agent():
         self.P_target_net.save_checkpoint()
         self.Q1_target_net.save_checkpoint()
         self.Q2_target_net.save_checkpoint()
+        torch.save(self.alpha, './Train/Networks/alpha_tensor.pt')
     
     def load_models(self):
         self.P_net.load_checkpoint()
@@ -124,6 +125,9 @@ class SAC_Agent():
         self.P_target_net.load_checkpoint()
         self.Q1_target_net.load_checkpoint()
         self.Q2_target_net.load_checkpoint()
+        self.alpha = torch.load('./Train/Networks/alpha_tensor.pt')
+        self.alpha_optimizer = optim.Adam([self.alpha], lr=0.001, betas=(0.9, 0.999))
+        
 
     def learn(self):
         if self.replay_buffer.mem_counter < self.replay_batch_size:

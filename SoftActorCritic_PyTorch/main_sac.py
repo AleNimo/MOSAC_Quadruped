@@ -6,10 +6,7 @@ from EnvironmentTetrapod import Environment
 
 import multiprocessing
 import queue
-import threading
-from threading import Timer
 import pyqtgraph as pg
-from dvg_pyqtgraph_threadsafe import PlotCurve
 
 import sys
 
@@ -30,6 +27,7 @@ def SAC_Agent_Training(q):
     episode = 0
     episode_steps = 200 #Maximum steps allowed per episode
     save_period = 1000
+    training_frequency = 3
 
     agent = SAC_Agent('Cuadruped', env.obs_sp_shape[0], env.act_sp_shape[0], replay_buffer_size=1000000)
 
@@ -52,19 +50,19 @@ def SAC_Agent_Training(q):
         if not os.path.isfile('./Train/Progress.txt'):
             print('Progress.txt could not be found')
             exit
-        with open('./Train/Progress.txt', 'r') as file: episode = int(np.loadtxt(file))
+        with open('./Train/Progress.txt', 'r') as file: last_episode = int(np.loadtxt(file))
 
-        filename = './Train/Train_History_episode_{0:07d}.npz'.format(episode)
+        filename = './Train/Train_History_episode_{0:07d}.npz'.format(last_episode)
         loaded_arrays = np.load(filename)
 
-        ep_ret[0:episode] = loaded_arrays['returns']
-        ep_loss[0:episode] = loaded_arrays['loss']
-        ep_alpha[0:episode] = loaded_arrays['alpha'][0:episode]
+        ep_ret[0:last_episode+1] = loaded_arrays['returns']
+        ep_loss[0:last_episode+1] = loaded_arrays['loss']
+        ep_alpha[0:last_episode+1] = loaded_arrays['alpha']
 
         if load_replay_buffer:
-            agent.replay_buffer.load(episode)
+            agent.replay_buffer.load(last_episode)
         
-        episode += 1
+        episode = last_episode + 1
 
     while episode <= episodes:
         
@@ -107,7 +105,8 @@ def SAC_Agent_Training(q):
         ep_ret[episode, 2] = np.sqrt(np.square(ep_ret[episode,0] - ep_ret[episode, 1]))
 
         for i in range(ep_len):
-            agent.learn()
+            if i % training_frequency == 0:
+                agent.learn()
         
         ep_loss[episode, 0] = agent.P_loss.item()
         ep_loss[episode, 1] = agent.Q_loss.item()
@@ -118,29 +117,20 @@ def SAC_Agent_Training(q):
         print("P_loss: ", ep_loss[episode, 1])
         print("Alpha: ", ep_alpha[episode])
 
-        q.put((episode, ep_ret, ep_loss, ep_alpha, ep_obs[0:ep_len+1, 0], ep_obs[0:ep_len+1, 1]))
+        q.put((episode, ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_obs[0:ep_len+1, 0], ep_obs[0:ep_len+1, 1]))
         
         if episode % save_period == 0:
             agent.save_models()
             agent.replay_buffer.save(episode)
             
             filename = './Train/Train_History_episode_{0:07d}'.format(episode)
-            np.savez_compressed(filename, returns = ep_ret[0:episode], loss = ep_loss[0:episode], alpha = ep_alpha[0:episode])
+            np.savez_compressed(filename, returns = ep_ret[0:episode+1], loss = ep_loss[0:episode+1], alpha = ep_alpha[0:episode+1])
         
         episode += 1
 
-class RepeatTimer(Timer):  
-    def run(self):  
-        while not self.finished.wait(self.interval):  
-            self.function(*self.args,**self.kwargs)
-        
-def emit_signal(q):
-    global signalComm
-    signalComm.request_graph_update.emit(q)
-
-def updateplot(q):   
-    global curve_Trajectory, curve_P_Loss,curve_Q_Loss,curve_Real_Return, curve_Predicted_Return,curve_Return_Error,curve_Alpha
-    #print('Thread ={}          Function = updateplot()'.format(threading.currentThread().getName()))
+def updateplot():   
+    global q, curve_Trajectory, curve_P_Loss,curve_Q_Loss,curve_Real_Return, curve_Predicted_Return,curve_Return_Error,curve_Alpha
+    # print('Thread ={}          Function = updateplot()'.format(threading.currentThread().getName()))
     try:  
         results=q.get_nowait()
         last_episode = results[0]
@@ -155,12 +145,12 @@ def updateplot(q):
         Trajectory_y_data = results[5]
 
         curve_Trajectory.setData(Trajectory_x_data,Trajectory_y_data)
-        curve_P_Loss.setData(episode_linspace,P_loss_data[0:last_episode+1])
-        curve_Q_Loss.setData(episode_linspace,Q_loss_data[0:last_episode+1])
-        curve_Real_Return.setData(episode_linspace,Real_Return_data[0:last_episode+1])
-        curve_Predicted_Return.setData(episode_linspace, Predicted_Return_data[0:last_episode+1])
-        curve_Return_Error.setData(episode_linspace,Return_loss_data[0:last_episode+1])
-        curve_Alpha.setData(episode_linspace,Alpha_data[0:last_episode+1])
+        curve_P_Loss.setData(episode_linspace,P_loss_data)
+        curve_Q_Loss.setData(episode_linspace,Q_loss_data)
+        curve_Real_Return.setData(episode_linspace,Real_Return_data)
+        curve_Predicted_Return.setData(episode_linspace, Predicted_Return_data)
+        curve_Return_Error.setData(episode_linspace,Return_loss_data)
+        curve_Alpha.setData(episode_linspace,Alpha_data)
 
         curve_Trajectory.update()
         curve_P_Loss.update()
@@ -173,9 +163,9 @@ def updateplot(q):
     except queue.Empty:
         #print("Empty Queue")
         pass
-         
+
 if __name__ == '__main__':
-    global curve_Trajectory, curve_P_Loss, curve_Q_Loss, curve_Returns, curve_Return_Error, curve_Alpha
+    global q, curve_Trajectory, curve_P_Loss, curve_Q_Loss, curve_Returns, curve_Return_Error, curve_Alpha
     # print('Thread ={}          Function = main()'.format(threading.currentThread().getName()))
     app = QApplication(sys.argv)
 
@@ -194,6 +184,7 @@ if __name__ == '__main__':
     pg.setConfigOptions(antialias=True)
 
     plot_Trajectory = grid_layout.addPlot(title="Last Trajectory", row=0, col=0)
+    #Center of the plot, target of the agent
     plot_Trajectory.plot([0], [0], pen=None, symbol='o', symbolPen=None, symbolSize=5, symbolBrush=(255, 255, 255, 200))
     
     plot_Q_Loss = grid_layout.addPlot(title="State-Value Loss", row=0, col=1)
@@ -217,6 +208,7 @@ if __name__ == '__main__':
     circle.setPen(pg.mkPen((255, 255, 255, 255), width=2))
     circle.setBrush(pg.mkBrush(None))
 
+    # The square delimitates the zone where de agent can appear
     square = QGraphicsRectItem(-2, -2, 4, 4)
     square.setPen(pg.mkPen((255,255,255,100), width=1, style=QtCore.Qt.DashLine))
     square.setBrush(pg.mkBrush(None))
@@ -226,17 +218,18 @@ if __name__ == '__main__':
     plot_Trajectory.setRange(xRange=(-3,3), yRange=(-3,3), padding=None, update=True, disableAutoRange=True)
 
     #Curves using dvg_pyqtgraph_threadsafe to update them in another thread
-    curve_Trajectory = PlotCurve(linked_curve=plot_Trajectory.plot())
-    curve_P_Loss=PlotCurve(linked_curve=plot_P_Loss.plot())
-    curve_Q_Loss=PlotCurve(linked_curve=plot_Q_Loss.plot())
-    curve_Real_Return=PlotCurve(linked_curve=plot_Returns.plot(pen=(255,0,0), name='Real'))
-    curve_Predicted_Return=PlotCurve(linked_curve=plot_Returns.plot(pen=(0,255,0), name='Predicted'))
-    curve_Return_Error=PlotCurve(linked_curve=plot_Return_Error.plot())
-    curve_Alpha=PlotCurve(linked_curve=plot_Alpha.plot())
+    curve_Trajectory = plot_Trajectory.plot()
+    curve_P_Loss = plot_P_Loss.plot()
+    curve_Q_Loss = plot_Q_Loss.plot()
+    curve_Real_Return = plot_Returns.plot(pen=(255,0,0), name='Real')
+    curve_Predicted_Return = plot_Returns.plot(pen=(0,255,0), name='Predicted')
+    curve_Return_Error = plot_Return_Error.plot()
+    curve_Alpha = plot_Alpha.plot()
     
     #Timer to update plots every 1 second (if there is new data) in another thread
-    t = RepeatTimer(1, updateplot,(q,))
-    t.start() 
+    timer = QtCore.QTimer()
+    timer.timeout.connect(updateplot)
+    timer.start(1000)
     
     grid_layout.show()
 
