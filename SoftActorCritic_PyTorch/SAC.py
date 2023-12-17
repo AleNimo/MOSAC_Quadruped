@@ -151,7 +151,7 @@ class SAC_Agent():
 
         next_action, _ = self.P_target_net.sample_normal(next_state, reparameterize=False)
         Q_hat = reward + self.discount_factor * (1-done_flag) * self.minimal_Q_target(next_state, next_action).view(-1)
-        
+
         Q = self.minimal_Q(state, action).view(-1)
 
         self.Q_loss = F.mse_loss(Q, Q_hat)
@@ -167,7 +167,7 @@ class SAC_Agent():
 
         action, log_prob = self.P_net.sample_normal(state, reparameterize=True)
 
-        self.entropy = -log_prob
+        self.entropy = torch.mean(-log_prob)
 
         Q = self.minimal_Q(state, action).view(-1)
 
