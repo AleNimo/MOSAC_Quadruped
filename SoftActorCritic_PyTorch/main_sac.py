@@ -189,9 +189,9 @@ if __name__ == '__main__':
     
     pg.setConfigOptions(antialias=True)
 
-    plot_Trajectory = grid_layout.addPlot(title="Last Trajectory", row=0, col=0)
+    plot_Trajectory = grid_layout.addPlot(title="Trajectory in Last Episode", row=0, col=0)
 
-    plot_StepReward = grid_layout.addPlot(title="Reward per Step", row=0, col=1)
+    plot_StepReward = grid_layout.addPlot(title="Reward per Step in Last Episode", row=0, col=1)
     plot_StepReward.showGrid(x=True, y=True)
 
     plot_Returns = grid_layout.addPlot(title="Real Return vs Predicted Return", row=0, col=2)

@@ -21,7 +21,7 @@ class Q_Network(nn.Module):
         self.checkpoint_dir = chkpt_dir
         self.checkpoint_file = self.checkpoint_dir + '/' + self.name
         
-        self.hidden1 = nn.Linear(self.obs_dim + actions_dim, self.hidden1_dim, dtype=data_type)
+        self.hidden1 = nn.Linear(self.obs_dim + self.actions_dim, self.hidden1_dim, dtype=data_type)
         self.hidden2 = nn.Linear(self.hidden1_dim, self.hidden2_dim, dtype=data_type)
         self.hidden3 = nn.Linear(self.hidden2_dim, self.hidden3_dim, dtype=data_type)
         self.q = nn.Linear(self.hidden3_dim, 1, dtype=data_type)

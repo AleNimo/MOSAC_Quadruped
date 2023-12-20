@@ -44,7 +44,7 @@ class SAC_Agent():
         self.Q2_target_net.name = 'Q2_target_net'
         self.Q2_target_net.checkpoint_file = self.Q2_target_net.checkpoint_dir + '/' + self.Q2_target_net.name
         
-        self.target_entropy = actions_dim
+        self.target_entropy = -actions_dim
 
         self.entropy = torch.tensor(0, dtype=torch.float).to(self.P_net.device)
 
@@ -144,27 +144,25 @@ class SAC_Agent():
         done_flag = torch.tensor(done_flag, dtype=torch.float64).to(self.P_net.device)
 
         #Update Q networks
+        with torch.no_grad():
+            next_action, log_prob = self.P_target_net.sample_normal(next_state, reparameterize=False)
+            Q_hat = reward + self.discount_factor * (1-done_flag) * (self.minimal_Q_target(next_state, next_action).view(-1) - self.alpha * log_prob)
 
-        #Bellman equation for Q_loss
+        Q1 = self.Q1_net(state, action).view(-1)
+        Q2 = self.Q2_net(state, action).view(-1)
+
+        Q1_loss = F.mse_loss(Q1, Q_hat)
+        Q2_loss = F.mse_loss(Q2, Q_hat)
+
+        self.Q_loss = Q1_loss + Q2_loss
+
         self.Q1_net.optimizer.zero_grad()
         self.Q2_net.optimizer.zero_grad()
-
-        next_action, _ = self.P_target_net.sample_normal(next_state, reparameterize=False)
-        Q_hat = reward + self.discount_factor * (1-done_flag) * self.minimal_Q_target(next_state, next_action).view(-1)
-
-        Q = self.minimal_Q(state, action).view(-1)
-
-        self.Q_loss = F.mse_loss(Q, Q_hat)
-
         self.Q_loss.backward()
-
         self.Q1_net.optimizer.step()
         self.Q2_net.optimizer.step()
 
         #Update P networks
-
-        self.P_net.optimizer.zero_grad()
-
         action, log_prob = self.P_net.sample_normal(state, reparameterize=True)
 
         self.entropy = torch.mean(-log_prob)
@@ -173,15 +171,15 @@ class SAC_Agent():
 
         self.P_loss = torch.mean(self.alpha * log_prob - Q)
 
+        self.P_net.optimizer.zero_grad()
         self.P_loss.backward()
-
         self.P_net.optimizer.step()
 
         #Update Alpha
 
         self.alpha_optimizer.zero_grad()
         
-        Alpha_loss = self.alpha * torch.mean((-log_prob + self.target_entropy).detach())
+        Alpha_loss = self.alpha * torch.mean((-log_prob - self.target_entropy).detach())
         Alpha_loss.backward()
 
         self.alpha_optimizer.step()
