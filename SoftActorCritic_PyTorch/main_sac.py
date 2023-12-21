@@ -20,6 +20,9 @@ def SAC_Agent_Training(q):
     env = Environment(obs_sp_shape=(19,), act_sp_shape=(12,), dest_pos=(0,0))
 
     load_agent = True
+
+    test_agent = True
+
     load_train_history = True
     load_replay_buffer = True   #(if load_train_history == false, the replay buffer is never loaded)
     
@@ -46,7 +49,7 @@ def SAC_Agent_Training(q):
     ep_alpha = np.zeros((episodes,), dtype=data_type)                           # Alpha for each episode
     ep_entropy = np.zeros((episodes,), dtype=data_type)                         # Entropy of the policy for each episode
 
-    if load_train_history:
+    if load_train_history and test_agent==False:
         # Check the last episode saved in Progress.txt
         if not os.path.isfile('./Train/Progress.txt'):
             print('Progress.txt could not be found')
@@ -66,23 +69,38 @@ def SAC_Agent_Training(q):
         
         episode = last_episode + 1
 
+    # Training
     while episode <= episodes:
         
         ep_obs[0], done_flag = env.reset(), False
 
-        for step in range(episode_steps):
-            # Decide action based on present observed state
-            ep_act[step] = agent.choose_action(ep_obs[step])
-            
-            # Act in the environment
-            ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
-            
-            # Store in replay buffer
-            agent.remember(ep_obs[step], ep_act[step], ep_rwd[step], ep_obs[step+1], done_flag)
+        # Testing
+        if test_agent:
+            for step in range(episode_steps):
+                # Decide action based on present observed state (taking the mean)
+                ep_act[step] = agent.choose_action(ep_obs[step], random=False)
 
-            # End episode on termination condition
-            if done_flag: break
-        
+                # Act in the environment
+                ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
+
+                if done_flag: break
+                
+            ep_len = step + 1
+
+        else:
+            for step in range(episode_steps):
+                # Decide action based on present observed state (mean + std)
+                ep_act[step] = agent.choose_action(ep_obs[step])
+                
+                # Act in the environment
+                ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
+                
+                # Store in replay buffer
+                agent.remember(ep_obs[step], ep_act[step], ep_rwd[step], ep_obs[step+1], done_flag)
+
+                # End episode on termination condition
+                if done_flag: break
+
         ep_len = step + 1
 
         # Compute the real and expected returns and the root mean square error:
@@ -108,10 +126,13 @@ def SAC_Agent_Training(q):
         # Root mean square error
         ep_ret[episode, 2] = np.sqrt(np.square(ep_ret[episode,0] - ep_ret[episode, 1]))
 
-        for i in range(ep_len):
-            if i % training_frequency == 0:
-                agent.learn()
-        
+        if test_agent == False:
+            for i in range(ep_len):
+                if i % training_frequency == 0:
+                    agent.learn()
+
+            
+            
         ep_loss[episode, 0] = agent.Q_loss.item()
         ep_loss[episode, 1] = agent.P_loss.item()
         ep_alpha[episode] = agent.alpha.item()
@@ -127,7 +148,7 @@ def SAC_Agent_Training(q):
 
         q.put((episode, ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_obs[0:ep_len+1, 0], ep_obs[0:ep_len+1, 1], ep_entropy[0:episode+1], ep_rwd[0:ep_len+1]))
         
-        if episode % save_period == 0:
+        if episode % save_period == 0 and test_agent == False:
             agent.save_models()
             agent.replay_buffer.save(episode)
             

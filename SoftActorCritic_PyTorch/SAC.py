@@ -8,10 +8,14 @@ from Networks import Q_Network, P_Network
 
 import copy
 
+una_vez = True
+
 class SAC_Agent():
     def __init__(self, name, obs_dim, actions_dim, replay_buffer_size):
         
         self.agent_name = name
+        
+        #Default values
         self.discount_factor = 0.95
         self.update_factor = 0.005
         self.replay_batch_size = 1000
@@ -32,9 +36,6 @@ class SAC_Agent():
         self.Q_loss = torch.tensor(0, dtype=torch.float).to(self.Q1_net.device)
         
         # Create target networks with different names and directories
-        self.P_target_net = copy.deepcopy(self.P_net)
-        self.P_target_net.name = 'P_target_net'
-        self.P_target_net.checkpoint_file = self.P_target_net.checkpoint_dir + '/' + self.P_target_net.name
 
         self.Q1_target_net = copy.deepcopy(self.Q1_net)
         self.Q1_target_net.name = 'Q1_target_net'
@@ -67,9 +68,13 @@ class SAC_Agent():
         else:
             os.chdir("./{0:s}".format(self.agent_name))
 
-    def choose_action(self, observations):
+    def choose_action(self, observations, random = True):
         state = torch.tensor([observations]).to(self.P_net.device)
-        actions,_ = self.P_net.sample_normal(state, reparameterize=False)
+        
+        if random:
+            actions,_ = self.P_net.sample_normal(state, reparameterize=False)
+        else:
+            actions,_ = self.P_net(state)
 
         return actions.detach().cpu().numpy()
     
@@ -102,20 +107,10 @@ class SAC_Agent():
         self.Q1_target_net.load_state_dict(Q1_state_dict)
         self.Q2_target_net.load_state_dict(Q2_state_dict)
 
-
-        target_P_state_dict = dict(self.P_target_net.named_parameters())
-        P_state_dict = dict(self.P_net.named_parameters())
-
-        for name in P_state_dict:
-            P_state_dict[name] = self.update_factor * P_state_dict[name].clone() + (1-self.update_factor) * target_P_state_dict[name].clone()
-
-        self.P_target_net.load_state_dict(P_state_dict)
-
     def save_models(self):
         self.P_net.save_checkpoint()
         self.Q1_net.save_checkpoint()
         self.Q2_net.save_checkpoint()
-        self.P_target_net.save_checkpoint()
         self.Q1_target_net.save_checkpoint()
         self.Q2_target_net.save_checkpoint()
         torch.save(self.alpha, './Train/Networks/alpha_tensor.pt')
@@ -124,14 +119,13 @@ class SAC_Agent():
         self.P_net.load_checkpoint()
         self.Q1_net.load_checkpoint()
         self.Q2_net.load_checkpoint()
-        self.P_target_net.load_checkpoint()
         self.Q1_target_net.load_checkpoint()
         self.Q2_target_net.load_checkpoint()
         self.alpha = torch.load('./Train/Networks/alpha_tensor.pt')
         self.alpha_optimizer = optim.Adam([self.alpha], lr=0.001, betas=(0.9, 0.999))
         
-
     def learn(self):
+        global una_vez
         if self.replay_buffer.mem_counter < self.replay_batch_size:
             return
         state, action, reward, next_state, done_flag = self.replay_buffer.sample(self.replay_batch_size)
@@ -145,16 +139,13 @@ class SAC_Agent():
 
         #Update Q networks
         with torch.no_grad():
-            next_action, log_prob = self.P_target_net.sample_normal(next_state, reparameterize=False)
-            Q_hat = reward + self.discount_factor * (1-done_flag) * (self.minimal_Q_target(next_state, next_action).view(-1) - self.alpha * log_prob)
+            next_action, log_prob = self.P_net.sample_normal(next_state, reparameterize=False)
+            next_Q = self.minimal_Q_target(next_state, next_action)
+            Q_hat = reward + self.discount_factor * (1-done_flag) * (next_Q.view(-1) - self.alpha * log_prob.view(-1))
 
-        Q1 = self.Q1_net(state, action).view(-1)
-        Q2 = self.Q2_net(state, action).view(-1)
+        Q = self.minimal_Q(state, action).view(-1)
 
-        Q1_loss = F.mse_loss(Q1, Q_hat)
-        Q2_loss = F.mse_loss(Q2, Q_hat)
-
-        self.Q_loss = Q1_loss + Q2_loss
+        self.Q_loss = F.mse_loss(Q, Q_hat, reduction='mean')
 
         self.Q1_net.optimizer.zero_grad()
         self.Q2_net.optimizer.zero_grad()
@@ -169,7 +160,7 @@ class SAC_Agent():
 
         Q = self.minimal_Q(state, action).view(-1)
 
-        self.P_loss = torch.mean(self.alpha * log_prob - Q)
+        self.P_loss = torch.mean(self.alpha * log_prob.view(-1) - Q)
 
         self.P_net.optimizer.zero_grad()
         self.P_loss.backward()
