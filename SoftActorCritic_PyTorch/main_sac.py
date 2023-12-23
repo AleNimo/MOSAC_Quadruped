@@ -146,7 +146,7 @@ def SAC_Agent_Training(q):
 
         q.put((episode, ep_obs[0:ep_len+1], env.target_direction, ep_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1]))
         
-        if episode % save_period == 0 and test_agent == False:
+        if (episode % save_period == 0 or episode == 50) and test_agent == False:
             agent.save_models()
             agent.replay_buffer.save(episode)
             
@@ -172,8 +172,8 @@ def updatePlot():
 
         target_direction = results[2]
 
-        Trajectory_x_target = np.array([0, target_direction[0]])
-        Trajectory_y_target = np.array([0, target_direction[1]])
+        Trajectory_x_target = np.array([0, target_direction[0]*3])
+        Trajectory_y_target = np.array([0, target_direction[1]*3])
 
         Step_rwd = results[3]
 
@@ -223,7 +223,7 @@ if __name__ == '__main__':
     # Create window
     
     grid_layout = pg.GraphicsLayoutWidget(title="Cuadruped - Training information")
-    grid_layout.resize(1700,715)
+    grid_layout.resize(1625,715)
     
     pg.setConfigOptions(antialias=True)
 

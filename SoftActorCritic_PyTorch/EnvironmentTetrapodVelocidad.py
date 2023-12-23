@@ -29,8 +29,8 @@ class Environment:
         
         #Parameters for orientation reward
         self.__maxRelativeIncreaseOrientation = 1
-        self.__maxRelativeDecreaseOrientation = -0.1
-        self.__maxDisorientation = 170 * np.pi / 180
+        self.__maxRelativeDecreaseOrientation = -0.5
+        self.__maxDisorientation = 110 * np.pi / 180
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
