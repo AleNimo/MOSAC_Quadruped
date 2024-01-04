@@ -30,7 +30,7 @@ class Environment:
         #Parameters for orientation reward
         self.__maxRelativeIncreaseOrientation = 1
         self.__maxRelativeDecreaseOrientation = -0.5
-        self.__maxDisorientation = 110 * np.pi / 180
+        self.__maxDisorientation = 45 * np.pi / 180
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -88,7 +88,7 @@ class Environment:
 
         velocity_vector = next_obs[:,19:22]
 
-        mod_velocity = np.sqrt(np.sum(np.square(velocity_vector), axis=1))
+        #mod_velocity = np.sqrt(np.sum(np.square(velocity_vector), axis=1))
 
         
         for i in range(obs.shape[0]):
@@ -99,8 +99,13 @@ class Environment:
                 end[i] = False
 
             '''Velocity reward (vel. of the body)'''
-            vel_reward = ( 1/(np.abs(mod_velocity[i]-self.target_velocity) + 1) - 1/(self.target_velocity + 1) ) * self.velocity_reward_normalization
 
+            dotproduct_velocidad = np.dot(velocity_vector[i,:-1],self.target_direction)
+
+            vel_reward = ( 1/(np.abs(dotproduct_velocidad-self.target_velocity) + 1) - 1/(self.target_velocity + 1) ) * self.velocity_reward_normalization
+           
+            base_reward = vel_reward
+            reward[i] = base_reward
 
             '''Orientation reward'''
             # Agent's orientation vector:
@@ -120,11 +125,12 @@ class Environment:
                 orientation_reward = self.__maxRelativeDecreaseOrientation * np.cos((angle_agent2target - np.pi) * np.pi/(2*(np.pi-self.__maxDisorientation) ) )
 
             '''Define base reward'''
-            if vel_reward < 0 and orientation_reward < 0:    
-                base_reward = - orientation_reward * vel_reward
+            if base_reward < 0 and orientation_reward < 0:    
+                reward[i]  -=  orientation_reward * base_reward * 0.5
             
             else:   
-                base_reward = orientation_reward * vel_reward
+                reward[i] += orientation_reward * base_reward * 0.5
+
         
             '''Extra Reward for the 2 angles (x and y axes) of the back close to 0°'''
             for j in range(3, 5):
