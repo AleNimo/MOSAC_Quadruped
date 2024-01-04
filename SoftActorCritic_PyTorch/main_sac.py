@@ -17,14 +17,12 @@ data_type = np.float64
 
 def SAC_Agent_Training(q):
 
-    env = Environment(obs_sp_shape=(22,), act_sp_shape=(12,), dest_pos=(0,0))
+    env = Environment(obs_sp_shape=(24,), act_sp_shape=(12,), dest_pos=(0,0))
 
-    load_agent = False
-
+    load_agent = True
     test_agent = False
-
-    load_train_history = False
-    load_replay_buffer = False   #(if load_train_history == false, the replay buffer is never loaded)
+    load_train_history = True
+    load_replay_buffer = True   #(if load_train_history == false, the replay buffer is never loaded)
     
     episodes = 20000
     episode = 0
@@ -35,7 +33,7 @@ def SAC_Agent_Training(q):
     #The agent receives the velocity instead of the position, but we still need the position to plot the trajectory (we subtract the 3 coordinates from the obs_sp_shape)
     agent = SAC_Agent('Cuadruped', env.obs_sp_shape[0]-3, env.act_sp_shape[0], replay_buffer_size=1000000)
     
-    agent.discount_factor = 0.95
+    agent.discount_factor = 0.99
     agent.update_factor = 0.005
     agent.replay_batch_size = 10000
 
@@ -166,11 +164,11 @@ def updatePlot():
         Trajectory_x_data = results[1][:,0]
         Trajectory_y_data = results[1][:,1]
 
-        vector_velocidad = results[1][:,19:22]
-
-        Step_velocity = np.sqrt(np.sum(np.square(vector_velocidad), axis=1))
+        velocity_vector = results[1][:,19:21] # For each step of the episode
 
         target_direction = results[2]
+
+        velocity_in_target_direction = np.dot(velocity_vector, target_direction) # For each step of the episode
 
         Trajectory_x_target = np.array([0, target_direction[0]*3])
         Trajectory_y_target = np.array([0, target_direction[1]*3])
@@ -178,7 +176,7 @@ def updatePlot():
         Step_rwd = results[3]
 
         rwd_linspace = np.arange(0,len(Step_rwd), 1, dtype=int)
-        vel_linspace = np.arange(0,len(Step_velocity), 1, dtype=int)
+        vel_linspace = np.arange(0,len(velocity_in_target_direction), 1, dtype=int)
 
         Real_Return_data = results[4][:,0]
         Predicted_Return_data = results[4][:,1]
@@ -194,7 +192,7 @@ def updatePlot():
         curve_Trajectory.setData(Trajectory_x_data,Trajectory_y_data)
         curve_Trajectory_startPoint.setData([Trajectory_x_data[0]], [Trajectory_y_data[0]])
         curve_Trajectory_target.setData(Trajectory_x_target, Trajectory_y_target)
-        curve_StepVelocity.setData(vel_linspace, Step_velocity)
+        curve_StepVelocity.setData(vel_linspace, velocity_in_target_direction)
         curve_StepReward.setData(rwd_linspace, Step_rwd)
         curve_P_Loss.setData(episode_linspace,P_loss_data)
         curve_Q_Loss.setData(episode_linspace,Q_loss_data)
@@ -227,12 +225,12 @@ if __name__ == '__main__':
     
     pg.setConfigOptions(antialias=True)
 
-    plot_Trajectory = grid_layout.addPlot(title="Trajectory in Last Episode", row=0, col=0)
+    plot_Trajectory = grid_layout.addPlot(title="Trajectory with Target Direction", row=0, col=0)
 
-    plot_StepVelocity = grid_layout.addPlot(title="Velocity's Module per Step in Last Episode", row=0, col=1)
+    plot_StepVelocity = grid_layout.addPlot(title="Velocity in Target Direction per Step", row=0, col=1)
     plot_StepVelocity.showGrid(x=True, y=True)
 
-    plot_StepReward = grid_layout.addPlot(title="Reward per Step in Last Episode", row=0, col=2)
+    plot_StepReward = grid_layout.addPlot(title="Reward per Step", row=0, col=2)
     plot_StepReward.showGrid(x=True, y=True)
 
     plot_P_Loss = grid_layout.addPlot(title="Policy Loss", row=0, col=3, colspan=2)

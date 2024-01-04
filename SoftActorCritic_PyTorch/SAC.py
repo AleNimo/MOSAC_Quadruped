@@ -23,15 +23,15 @@ class SAC_Agent():
         self.replay_buffer = ReplayBuffer(replay_buffer_size, obs_dim, actions_dim)
 
         self.P_net = P_Network(obs_dim, actions_dim, hidden1_dim=64, hidden2_dim=32,
-                               alfa=0.001, beta1=0.9, beta2=0.999)
+                               alfa=0.0003, beta1=0.9, beta2=0.999)
         
         self.P_loss = torch.tensor(0, dtype=torch.float).to(self.P_net.device)
 
         self.Q1_net = Q_Network(obs_dim, actions_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
-                                  alfa=0.001, beta1=0.9, beta2=0.999, name='Q1_net')
+                                  alfa=0.0003, beta1=0.9, beta2=0.999, name='Q1_net')
         
         self.Q2_net = Q_Network(obs_dim, actions_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
-                                  alfa=0.001, beta1=0.9, beta2=0.999, name='Q2_net')
+                                  alfa=0.0003, beta1=0.9, beta2=0.999, name='Q2_net')
         
         self.Q_loss = torch.tensor(0, dtype=torch.float).to(self.Q1_net.device)
         
@@ -53,7 +53,7 @@ class SAC_Agent():
         self.alpha = torch.tensor(0.01, dtype=torch.float64).to(self.P_net.device)
         self.alpha.requires_grad = True
 
-        self.alpha_optimizer = optim.Adam([self.alpha], lr=0.001, betas=(0.9, 0.999))
+        self.alpha_optimizer = optim.Adam([self.alpha], lr=0.0003, betas=(0.9, 0.999))
 
         # Create the required directories if necessary
         if not os.path.isdir("./{0:s}".format(self.agent_name)):

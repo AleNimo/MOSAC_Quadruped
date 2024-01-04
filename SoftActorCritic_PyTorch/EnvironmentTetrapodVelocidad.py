@@ -18,19 +18,19 @@ class Environment:
         self.__pos_size = len(dest_pos)                         # Position's size
         self.__end_cond = 2.5                                   # End condition
         self.__obs = np.zeros((1,)+self.obs_sp_shape)           # Observed state
-        self.__coppelia = CoppeliaSocket(obs_sp_shape[0])       # Socket to the simulated environment
+        self.__coppelia = CoppeliaSocket(obs_sp_shape[0]-2)     # Socket to the simulated environment   (-2 because coppelia doesn't send the target direction)
 
-        self.target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
-        self.velocity_reward_normalization = 100/(1 - 1/(self.target_velocity + 1))
+        self.__target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
+        self.__velocity_reward_normalization = 100/(1 - 1/(self.__target_velocity + 1))
 
         self.__maxBackAngle = 10    #deg
-        
+
         self.__maxRelativeIncreaseBack = 0.5    #50%
-        
+
         #Parameters for orientation reward
-        self.__maxRelativeIncreaseOrientation = 1
+        self.__maxRelativeIncreaseOrientation = 0.5
         self.__maxRelativeDecreaseOrientation = -0.5
-        self.__maxDisorientation = 110 * np.pi / 180
+        self.__maxDisorientation = 90 * np.pi / 180
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -41,13 +41,15 @@ class Environment:
         # Join position and angle in one vector
         pos_angle = np.concatenate((pos,z_ang))
 
-        # Define the random direction for the episode
+        # Define the random direction for the episode (versor)
         self.target_direction = 2 * np.random.rand(2) - 1
         self.target_direction = self.target_direction / np.sqrt(np.sum(np.square(self.target_direction)))
         
         # Reset the simulation environment and obtain the new state
         self.__step = 0
-        self.__obs = self.__coppelia.reset(pos_angle)
+        obs_coppelia = self.__coppelia.reset(pos_angle)
+        self.__obs = np.concatenate((obs_coppelia, self.target_direction))  # We add the target direction to the observed state
+        self.__next_obs = np.copy(self.__obs)
         return np.copy(self.__obs)
 
     def set_pos(self, pos):
@@ -65,66 +67,67 @@ class Environment:
         ''' Simulates the agent's action in the environment, computes and returns the environment's next state, the
         obtained reward and the termination condition status '''
         # Take the requested action in the simulation and obtain the new state
-        next_obs = self.__coppelia.act(act.reshape(-1))
+        self.__next_obs[:self.obs_sp_shape[0]-2] = self.__coppelia.act(act.reshape(-1))   #Replace first 22 values, maintaining the last 2 corresponding to the target direction
         # Compute the reward
-        reward, end = self.__compute_reward_and_end(self.__obs.reshape(1,-1), next_obs.reshape(1,-1))
+        reward, end = self.__compute_reward_and_end(self.__obs.reshape(1,-1), self.__next_obs.reshape(1,-1))
         # Update the observed state
-        self.__obs = np.copy(next_obs)
+        self.__obs[:] = self.__next_obs
         # Return the environment's next state, the obtained reward and the termination condition status
-        return next_obs, reward, end
+        return self.__next_obs, reward, end
 
     def compute_reward(self, obs):
         reward, _ = self.__compute_reward_and_end(obs[0:-1], obs[1:])
         return reward
 
     def __compute_reward_and_end(self, obs, next_obs):
-        
-        # Final distance to evaluate end condition
+        # Compute reward for every individual transition (state -> next_state)
+
+            # Final distance to evaluate end condition
         dist_fin = np.sqrt(np.sum(np.square(next_obs[:,0:self.__pos_size]), axis=1, keepdims=True))
 
-        # Compute reward for every individual state observed
+            # Velocity vector from every state observed
+        velocity_vector = next_obs[:,19:21]
 
+            # Empty vectors to store reward and end flags for every transition
         reward, end = np.zeros((obs.shape[0], 1)), np.zeros((obs.shape[0], 1))
 
-        velocity_vector = next_obs[:,19:22]
-
-        mod_velocity = np.sqrt(np.sum(np.square(velocity_vector), axis=1))
-
-        
         for i in range(obs.shape[0]):
-            
+
             if dist_fin[i] >= self.__end_cond:
                 end[i] = True
             else:
                 end[i] = False
 
-            '''Velocity reward (vel. of the body)'''
-            vel_reward = ( 1/(np.abs(mod_velocity[i]-self.target_velocity) + 1) - 1/(self.target_velocity + 1) ) * self.velocity_reward_normalization
+            '''Velocity reward -> base_reward'''
+            velocity_in_target_direction = np.dot(velocity_vector[i], self.target_direction)
 
+            velocity_reward = ( 1/(np.abs(velocity_in_target_direction-self.__target_velocity) + 1) - 1/(self.__target_velocity + 1) ) * self.__velocity_reward_normalization
+
+            reward[i] = velocity_reward
 
             '''Orientation reward'''
-            # Agent's orientation vector:
-            Agent = np.array([next_obs[i,5], next_obs[i,6]])
+            # Compute angle between agents orientation and target direction:
+            agent_orientation = np.array([next_obs[i,5], next_obs[i,6]])
 
-            dotproduct = np.dot(Agent,self.target_direction)
+            dot_product = np.dot(agent_orientation, self.target_direction)
             
-            # Due to rounding errors we have to check that the dotproduct doesn't exceed the domain of the arcosine [-1;1]
-            if dotproduct > 1: angle_agent2target = 0
-            elif dotproduct < -1: angle_agent2target = np.pi
+            # Due to rounding errors we have to check that the dot product doesn't exceed the domain of the arccosine [-1;1]
+            if dot_product > 1: angle_agent2target = 0
+            elif dot_product < -1: angle_agent2target = np.pi
             else:
-                angle_agent2target = np.arccos(dotproduct) #Angle between Agent and Center
+                angle_agent2target = np.arccos(dot_product) #Angle between Agent and Center
             
+            # Compute reward based on angle:
             if angle_agent2target < self.__maxDisorientation: 
                 orientation_reward = self.__maxRelativeIncreaseOrientation * np.cos(angle_agent2target * np.pi/(2*self.__maxDisorientation))
             else:
                 orientation_reward = self.__maxRelativeDecreaseOrientation * np.cos((angle_agent2target - np.pi) * np.pi/(2*(np.pi-self.__maxDisorientation) ) )
 
-            '''Define base reward'''
-            if vel_reward < 0 and orientation_reward < 0:    
-                base_reward = - orientation_reward * vel_reward
-            
+            # If both rewards are negative, the product will be positive but the reward must decrease
+            if velocity_reward < 0 and orientation_reward < 0:
+                reward[i] -= orientation_reward * velocity_reward
             else:   
-                base_reward = orientation_reward * vel_reward
+                reward[i] += orientation_reward * velocity_reward
         
             '''Extra Reward for the 2 angles (x and y axes) of the back close to 0°'''
             for j in range(3, 5):
@@ -132,11 +135,10 @@ class Environment:
 
                 #if the angle is 0° the reward increases a maximumRelativeValue of the base reward
                 #if it is __maxBackAngle° or more, base reward is decreased (The mean of the X,Y angles is computed)
-                if base_reward < 0 and back_angle > self.__maxBackAngle:
-                    reward[i] -= (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * base_reward * 1/2
+                if velocity_reward < 0 and back_angle > self.__maxBackAngle:
+                    reward[i] -= (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * velocity_reward * 1/2
                 else:
-                    reward[i] += (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * base_reward * 1/2
-
+                    reward[i] += (self.__maxBackAngle-back_angle)* self.__maxRelativeIncreaseBack/self.__maxBackAngle * velocity_reward * 1/2
 
             #If the robot flips downwards the episode ends (absolute value of X or Y angle greater than 50°)
             if abs(next_obs[i, 3]) >= 0.278 or abs(next_obs[i, 4]) >= 0.278:
