@@ -30,7 +30,11 @@ class Environment:
         #Parameters for orientation reward
         self.__maxRelativeIncreaseOrientation = 0.5
         self.__maxRelativeDecreaseOrientation = -0.5
+<<<<<<< HEAD
         self.__maxDisorientation = 90 * np.pi / 180
+=======
+        self.__maxDisorientation = 45 * np.pi / 180
+>>>>>>> 9424406d208f30f62f2c3f93d85b958748b3b9cf
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -91,6 +95,14 @@ class Environment:
             # Empty vectors to store reward and end flags for every transition
         reward, end = np.zeros((obs.shape[0], 1)), np.zeros((obs.shape[0], 1))
 
+<<<<<<< HEAD
+=======
+        velocity_vector = next_obs[:,19:22]
+
+        #mod_velocity = np.sqrt(np.sum(np.square(velocity_vector), axis=1))
+
+        
+>>>>>>> 9424406d208f30f62f2c3f93d85b958748b3b9cf
         for i in range(obs.shape[0]):
 
             if dist_fin[i] >= self.__end_cond:
@@ -98,12 +110,23 @@ class Environment:
             else:
                 end[i] = False
 
+<<<<<<< HEAD
             '''Velocity reward -> base_reward'''
             velocity_in_target_direction = np.dot(velocity_vector[i], self.target_direction)
 
             velocity_reward = ( 1/(np.abs(velocity_in_target_direction-self.__target_velocity) + 1) - 1/(self.__target_velocity + 1) ) * self.__velocity_reward_normalization
 
             reward[i] = velocity_reward
+=======
+            '''Velocity reward (vel. of the body)'''
+
+            dotproduct_velocidad = np.dot(velocity_vector[i,:-1],self.target_direction)
+
+            vel_reward = ( 1/(np.abs(dotproduct_velocidad-self.target_velocity) + 1) - 1/(self.target_velocity + 1) ) * self.velocity_reward_normalization
+           
+            base_reward = vel_reward
+            reward[i] = base_reward
+>>>>>>> 9424406d208f30f62f2c3f93d85b958748b3b9cf
 
             '''Orientation reward'''
             # Compute angle between agents orientation and target direction:
@@ -123,11 +146,21 @@ class Environment:
             else:
                 orientation_reward = self.__maxRelativeDecreaseOrientation * np.cos((angle_agent2target - np.pi) * np.pi/(2*(np.pi-self.__maxDisorientation) ) )
 
+<<<<<<< HEAD
             # If both rewards are negative, the product will be positive but the reward must decrease
             if velocity_reward < 0 and orientation_reward < 0:
                 reward[i] -= orientation_reward * velocity_reward
             else:   
                 reward[i] += orientation_reward * velocity_reward
+=======
+            '''Define base reward'''
+            if base_reward < 0 and orientation_reward < 0:    
+                reward[i]  -=  orientation_reward * base_reward * 0.5
+            
+            else:   
+                reward[i] += orientation_reward * base_reward * 0.5
+
+>>>>>>> 9424406d208f30f62f2c3f93d85b958748b3b9cf
         
             '''Extra Reward for the 2 angles (x and y axes) of the back close to 0°'''
             for j in range(3, 5):
