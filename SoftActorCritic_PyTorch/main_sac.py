@@ -19,23 +19,23 @@ def SAC_Agent_Training(q):
 
     env = Environment(obs_sp_shape=(24,), act_sp_shape=(12,), dest_pos=(0,0))
 
-    load_agent = True
+    load_agent = False
     test_agent = False
-    load_train_history = True
-    load_replay_buffer = True   #(if load_train_history == false, the replay buffer is never loaded)
+    load_train_history = False   #(if test_agent == True, the train history and the replay buffer are never loaded)
+    load_replay_buffer = False   #(if load_train_history == false, the replay buffer is never loaded)
     
     episodes = 20000
     episode = 0
     episode_steps = 200 #Maximum steps allowed per episode
     save_period = 1000
-    training_frequency = 1
 
     #The agent receives the velocity instead of the position, but we still need the position to plot the trajectory (we subtract the 3 coordinates from the obs_sp_shape)
     agent = SAC_Agent('Cuadruped', env.obs_sp_shape[0]-3, env.act_sp_shape[0], replay_buffer_size=1000000)
     
-    agent.discount_factor = 0.99
-    agent.update_factor = 0.005
-    agent.replay_batch_size = 1000
+    agent.replay_batch_size = 10000
+
+    agent.update_Q = 1  # The Q function is updated every episode
+    agent.update_P = 3  # The policy is updated every 3 episodes
 
     if load_agent:
         agent.load_models()
@@ -126,8 +126,7 @@ def SAC_Agent_Training(q):
 
         if test_agent == False:
             for i in range(ep_len):
-                if i % training_frequency == 0:
-                    agent.learn()
+                agent.learn(episode)
 
         ep_loss[episode, 0] = agent.Q_loss.item()
         ep_loss[episode, 1] = agent.P_loss.item()
