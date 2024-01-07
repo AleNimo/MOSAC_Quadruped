@@ -125,7 +125,7 @@ class SAC_Agent():
         self.alpha = torch.load('./Train/Networks/alpha_tensor.pt')
         self.alpha_optimizer = optim.Adam([self.alpha], lr=0.001, betas=(0.9, 0.999))
 
-    def learn(self, episode):
+    def learn(self, step):
         if self.replay_buffer.mem_counter < self.replay_batch_size:
             return
         state, action, reward, next_state, done_flag = self.replay_buffer.sample(self.replay_batch_size)
@@ -137,7 +137,7 @@ class SAC_Agent():
         next_state = torch.tensor(next_state, dtype=torch.float64).to(self.P_net.device)
         done_flag = torch.tensor(done_flag, dtype=torch.float64).to(self.P_net.device)
 
-        if episode % self.update_Q == 0:
+        if step % self.update_Q == 0:
             #Update Q networks
             with torch.no_grad():
                 next_action, log_prob = self.P_net.sample_normal(next_state, reparameterize=False)
@@ -154,7 +154,7 @@ class SAC_Agent():
             self.Q1_net.optimizer.step()
             self.Q2_net.optimizer.step()
 
-        if episode % self.update_P == 0:
+        if step % self.update_P == 0:
             #Update P networks
             action, log_prob = self.P_net.sample_normal(state, reparameterize=True)
 

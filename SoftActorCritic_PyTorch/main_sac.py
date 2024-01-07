@@ -125,8 +125,8 @@ def SAC_Agent_Training(q):
         ep_ret[episode, 2] = np.sqrt(np.square(ep_ret[episode,0] - ep_ret[episode, 1]))
 
         if test_agent == False:
-            for i in range(ep_len):
-                agent.learn(episode)
+            for step in range(ep_len):
+                agent.learn(step)
 
         ep_loss[episode, 0] = agent.Q_loss.item()
         ep_loss[episode, 1] = agent.P_loss.item()
@@ -262,21 +262,28 @@ if __name__ == '__main__':
 
     # Drawing of the scene in the trajectory plot:
 
-        # Add point in the center of the scene, target of the agent
+        # Point in the center of the scene, target of the agent
     plot_Trajectory.plot([0], [0], pen=None, symbol='o', symbolPen=None, symbolSize=5, symbolBrush=(255, 255, 255, 200))
 
-        # Add circule to delimitate scene of trajectory plot
-    circle = QGraphicsEllipseItem(-3, -3, 6, 6)  # x, y, width, height
-    circle.setPen(pg.mkPen((255, 255, 255, 255), width=2))
-    circle.setBrush(pg.mkBrush(None))
+        # Circule to delimitate scene of trajectory plot
+    scene_limit = QGraphicsEllipseItem(-3, -3, 6, 6)  # x, y, width, height
+    scene_limit.setPen(pg.mkPen((255, 255, 255, 255), width=2))
+    scene_limit.setBrush(pg.mkBrush(None))
 
-        # The square delimitates the zone where de agent can appear
+        # Square to delimitate the zone where de agent can appear (Currently not used)
     square = QGraphicsRectItem(-2, -2, 4, 4)
     square.setPen(pg.mkPen((255,255,255,100), width=1, style=QtCore.Qt.DashLine))
     square.setBrush(pg.mkBrush(None))
 
-    plot_Trajectory.addItem(circle)
+        # Circule to delimitate the end condition of the episode (the goal to reach)
+    end_limit = QGraphicsEllipseItem(-2.5, -2.5, 5, 5)  # x, y, width, height
+    end_limit.setPen(pg.mkPen((0, 255, 0, 100), width=1, style=QtCore.Qt.DashLine))
+    end_limit.setBrush(pg.mkBrush(None))
+
+    plot_Trajectory.addItem(scene_limit)
     plot_Trajectory.addItem(square)
+    plot_Trajectory.addItem(end_limit)
+
     plot_Trajectory.setRange(xRange=(-3,3), yRange=(-3,3), padding=None, update=True, disableAutoRange=True)
 
     #Curves to update them in updatePlot()
