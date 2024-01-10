@@ -146,8 +146,6 @@ class Environment:
 
                 # print("back_angle ({0}) = {1:.2f}".format(j, back_angle))
                 # print("Flat_back_reward ({0}) = {1:.2f}".format(j, flat_back_reward))
-
-                reward[i] += flat_back_reward
             
             # print("Total_reward = ", reward[i])
 
