@@ -26,7 +26,7 @@ class SAC_Agent():
         self.P_net = P_Network(obs_dim, actions_dim, hidden1_dim=64, hidden2_dim=32,
                                alfa=0.0003, beta1=0.9, beta2=0.999)
 
-        self.P_loss = torch.tensor(0, dtype=torch.float).to(self.P_net.device)
+        self.P_loss = torch.tensor(0, dtype=torch.float64).to(self.P_net.device)
 
         self.Q1_net = Q_Network(obs_dim, actions_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
                                   alfa=0.0003, beta1=0.9, beta2=0.999, name='Q1_net')
@@ -34,7 +34,7 @@ class SAC_Agent():
         self.Q2_net = Q_Network(obs_dim, actions_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
                                   alfa=0.0003, beta1=0.9, beta2=0.999, name='Q2_net')
 
-        self.Q_loss = torch.tensor(0, dtype=torch.float).to(self.Q1_net.device)
+        self.Q_loss = torch.tensor(0, dtype=torch.float64).to(self.Q1_net.device)
 
         # Create target networks with different names and directories
 
@@ -48,13 +48,13 @@ class SAC_Agent():
 
         self.target_entropy = -actions_dim
 
-        self.entropy = torch.tensor(0, dtype=torch.float).to(self.P_net.device)
+        self.entropy = torch.tensor(0, dtype=torch.float64).to(self.P_net.device)
 
-        # Create entropy temperature coefficient 
-        self.alpha = torch.tensor(0.01, dtype=torch.float64).to(self.P_net.device)
-        self.alpha.requires_grad = True
+        # Create entropy temperature coefficient
+        self.log_alpha = torch.tensor(0, dtype=torch.float64).to(self.P_net.device)
+        self.log_alpha.requires_grad = True
 
-        self.alpha_optimizer = optim.Adam([self.alpha], lr=0.0003, betas=(0.9, 0.999))
+        self.alpha_optimizer = optim.Adam([self.log_alpha], lr=0.0003, betas=(0.9, 0.999))
 
         # Create the required directories if necessary
         if not os.path.isdir("./{0:s}".format(self.agent_name)):
@@ -114,7 +114,7 @@ class SAC_Agent():
         self.Q2_net.save_checkpoint()
         self.Q1_target_net.save_checkpoint()
         self.Q2_target_net.save_checkpoint()
-        torch.save(self.alpha, './Train/Networks/alpha_tensor.pt')
+        torch.save(self.log_alpha, './Train/Networks/alpha_tensor.pt')
 
     def load_models(self):
         self.P_net.load_checkpoint()
@@ -122,8 +122,8 @@ class SAC_Agent():
         self.Q2_net.load_checkpoint()
         self.Q1_target_net.load_checkpoint()
         self.Q2_target_net.load_checkpoint()
-        self.alpha = torch.load('./Train/Networks/alpha_tensor.pt')
-        self.alpha_optimizer = optim.Adam([self.alpha], lr=0.001, betas=(0.9, 0.999))
+        self.log_alpha = torch.load('./Train/Networks/alpha_tensor.pt')
+        self.alpha_optimizer = optim.Adam([self.log_alpha], lr=0.001, betas=(0.9, 0.999))
 
     def learn(self, step):
         if self.replay_buffer.mem_counter < self.replay_batch_size:
@@ -142,7 +142,7 @@ class SAC_Agent():
             with torch.no_grad():
                 next_action, log_prob = self.P_net.sample_normal(next_state, reparameterize=False)
                 next_Q = self.minimal_Q_target(next_state, next_action)
-                Q_hat = reward + self.discount_factor * (1-done_flag) * (next_Q.view(-1) - self.alpha * log_prob.view(-1))
+                Q_hat = reward + self.discount_factor * (1-done_flag) * (next_Q.view(-1) - self.log_alpha.exp() * log_prob.view(-1))
 
             Q = self.minimal_Q(state, action).view(-1)
 
@@ -162,7 +162,7 @@ class SAC_Agent():
 
             Q = self.minimal_Q(state, action).view(-1)
 
-            self.P_loss = torch.mean(self.alpha * log_prob.view(-1) - Q)
+            self.P_loss = torch.mean(self.log_alpha.exp() * log_prob.view(-1) - Q)
 
             self.P_net.optimizer.zero_grad()
             self.P_loss.backward()
@@ -172,7 +172,7 @@ class SAC_Agent():
 
             self.alpha_optimizer.zero_grad()
 
-            Alpha_loss = self.alpha * torch.mean((-log_prob - self.target_entropy).detach())
+            Alpha_loss = self.log_alpha.exp() * torch.mean((-log_prob - self.target_entropy).detach())
             Alpha_loss.backward()
 
             self.alpha_optimizer.step()

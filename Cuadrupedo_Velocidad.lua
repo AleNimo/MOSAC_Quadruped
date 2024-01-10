@@ -86,6 +86,8 @@ function sysCall_init() -- Executed when the scene is loaded
     max_delta_t = 0.02
 
     -- Get agent handles
+    A = {} --Agent's Orientation (unit vector pointing forward)
+    A_orth = {} --Agent's Orientation (unit vector pointing to the right, orthogonal)
     joints_number = 12
     leg_number = 4
     joint = {}
@@ -102,6 +104,15 @@ function sysCall_init() -- Executed when the scene is loaded
     base_pos, relative_pos = {}, {}
     state = 0 -- state 0 = idle / 1 = moving to intermediate position / 2 = moving to target position / 3 = reset
     r = 0.025
+
+    -- Initialize the pseudo random number generator
+    math.randomseed( os.time() )
+    math.random(); math.random(); math.random()
+    
+    -- Random Target Direction for the episode:
+    T = {}
+    T.x = 2 * math.random() - 1
+    T.y = 2 * math.random() - 1
 end
 
 function sysCall_beforeSimulation() -- Executed just before the simulation starts
@@ -130,27 +141,44 @@ function sysCall_actuation()
         --sim.pauseSimulation()
         --Send the agent's status
         --Obtain and send the object world position (change the second parameter from -1 to another handle to get a relative position)
+        --This are used to plot the agents trajectory and target direction but are not used in the agents state vector
         data = sim.getObjectPosition(agent, -1)
-        client:send(string.format(Tx_float_length, data[1]))
-        client:send(string.format(Tx_float_length, data[2]))
-        client:send(string.format(Tx_float_length, data[3]))
-        --Obtain and send the object world rotation (change the second parameter from -1 to another handle to get a relative position)
+        client:send(string.format(Tx_float_length, data[1])) --x
+        client:send(string.format(Tx_float_length, data[2])) --y
+        client:send(string.format(Tx_float_length, data[3])) --z
+        client:send(string.format(Tx_float_length, T.x)) --Target direction x
+        client:send(string.format(Tx_float_length, T.y)) --Target direction y
+
+        --Obtain and send the object world orientation (change the second parameter from -1 to another handle to get a relative position)
         data = sim.getObjectOrientation(agent, -1)
-        client:send(string.format(Tx_float_length, data[1]/math.pi))
-        client:send(string.format(Tx_float_length, data[2]/math.pi))
-        --For the Z angle that has full rotation we send the cosine and sine to avoid the discontinuity
-        client:send(string.format(Tx_float_length, math.cos(data[3])))
-        client:send(string.format(Tx_float_length, math.sin(data[3])))
+        client:send(string.format(Tx_float_length, data[1]/math.pi)) --pitch angle
+        client:send(string.format(Tx_float_length, data[2]/math.pi)) --roll angle
+
+        --Compute the signed angle between the target direction and the agent (send the cosine and sine of the angle to avoid discontinuity)
+        A.x = math.cos(data[3])
+        A.y = math.sin(data[3])
+        --gamma = math.atan2(T.x * A.y - T.y * A.x, T.x * A.x + T.y * A.y)
+        --client:send(string.format(Tx_float_length, math.cos(gamma)))
+        --client:send(string.format(Tx_float_length, math.sin(gamma)))
+
+        --Obtain and send the object velocity with respect to the agents frame of reference (ignoring z_velocity and angular velocity)
+        world_velocity, _ = sim.getObjectVelocity(agent)
+
+        --first get the agents orthogonal axis(unit vector to the right, for lateral velocity)
+        A_orth.x = A.y
+        A_orth.y = -A.x
+
+        forward_velocity = world_velocity[1] * A.x + world_velocity[2] * A.y
+        lateral_velocity = world_velocity[1] * A_orth.x + world_velocity[2] * A_orth.y
+        
+        client:send(string.format(Tx_float_length, forward_velocity))
+        client:send(string.format(Tx_float_length, lateral_velocity))
+
         --Send the joints positions
         for i=1,joints_number,1 do
             jointPos[i] = (sim.getJointPosition(joint[i]) - (jointUpperLimit[i]+jointLowerLimit[i])/2) / ((jointUpperLimit[i]-jointLowerLimit[i])/2)
             client:send(string.format(Tx_float_length, jointPos[i]))
         end
-        --Obtain and send the object world velocity
-        data, _ = sim.getObjectVelocity(agent)
-        client:send(string.format(Tx_float_length, data[1]))
-        client:send(string.format(Tx_float_length, data[2]))
-        client:send(string.format(Tx_float_length, data[3]))
 
         --Receive the agent's next action
         data = {}

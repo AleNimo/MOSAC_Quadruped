@@ -18,50 +18,32 @@ class Environment:
         self.__pos_size = len(dest_pos)                         # Position's size
         self.__end_cond = 2.5                                   # End condition
         self.__obs = np.zeros((1,)+self.obs_sp_shape)           # Observed state
-        self.__coppelia = CoppeliaSocket(obs_sp_shape[0]-2)     # Socket to the simulated environment   (-2 because coppelia doesn't send the target direction)
+        self.__coppelia = CoppeliaSocket(obs_sp_shape[0])     # Socket to the simulated environment
 
-        #Parameters for velocity in target direction reward
+        #Parameters for forward velocity reward
         self.__target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
-        self.__velocity_reward_normalization = 1/(1 - 1/(self.__target_velocity + 1))
+        self.__vmax = 1
+        self.__delta_vel = 0.3
+        self.__vmin = -2
 
-        #Parameters for velocity direction reward
-        self.__maxIncreaseVelocityDirection = 0.5
-        self.__curvaturePositiveReward_velocity = 30
+        self.__curvature_forward = -2*self.__vmax/(self.__delta_vel * self.__vmin)
 
-        self.__neutralAngleVelocity = 5 * np.pi / 180
+        #Parameters for lateral velocity penalization
+        self.__vmin_lat = -1
+        self.__curvature_lateral = 3
+        
 
-        self.__maxDecreaseVelocityDirection = -0.5
-        self.__curvatureNegativeReward_velocity = 0.5
-
-            #Auxiliary parameters to simplify equation
-        self.__b1_vel = -np.exp(-self.__curvaturePositiveReward_velocity*self.__neutralAngleVelocity)
-        self.__k1_vel = self.__maxIncreaseVelocityDirection/(1+self.__b1_vel)
-
-        self.__b2_vel = -np.exp(-self.__curvatureNegativeReward_velocity*self.__neutralAngleVelocity)
-        self.__k2_vel = self.__maxDecreaseVelocityDirection/(np.exp(-self.__curvatureNegativeReward_velocity*np.pi)+self.__b2_vel)
-
-        #Parameters for orientation reward
-        self.__maxIncreaseOrientation = 0.5
-        self.__curvaturePositiveReward_orientation = 30
-
-        self.__neutralAngleOrientation = 5 * np.pi / 180
-
-        self.__maxDecreaseOrientation = -0.5
-        self.__curvatureNegativeReward_orientation = 0.5
-
-            #Auxiliary parameters to simplify equation
-        self.__b1_ori = -np.exp(-self.__curvaturePositiveReward_orientation*self.__neutralAngleOrientation)
-        self.__k1_ori = self.__maxIncreaseOrientation/(1+self.__b1_ori)
-
-        self.__b2_ori = -np.exp(-self.__curvatureNegativeReward_orientation*self.__neutralAngleOrientation)
-        self.__k2_ori = self.__maxDecreaseOrientation/(np.exp(-self.__curvatureNegativeReward_orientation*np.pi)+self.__b2_ori)
+        # #Parameters for orientation reward
+        # self.__maxDecreaseOrientation = -0.5
+        # self.__curvature = 1
+        # self.__k = self.__maxDecreaseOrientation/(np.exp(-self.__curvature*np.pi)-1)#Auxiliary parameter to simplify equation
         
         #Parameters for flat back reward
-        self.__neutralAngleBack = 10    #deg
-        self.__maxIncreaseBack = 0.5    #50%
+        self.__vmin_back = -0.8
+        self.__curvature_back = 2
 
-        #Parameters for flipping penalization
-        self.__flipping_penalization = -5
+        #Rewards at the end of the episode (either flipping or reaching the goal)
+        self.__flipping_penalization = -2
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -72,15 +54,9 @@ class Environment:
         # Join position and angle in one vector
         pos_angle = np.concatenate((pos,z_ang))
 
-        # Define the random direction for the episode (versor)
-        self.target_direction = 2 * np.random.rand(2) - 1   #(In the future it could be a changing direction, instead of a constant in the episode)
-        self.target_direction = self.target_direction / np.sqrt(np.sum(np.square(self.target_direction)))
-        
         # Reset the simulation environment and obtain the new state
         self.__step = 0
-        obs_coppelia = self.__coppelia.reset(pos_angle)
-        self.__obs = np.concatenate((obs_coppelia, self.target_direction))  # We add the target direction to the observed state
-        self.__next_obs = np.copy(self.__obs)
+        self.__obs = self.__coppelia.reset(pos_angle)
         return np.copy(self.__obs)
 
     def set_pos(self, pos):
@@ -98,13 +74,13 @@ class Environment:
         ''' Simulates the agent's action in the environment, computes and returns the environment's next state, the
         obtained reward and the termination condition status '''
         # Take the requested action in the simulation and obtain the new state
-        self.__next_obs[:self.obs_sp_shape[0]-2] = self.__coppelia.act(act.reshape(-1))   #Replace first 22 values, maintaining the last 2 corresponding to the target direction
+        next_obs = self.__coppelia.act(act.reshape(-1))
         # Compute the reward
-        reward, end = self.__compute_reward_and_end(self.__obs.reshape(1,-1), self.__next_obs.reshape(1,-1))
+        reward, end = self.__compute_reward_and_end(self.__obs.reshape(1,-1), next_obs.reshape(1,-1))
         # Update the observed state
-        self.__obs[:] = self.__next_obs
+        self.__obs[:] = next_obs
         # Return the environment's next state, the obtained reward and the termination condition status
-        return self.__next_obs, reward, end
+        return next_obs, reward, end
 
     def compute_reward(self, obs):
         reward, _ = self.__compute_reward_and_end(obs[0:-1], obs[1:])
@@ -117,93 +93,78 @@ class Environment:
         dist_fin = np.sqrt(np.sum(np.square(next_obs[:,0:self.__pos_size]), axis=1, keepdims=True))
 
             # Velocity vector from every state observed
-        velocity_vector = next_obs[:,19:21]
+        forward_velocity = next_obs[:,7]
+        lateral_velocity = next_obs[:,8]
 
             # Empty vectors to store reward and end flags for every transition
         reward, end = np.zeros((obs.shape[0], 1)), np.zeros((obs.shape[0], 1))
 
         for i in range(obs.shape[0]):
 
-            if dist_fin[i] >= self.__end_cond:
-                end[i] = True
-            else:
-                end[i] = False
+            '''Reward for forward velocity reaching target velocity'''
 
-            '''Velocity in target direction reward -> base_reward'''
-            velocity_in_target_direction = np.dot(velocity_vector[i], self.target_direction)
+            forward_velocity_penalty = (self.__vmax - self.__vmin)/(self.__curvature_forward * np.abs(self.__target_velocity - forward_velocity[i]) + 1) + self.__vmin
 
-            velocity_reward = ( 1/(np.abs(velocity_in_target_direction-self.__target_velocity) + 1) - 1/(self.__target_velocity + 1) ) * self.__velocity_reward_normalization
+            # print("forward_velocity = ", forward_velocity[i])
+            # print("forward_velocity_penalty = ", forward_velocity_penalty)
 
-            reward[i] = velocity_reward
+            base_reward = forward_velocity_penalty
 
+            '''Penalization for Lateral velocity'''
+            lateral_velocity_penalty = -self.__vmin_lat/(self.__curvature_lateral * np.abs(lateral_velocity[i]) + 1) + self.__vmin_lat
 
-            '''Velocity direction reward'''
-            # Compute angle between direction of velocity and target direction:
-            abs_velocity = np.square(np.sum(np.square(velocity_vector[i])))
-            # If the agent isn't moving, we can't divide by the abs_velocity (and there is no direction of velocity to compute)
-            # We decide to slightly penalize in this case
-            if abs_velocity == 0:
-                velocity_direction_reward = self.__maxDecreaseVelocityDirection/2
-            else:
-                cos_angle_velocity2target = velocity_in_target_direction/abs_velocity
-                # Due to rounding errors we have to check that cos_angle_velocity2target doesn't exceed the domain of the arccosine [-1;1]
-                if cos_angle_velocity2target > 1: angle_velocity2target = 0
-                elif cos_angle_velocity2target < -1: angle_velocity2target = np.pi
-                else:
-                    angle_velocity2target = np.arccos(cos_angle_velocity2target) #Angle between Agent and Center
+            # print("lateral_velocity = ", lateral_velocity[i])
+            # print("lateral_velocity_penalty = ", lateral_velocity_penalty)
 
-                # Compute reward based on angle:
-                if angle_velocity2target < self.__neutralAngleVelocity:
-                    velocity_direction_reward = self.__k1_vel*(np.exp(-self.__curvaturePositiveReward_velocity * angle_velocity2target) + self.__b1_vel)
-                else:
-                    velocity_direction_reward = self.__k2_vel*(np.exp(-self.__curvatureNegativeReward_velocity * angle_velocity2target) + self.__b2_vel)
+            base_reward += lateral_velocity_penalty
 
+            # '''Penalization for Orientation deviating from target direction'''
+            # # Compute angle between agents orientation and target direction:
+            # angle_agent2target = np.arctan2(next_obs[i,7], next_obs[i,8])
 
-            if velocity_reward < 0 and velocity_direction_reward < 0:
-                reward[i] -= velocity_direction_reward * velocity_reward
-            else:
-                reward[i] += velocity_direction_reward * velocity_reward
+            # # Compute reward based on angle:
+            # orientation_reward = self.__k*(np.exp(-self.__curvature * angle_agent2target) - 1)
 
-            '''Orientation reward'''
-            # Compute angle between agents orientation and target direction:
-            agent_orientation = np.array([next_obs[i,5], next_obs[i,6]])
+            # if reward[i] < 0:
+            #     reward[i] -= orientation_reward * reward[i]
+            # else:
+            #     reward[i] += orientation_reward * reward[i]
 
-            dot_product = np.dot(agent_orientation, self.target_direction)
-            
-            # Due to rounding errors we have to check that the dot product doesn't exceed the domain of the arccosine [-1;1]
-            if dot_product > 1: angle_agent2target = 0
-            elif dot_product < -1: angle_agent2target = np.pi
-            else:
-                angle_agent2target = np.arccos(dot_product) #Angle between Agent and Center
-            
-            # Compute reward based on angle:
-            if angle_agent2target < self.__neutralAngleOrientation:
-                orientation_reward = self.__k1_ori*(np.exp(-self.__curvaturePositiveReward_orientation * angle_agent2target) + self.__b1_ori)
-            else:
-                orientation_reward = self.__k2_ori*(np.exp(-self.__curvatureNegativeReward_orientation * angle_agent2target) + self.__b2_ori)
-
-            # If both rewards are negative, the product will be positive but the reward must decrease
-            if velocity_reward < 0 and orientation_reward < 0:
-                reward[i] -= orientation_reward * velocity_direction_reward
-            else:   
-                reward[i] += orientation_reward * velocity_direction_reward
-        
-            '''Flat Back reward: extra reward for the 2 angles (x and y axes) of the back close to 0°'''
-            for j in range(3, 5):
-                back_angle = np.abs(next_obs[i, j])*180    #angle (in deg) of the back with respect to 0° (horizontal position)
+            '''Flat Back relative reward: pitch and roll close to 0°'''
+            for j in range(5, 7):
+                back_angle = np.abs(next_obs[i, j])*np.pi    #angle (in rad) of the back with respect to 0° (horizontal position)
 
                 #if the angle is 0° the reward increases a __maxIncreaseBack of the base reward
                 #if it is __neutralAngleBack or more, base reward is decreased (The mean of the X,Y angles is computed)
-                if velocity_reward < 0 and back_angle > self.__neutralAngleBack:
-                    reward[i] -= (self.__neutralAngleBack-back_angle)* self.__maxIncreaseBack/self.__neutralAngleBack * velocity_reward * 1/2
+
+                flat_back_reward = -self.__vmin_back/(self.__curvature_back * back_angle + 1) + self.__vmin_back
+
+                if base_reward < 0:
+                    reward[i] -= flat_back_reward * base_reward * 0.5
                 else:
-                    reward[i] += (self.__neutralAngleBack-back_angle)* self.__maxIncreaseBack/self.__neutralAngleBack * velocity_reward * 1/2
+                    reward[i] += flat_back_reward * base_reward * 0.5
+
+                # print("back_angle ({0}) = {1:.2f}".format(j, back_angle))
+                # print("Flat_back_reward ({0}) = {1:.2f}".format(j, flat_back_reward))
+
+                reward[i] += flat_back_reward
+            
+            # print("Total_reward = ", reward[i])
 
             '''Penalization for flipping downwards'''
             #If the absolute value of X or Y angle is greater than 50° there is a penalization and the episode ends
-            if abs(next_obs[i, 3]) >= 0.278 or abs(next_obs[i, 4]) >= 0.278:
+            if abs(next_obs[i, 5]) >= 0.278 or abs(next_obs[i, 6]) >= 0.278:
                 reward[i] += self.__flipping_penalization
                 end[i] = True
+
+            elif dist_fin[i] >= self.__end_cond:
+                end[i] = True
+                # print("finaliza")
+            else:
+                end[i] = False
+
+            # print("reward = ", reward[i])
+            # print("end = ", end[i])
 
         return reward, end
 

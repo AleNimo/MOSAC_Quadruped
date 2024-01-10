@@ -17,7 +17,18 @@ data_type = np.float64
 
 def SAC_Agent_Training(q):
 
-    env = Environment(obs_sp_shape=(24,), act_sp_shape=(12,), dest_pos=(0,0))
+    env = Environment(obs_sp_shape=(21,), act_sp_shape=(12,), dest_pos=(0,0))
+
+    #The 23 values from coppelia, in order:
+        #---- Not seen by the agent --------
+        #position (x,y,z)
+        #target_direction (x,y)
+        #-----------------------------------
+    
+        #pitch and roll of the agent's body
+        ##############cosine and sine of the signed angle between the agent and the target direction (CURRENTLY NOT)
+        #Forward and lateral velocity with the reference frame of the agent
+        #the 12 joint angles
 
     load_agent = False
     test_agent = False
@@ -29,13 +40,13 @@ def SAC_Agent_Training(q):
     episode_steps = 200 #Maximum steps allowed per episode
     save_period = 1000
 
-    #The agent receives the velocity instead of the position, but we still need the position to plot the trajectory (we subtract the 3 coordinates from the obs_sp_shape)
-    agent = SAC_Agent('Cuadruped', env.obs_sp_shape[0]-3, env.act_sp_shape[0], replay_buffer_size=1000000)
+    #The vector received from coppelia contains the x,y,z coordinates and the target direction not used by the agent, only for plotting. Thats why we subtract the 5 values from the vector dimensions
+    agent = SAC_Agent('Cuadruped', env.obs_sp_shape[0]-5, env.act_sp_shape[0], replay_buffer_size=1000000)
     
     agent.replay_batch_size = 10000
 
     agent.update_Q = 1  # The Q function is updated every episode
-    agent.update_P = 3  # The policy is updated every 3 episodes
+    agent.update_P = 1  # The policy is updated every 3 episodes
 
     if load_agent:
         agent.load_models()
@@ -65,36 +76,36 @@ def SAC_Agent_Training(q):
 
         if load_replay_buffer:
             agent.replay_buffer.load(last_episode)
-        
+
         episode = last_episode + 1
 
     # Training
     while episode <= episodes:
-        
+
         ep_obs[0], done_flag = env.reset(), False
         # Testing
         if test_agent:
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
-                ep_act[step] = agent.choose_action(ep_obs[step][3:], random=False)  #The agent doesn't receive the position although it is on the ep_obs vector for plotting reasons
+                ep_act[step] = agent.choose_action(ep_obs[step][5:], random=False)  #The agent doesn't receive the position and target direction although it is on the ep_obs vector for plotting reasons
 
                 # Act in the environment
                 ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
 
                 if done_flag: break
-                
+
             ep_len = step + 1
 
         else:
             for step in range(episode_steps):
                 # Decide action based on present observed state (random action with mean and std)
-                ep_act[step] = agent.choose_action(ep_obs[step][3:])
-                
+                ep_act[step] = agent.choose_action(ep_obs[step][5:])
+
                 # Act in the environment
                 ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
-                
+
                 # Store in replay buffer
-                agent.remember(ep_obs[step][3:], ep_act[step], ep_rwd[step], ep_obs[step+1][3:], done_flag)
+                agent.remember(ep_obs[step][5:], ep_act[step], ep_rwd[step], ep_obs[step+1][5:], done_flag)
 
                 # End episode on termination condition
                 if done_flag: break
@@ -103,10 +114,10 @@ def SAC_Agent_Training(q):
 
         # Compute the real and expected returns and the root mean square error:
         # Real return: If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
-        last_state = torch.tensor([ep_obs[step+1][3:]], dtype=torch.float64).to(agent.P_net.device).view(-1)
+        last_state = torch.tensor([ep_obs[step+1][5:]], dtype=torch.float64).to(agent.P_net.device).view(-1)
         last_state = torch.unsqueeze(last_state, 0)
         
-        last_action = agent.choose_action(ep_obs[step+1][3:], random=not(test_agent))
+        last_action = agent.choose_action(ep_obs[step+1][5:], random=not(test_agent))
         last_action = torch.tensor([last_action], dtype=torch.float64).to(agent.P_net.device).view(-1)
         last_action = torch.unsqueeze(last_action, 0)
         
@@ -117,7 +128,7 @@ def SAC_Agent_Training(q):
         ep_ret[episode, 0] = aux_rwd[0]
 
         # Expected return at the start of the episode
-        initial_state = torch.tensor([ep_obs[0][3:]], dtype=torch.float64).to(agent.P_net.device)
+        initial_state = torch.tensor([ep_obs[0][5:]], dtype=torch.float64).to(agent.P_net.device)
         initial_action = torch.tensor([ep_act[0]], dtype=torch.float64).to(agent.P_net.device)
         ep_ret[episode, 1] = agent.minimal_Q(initial_state, initial_action)
 
@@ -130,7 +141,7 @@ def SAC_Agent_Training(q):
 
         ep_loss[episode, 0] = agent.Q_loss.item()
         ep_loss[episode, 1] = agent.P_loss.item()
-        ep_alpha[episode] = agent.alpha.item()
+        ep_alpha[episode] = agent.log_alpha.exp().item()
         ep_entropy[episode] = agent.entropy.item()
         
         print("Episode: ", episode)
@@ -141,7 +152,7 @@ def SAC_Agent_Training(q):
         print("Policy's Entropy: ", ep_entropy[episode])
         print("------------------------------------------")
 
-        q.put((episode, ep_obs[0:ep_len+1], env.target_direction, ep_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1]))
+        q.put((episode, ep_obs[0:ep_len+1], ep_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1]))
         
         if (episode % save_period == 0 or episode == 50) and test_agent == False:
             agent.save_models()
@@ -153,7 +164,7 @@ def SAC_Agent_Training(q):
         episode += 1
 
 def updatePlot():   
-    global q, curve_Trajectory, curve_Trajectory_startPoint,curve_Trajectory_target, curve_StepVelocity, curve_StepReward, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy
+    global q, curve_Trajectory, curve_Trajectory_startPoint,curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_StepReward, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy
     # print('Thread ={}          Function = updatePlot()'.format(threading.currentThread().getName()))
     try:  
         results=q.get_nowait()
@@ -163,35 +174,35 @@ def updatePlot():
         Trajectory_x_data = results[1][:,0]
         Trajectory_y_data = results[1][:,1]
 
-        velocity_vector = results[1][:,19:21] # For each step of the episode
+        target_direction = results[1][0,3:5]    #Currently constant through out the episode
 
-        target_direction = results[2]
-
-        velocity_in_target_direction = np.dot(velocity_vector, target_direction) # For each step of the episode
+        forward_velocity = results[1][:,7]      #For each step of the episode
+        lateral_velocity = results[1][:,8]
 
         Trajectory_x_target = np.array([0, target_direction[0]*3])
         Trajectory_y_target = np.array([0, target_direction[1]*3])
 
-        Step_rwd = results[3]
+        Step_rwd = results[2]
 
-        rwd_linspace = np.arange(0,len(Step_rwd), 1, dtype=int)
-        vel_linspace = np.arange(0,len(velocity_in_target_direction), 1, dtype=int)
+        rwd_linspace = np.arange(1,len(Step_rwd)+1, 1, dtype=int)   #Because there is no reward in the first state (step 0)
+        vel_linspace = np.arange(0,len(forward_velocity), 1, dtype=int)
 
-        Real_Return_data = results[4][:,0]
-        Predicted_Return_data = results[4][:,1]
-        Return_loss_data = results[4][:,2]
+        Real_Return_data = results[3][:,0]
+        Predicted_Return_data = results[3][:,1]
+        Return_loss_data = results[3][:,2]
 
-        Q_loss_data = results[5][:,0]
-        P_loss_data = results[5][:,1]
+        Q_loss_data = results[4][:,0]
+        P_loss_data = results[4][:,1]
 
-        Alpha_data = results[6]
+        Alpha_data = results[5]
         
-        Entropy_data = results[7]
+        Entropy_data = results[6]
 
         curve_Trajectory.setData(Trajectory_x_data,Trajectory_y_data)
         curve_Trajectory_startPoint.setData([Trajectory_x_data[0]], [Trajectory_y_data[0]])
         curve_Trajectory_target.setData(Trajectory_x_target, Trajectory_y_target)
-        curve_StepVelocity.setData(vel_linspace, velocity_in_target_direction)
+        curve_ForwardVelocity.setData(vel_linspace, forward_velocity)
+        curve_LateralVelocity.setData(vel_linspace, lateral_velocity)
         curve_StepReward.setData(rwd_linspace, Step_rwd)
         curve_P_Loss.setData(episode_linspace,P_loss_data)
         curve_Q_Loss.setData(episode_linspace,Q_loss_data)
@@ -206,7 +217,7 @@ def updatePlot():
         pass
 
 if __name__ == '__main__':
-    global q, curve_Trajectory, curve_Trajectory_startPoint, curve_Trajectory_target, curve_StepVelocity, curve_StepReward, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy
+    global q, curve_Trajectory, curve_Trajectory_startPoint, curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_StepReward, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy
     # print('Thread ={}          Function = main()'.format(threading.currentThread().getName()))
     app = QApplication(sys.argv)
 
@@ -226,7 +237,8 @@ if __name__ == '__main__':
 
     plot_Trajectory = grid_layout.addPlot(title="Trajectory with Target Direction", row=0, col=0)
 
-    plot_StepVelocity = grid_layout.addPlot(title="Velocity in Target Direction per Step", row=0, col=1)
+    plot_StepVelocity = grid_layout.addPlot(title="Forward and lateral velocity per Step", row=0, col=1)
+    plot_StepVelocity.addLegend()
     plot_StepVelocity.showGrid(x=True, y=True)
 
     plot_StepReward = grid_layout.addPlot(title="Reward per Step", row=0, col=2)
@@ -290,7 +302,8 @@ if __name__ == '__main__':
     curve_Trajectory = plot_Trajectory.plot()
     curve_Trajectory_startPoint = plot_Trajectory.plot(pen=None, symbol='o', symbolPen=None, symbolSize=5, symbolBrush=(0, 255, 0, 150))
     curve_Trajectory_target = plot_Trajectory.plot(pen=pg.mkPen((255,201,14,255), width=1, style=QtCore.Qt.DashLine))
-    curve_StepVelocity = plot_StepVelocity.plot(pen=(255,0,0))
+    curve_ForwardVelocity = plot_StepVelocity.plot(pen=(0,255,0), name='Forward')
+    curve_LateralVelocity = plot_StepVelocity.plot(pen=(255,0,0), name='Lateral')
     curve_StepReward = plot_StepReward.plot(pen=(255,201,14))
     curve_Real_Return = plot_Returns.plot(pen=(255,0,0), name='Real')
     curve_Predicted_Return = plot_Returns.plot(pen=(0,255,0), name='Predicted')
