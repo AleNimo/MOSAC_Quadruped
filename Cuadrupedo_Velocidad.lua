@@ -72,9 +72,9 @@ function sysCall_init() -- Executed when the scene is loaded
     mode = 0  -- mode 0 = joint control / 1 = direction control
 
     -- Joints' absolut limits
---    bod_llim, bod_ulim = -15.0*math.pi/180.0,  60.0*math.pi/180.0
---    leg_llim, leg_ulim = -40.0*math.pi/180.0, 130.0*math.pi/180.0
---    paw_llim, paw_ulim = -90.0*math.pi/180.0,  30.0*math.pi/180.0
+    -- bod_llim, bod_ulim = -15.0*math.pi/180.0,  60.0*math.pi/180.0
+    --leg_llim, leg_ulim = -40.0*math.pi/180.0, 130.0*math.pi/180.0
+    --paw_llim, paw_ulim = -90.0*math.pi/180.0,  30.0*math.pi/180.0
     -- Joints' prefered limits
     bod_llim, bod_ulim = -10.0*math.pi/180.0, 15.0*math.pi/180.0
     leg_llim, leg_ulim = -10.0*math.pi/180.0, 40.0*math.pi/180.0
@@ -82,8 +82,8 @@ function sysCall_init() -- Executed when the scene is loaded
     jointLowerLimit = {bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim}
     jointUpperLimit = {bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim}
     max_delta = 0.01   -- Newton
---    max_delta = 0.1   -- Bullet
-    max_delta_t = 0.02
+    --max_delta = 0.1   -- Bullet
+    max_delta_t = 0.5
 
     -- Get agent handles
     A = {} --Agent's Orientation (unit vector pointing forward)
@@ -113,8 +113,66 @@ function sysCall_init() -- Executed when the scene is loaded
     T = {}
     T.x = 2 * math.random() - 1
     T.y = 2 * math.random() - 1
+    
+
+    --Variables for graphing
+    graph = sim.getObject('/Graph')
+
+    agentCreated = false --To plot only when there is an agent created (not between episodes where the agent is destroyed)
+    step_completed = false --To plot the mean velocities only when each step is completed
+    
+    samples = 0 --Number of samples of velocity sensed each step
+
+    mean_forward_velocity = 0
+    mean_lateral_velocity = 0
+
+    forward_vel_stream = sim.addGraphStream(graph, 'Forward velocity', 'm/s', 0, {0, 1, 0})
+    lateral_vel_stream = sim.addGraphStream(graph, 'Lateral velocity', 'm/s', 0, {1, 0, 0})
+
+    mean_forward_vel_stream = sim.addGraphStream(graph, 'Mean Forward velocity', 'm/s', 0, {0, 1, 0.88})
+    mean_lateral_vel_stream = sim.addGraphStream(graph, 'Mean Lateral velocity', 'm/s', 0, {0.98, 0.57, 0})
 end
 
+function sysCall_sensing()
+    
+    if agentCreated == true then
+        --Obtain agents orientation
+        orientation = sim.getObjectOrientation(agent, -1)
+
+        --Compute the agent's reference unit vectors
+        A.x = math.cos(orientation[3])
+        A.y = math.sin(orientation[3])
+        
+        A_orth.x = A.y
+        A_orth.y = -A.x
+        
+        world_velocity, _ = sim.getObjectVelocity(agent)
+        
+        forward_velocity = world_velocity[1] * A.x + world_velocity[2] * A.y
+        lateral_velocity = world_velocity[1] * A_orth.x + world_velocity[2] * A_orth.y
+
+        sim.setGraphStreamValue(graph, forward_vel_stream, forward_velocity)
+        sim.setGraphStreamValue(graph, lateral_vel_stream, lateral_velocity)
+
+        mean_forward_velocity = 1/(samples+ 1) * (mean_forward_velocity * samples + forward_velocity)
+        mean_lateral_velocity = 1/(samples+ 1) * (mean_lateral_velocity * samples + lateral_velocity)
+
+        samples = samples + 1
+
+        if step_completed == true then
+
+            sim.setGraphStreamValue(graph, mean_forward_vel_stream, mean_forward_velocity)
+            sim.setGraphStreamValue(graph, mean_lateral_vel_stream, mean_lateral_velocity)
+
+            mean_forward_velocity = 0
+            mean_lateral_velocity = 0
+
+            samples = 0
+
+            step_completed = false
+        end
+    end
+end
 function sysCall_beforeSimulation() -- Executed just before the simulation starts
     -- Load the agent model
     createAgent()
@@ -122,6 +180,8 @@ function sysCall_beforeSimulation() -- Executed just before the simulation start
     -- Get the agent initial status
     sim.setObjectPosition(agent,-1,reset_pos)
     sim.setObjectOrientation(agent,-1,reset_or)
+
+    agentCreated = true --To start measuring velocity
 
     -- Define joints' position variables
     jointPos = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}
@@ -142,6 +202,8 @@ function sysCall_actuation()
         --Send the agent's status
         --Obtain and send the object world position (change the second parameter from -1 to another handle to get a relative position)
         --This are used to plot the agents trajectory and target direction but are not used in the agents state vector
+        step_completed = true
+
         data = sim.getObjectPosition(agent, -1)
         client:send(string.format(Tx_float_length, data[1])) --x
         client:send(string.format(Tx_float_length, data[2])) --y
@@ -192,6 +254,7 @@ function sysCall_actuation()
             reset_or[3], status, partial_data = client:receive(Rx_float_length)
             reset_or[3] = math.pi * reset_or[3]
             --Destroy the agent and restart the simulation
+            agentCreated = false    --To stop measuring velocity
             destroyAgent()
             state = 3
             sim.stopSimulation()
@@ -214,7 +277,7 @@ function sysCall_actuation()
                 dir = math.pi*tonumber(data)
                 dir_x, dir_y = math.cos(dir), math.sin(dir)
                 x0, y0 = dir_x*r, dir_y*r
---                print("Dir: "..(dir/math.pi*180).." - Relative pos: ("..x0..", "..y0..")")
+                --print("Dir: "..(dir/math.pi*180).." - Relative pos: ("..x0..", "..y0..")")
                 if sequence_step == 1 then
                     walk_pos[f2][1] = { (walk_pos[f1][1][1]+base_pos[1][1]-x0)/2, (walk_pos[f1][1][2]+base_pos[1][2]-y0)/2, base_pos[1][3]-z_rise }
                     walk_pos[f2][2] = { (walk_pos[f1][2][1]+base_pos[2][1]+x0)/2, (walk_pos[f1][2][2]+base_pos[2][2]+y0)/2, base_pos[1][3]+z_rise }
@@ -263,7 +326,7 @@ function sysCall_actuation()
             jointPos[i] = sim.getJointPosition(joint[i])
         end
         
-        -- Get the current time and if a certain delta passed with no change, end movement
+        -- Get the current time and if a certain delta passed with no significant change, end movement
         t = sim.getSimulationTime()
         if t > last_t + max_delta_t then
             last_t = t
@@ -275,7 +338,7 @@ function sysCall_actuation()
                 if delta >= 2*math.pi then delta = delta - 2*math.pi end
                 if delta > max_delta then state = last_state end
             end
---            print("Timeout state:", state)
+            if state == 0 then print("timeout: step aborted") end
         end
         
         if state == 1 then

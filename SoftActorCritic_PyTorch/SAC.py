@@ -14,7 +14,7 @@ class SAC_Agent():
         self.agent_name = name
 
         #Default values
-        self.discount_factor = 0.99
+        self.discount_factor = 0.95
         self.update_factor = 0.005
         self.replay_batch_size = 1000
 
