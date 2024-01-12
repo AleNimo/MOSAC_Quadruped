@@ -83,7 +83,7 @@ function sysCall_init() -- Executed when the scene is loaded
     jointUpperLimit = {bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim}
     max_delta = 0.01   -- Newton
     --max_delta = 0.1   -- Bullet
-    max_delta_t = 0.5
+    max_delta_t = 0.3
 
     -- Get agent handles
     A = {} --Agent's Orientation (unit vector pointing forward)
@@ -148,6 +148,7 @@ function sysCall_sensing()
         
         world_velocity, _ = sim.getObjectVelocity(agent)
         
+        --Compute mean in a recursive manner
         forward_velocity = world_velocity[1] * A.x + world_velocity[2] * A.y
         lateral_velocity = world_velocity[1] * A_orth.x + world_velocity[2] * A_orth.y
 
@@ -202,7 +203,6 @@ function sysCall_actuation()
         --Send the agent's status
         --Obtain and send the object world position (change the second parameter from -1 to another handle to get a relative position)
         --This are used to plot the agents trajectory and target direction but are not used in the agents state vector
-        step_completed = true
 
         data = sim.getObjectPosition(agent, -1)
         client:send(string.format(Tx_float_length, data[1])) --x
@@ -217,24 +217,19 @@ function sysCall_actuation()
         client:send(string.format(Tx_float_length, data[2]/math.pi)) --roll angle
 
         --Compute the signed angle between the target direction and the agent (send the cosine and sine of the angle to avoid discontinuity)
-        A.x = math.cos(data[3])
-        A.y = math.sin(data[3])
+        --A.x = math.cos(data[3])
+        --A.y = math.sin(data[3])
         --gamma = math.atan2(T.x * A.y - T.y * A.x, T.x * A.x + T.y * A.y)
         --client:send(string.format(Tx_float_length, math.cos(gamma)))
         --client:send(string.format(Tx_float_length, math.sin(gamma)))
 
-        --Obtain and send the object velocity with respect to the agents frame of reference (ignoring z_velocity and angular velocity)
-        world_velocity, _ = sim.getObjectVelocity(agent)
-
-        --first get the agents orthogonal axis(unit vector to the right, for lateral velocity)
-        A_orth.x = A.y
-        A_orth.y = -A.x
-
-        forward_velocity = world_velocity[1] * A.x + world_velocity[2] * A.y
-        lateral_velocity = world_velocity[1] * A_orth.x + world_velocity[2] * A_orth.y
+        --Send the mean forward and lateral velocities with (reference of the agent)
+        --Measured and computed in sysCall_sensing
         
-        client:send(string.format(Tx_float_length, forward_velocity))
-        client:send(string.format(Tx_float_length, lateral_velocity))
+        client:send(string.format(Tx_float_length, mean_forward_velocity))
+        client:send(string.format(Tx_float_length, mean_lateral_velocity))
+
+        step_completed = true
 
         --Send the joints positions
         for i=1,joints_number,1 do
@@ -260,6 +255,7 @@ function sysCall_actuation()
             sim.stopSimulation()
 
         elseif data=="ACT__" then
+
             --print("ACT__: Action")
             if mode == 0 then
                 --Receive joints target positions and set the midpoint targets

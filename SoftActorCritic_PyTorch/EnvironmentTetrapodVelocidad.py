@@ -21,16 +21,18 @@ class Environment:
         self.__coppelia = CoppeliaSocket(obs_sp_shape[0])     # Socket to the simulated environment
 
         #Parameters for forward velocity reward
-        self.__target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
-        self.__vmax = 1
-        self.__delta_vel = 0.3
+        self.forward_velocity_reward = 0
+        self.__target_velocity = 0.4 # m/s (In the future it could be a changing velocity)
+        self.__vmax = 2
+        self.__delta_vel = 0.6
         self.__vmin = -2
 
         self.__curvature_forward = -2*self.__vmax/(self.__delta_vel * self.__vmin)
 
         #Parameters for lateral velocity penalization
+        self.lateral_velocity_penalty = 0
         self.__vmin_lat = -1
-        self.__curvature_lateral = 3
+        self.__curvature_lateral = 1.5
         
 
         # #Parameters for orientation reward
@@ -39,11 +41,12 @@ class Environment:
         # self.__k = self.__maxDecreaseOrientation/(np.exp(-self.__curvature*np.pi)-1)#Auxiliary parameter to simplify equation
         
         #Parameters for flat back reward
+        self.flat_back_reward = np.zeros(2)
         self.__vmin_back = -0.8
         self.__curvature_back = 2
 
         #Rewards at the end of the episode (either flipping or reaching the goal)
-        self.__flipping_penalization = -2
+        self.__flipping_penalization = -3
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -102,21 +105,22 @@ class Environment:
         for i in range(obs.shape[0]):
 
             '''Reward for forward velocity reaching target velocity'''
-
-            forward_velocity_penalty = (self.__vmax - self.__vmin)/(self.__curvature_forward * np.abs(self.__target_velocity - forward_velocity[i]) + 1) + self.__vmin
+            self.forward_velocity_reward = (self.__vmax - self.__vmin)/(self.__curvature_forward * np.abs(self.__target_velocity - forward_velocity[i]) + 1) + self.__vmin
 
             # print("forward_velocity = ", forward_velocity[i])
             # print("forward_velocity_penalty = ", forward_velocity_penalty)
 
-            base_reward = forward_velocity_penalty
+            base_reward = self.forward_velocity_reward
 
             '''Penalization for Lateral velocity'''
-            lateral_velocity_penalty = -self.__vmin_lat/(self.__curvature_lateral * np.abs(lateral_velocity[i]) + 1) + self.__vmin_lat
+            self.lateral_velocity_penalty = -self.__vmin_lat/(self.__curvature_lateral * np.abs(lateral_velocity[i]) + 1) + self.__vmin_lat
 
             # print("lateral_velocity = ", lateral_velocity[i])
             # print("lateral_velocity_penalty = ", lateral_velocity_penalty)
 
-            base_reward += lateral_velocity_penalty
+            base_reward += self.lateral_velocity_penalty
+
+            reward[i] = base_reward
 
             # '''Penalization for Orientation deviating from target direction'''
             # # Compute angle between agents orientation and target direction:
@@ -137,12 +141,9 @@ class Environment:
                 #if the angle is 0° the reward increases a __maxIncreaseBack of the base reward
                 #if it is __neutralAngleBack or more, base reward is decreased (The mean of the X,Y angles is computed)
 
-                flat_back_reward = -self.__vmin_back/(self.__curvature_back * back_angle + 1) + self.__vmin_back
-
-                if base_reward < 0:
-                    reward[i] -= flat_back_reward * base_reward * 0.5
-                else:
-                    reward[i] += flat_back_reward * base_reward * 0.5
+                self.flat_back_reward[j-5] = (-self.__vmin_back/(self.__curvature_back * back_angle + 1) + self.__vmin_back)
+                
+                reward[i] += self.flat_back_reward[j-5]
 
                 # print("back_angle ({0}) = {1:.2f}".format(j, back_angle))
                 # print("Flat_back_reward ({0}) = {1:.2f}".format(j, flat_back_reward))

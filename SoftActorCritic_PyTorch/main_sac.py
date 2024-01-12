@@ -54,6 +54,7 @@ def SAC_Agent_Training(q):
     ep_obs = np.zeros((episode_steps+1,) + env.obs_sp_shape, dtype=data_type)   # Episode's observed states
     ep_act = np.zeros((episode_steps,) + env.act_sp_shape, dtype=data_type)     # Episode's actions
     ep_rwd = np.zeros((episode_steps,), dtype=data_type)                        # Episode's rewards
+    ep_ind_rwd = np.zeros((episode_steps, 4), dtype=data_type)                  # Epidose's individual rewards
     ep_ret = np.zeros((episodes, 3), dtype=data_type)                           # Returns for each episode (real, expected and RMSE)
     ep_loss = np.zeros((episodes, 2), dtype=data_type)                          # Training loss for each episode (Q and P)
     ep_alpha = np.zeros((episodes,), dtype=data_type)                           # Alpha for each episode
@@ -92,6 +93,8 @@ def SAC_Agent_Training(q):
                 # Act in the environment
                 ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
 
+                ep_ind_rwd[step, :] = [env.forward_velocity_reward, env.lateral_velocity_penalty, env.flat_back_reward[0], env.flat_back_reward[1]]
+
                 if done_flag: break
 
             ep_len = step + 1
@@ -103,6 +106,8 @@ def SAC_Agent_Training(q):
 
                 # Act in the environment
                 ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
+
+                ep_ind_rwd[step, :] = [env.forward_velocity_reward, env.lateral_velocity_penalty, env.flat_back_reward[0], env.flat_back_reward[1]]
 
                 # Store in replay buffer
                 agent.remember(ep_obs[step][5:], ep_act[step], ep_rwd[step], ep_obs[step+1][5:], done_flag)
@@ -152,7 +157,7 @@ def SAC_Agent_Training(q):
         print("Policy's Entropy: ", ep_entropy[episode])
         print("------------------------------------------")
 
-        q.put((episode, ep_obs[0:ep_len+1], ep_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1]))
+        q.put((episode, ep_obs[0:ep_len+1], ep_rwd[0:ep_len+1], ep_ind_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1]))
         
         if (episode % save_period == 0 or episode == 50) and test_agent == False:
             agent.save_models()
@@ -164,7 +169,7 @@ def SAC_Agent_Training(q):
         episode += 1
 
 def updatePlot():   
-    global q, curve_Trajectory, curve_Trajectory_startPoint,curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_StepReward, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy
+    global q, curve_Trajectory, curve_Trajectory_startPoint,curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_Pitch, curve_Roll, curve_Reward, curve_Forward_vel_rwd, curve_Lateral_vel_rwd, curve_Pitch_rwd, curve_Roll_rwd, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy
     # print('Thread ={}          Function = updatePlot()'.format(threading.currentThread().getName()))
     try:  
         results=q.get_nowait()
@@ -176,34 +181,49 @@ def updatePlot():
 
         target_direction = results[1][0,3:5]    #Currently constant through out the episode
 
+        Trajectory_x_target = np.array([0, target_direction[0]*3])
+        Trajectory_y_target = np.array([0, target_direction[1]*3])
+
         forward_velocity = results[1][:,7]      #For each step of the episode
         lateral_velocity = results[1][:,8]
 
-        Trajectory_x_target = np.array([0, target_direction[0]*3])
-        Trajectory_y_target = np.array([0, target_direction[1]*3])
+        state_linspace = np.arange(0,len(forward_velocity), 1, dtype=int)
+
+        pitch = results[1][:,5]
+        roll = results[1][:,6]
 
         Step_rwd = results[2]
 
         rwd_linspace = np.arange(1,len(Step_rwd)+1, 1, dtype=int)   #Because there is no reward in the first state (step 0)
-        vel_linspace = np.arange(0,len(forward_velocity), 1, dtype=int)
-
-        Real_Return_data = results[3][:,0]
-        Predicted_Return_data = results[3][:,1]
-        Return_loss_data = results[3][:,2]
-
-        Q_loss_data = results[4][:,0]
-        P_loss_data = results[4][:,1]
-
-        Alpha_data = results[5]
         
-        Entropy_data = results[6]
+        forward_velocity_rwd = results[3][:,0]
+        lateral_velocity_rwd = results[3][:,1]
+        pitch_rwd = results[3][:,2]
+        roll_rwd = results[3][:,3]
+
+        Real_Return_data = results[4][:,0]
+        Predicted_Return_data = results[4][:,1]
+        Return_loss_data = results[4][:,2]
+
+        Q_loss_data = results[5][:,0]
+        P_loss_data = results[5][:,1]
+
+        Alpha_data = results[6]
+        
+        Entropy_data = results[7]
 
         curve_Trajectory.setData(Trajectory_x_data,Trajectory_y_data)
         curve_Trajectory_startPoint.setData([Trajectory_x_data[0]], [Trajectory_y_data[0]])
         curve_Trajectory_target.setData(Trajectory_x_target, Trajectory_y_target)
-        curve_ForwardVelocity.setData(vel_linspace, forward_velocity)
-        curve_LateralVelocity.setData(vel_linspace, lateral_velocity)
-        curve_StepReward.setData(rwd_linspace, Step_rwd)
+        curve_ForwardVelocity.setData(state_linspace, forward_velocity)
+        curve_LateralVelocity.setData(state_linspace, lateral_velocity)
+        curve_Pitch.setData(state_linspace, pitch)
+        curve_Roll.setData(state_linspace, roll)
+        curve_Reward.setData(rwd_linspace, Step_rwd)
+        curve_Forward_vel_rwd.setData(rwd_linspace, forward_velocity_rwd)
+        curve_Lateral_vel_rwd.setData(rwd_linspace, lateral_velocity_rwd)
+        curve_Pitch_rwd.setData(rwd_linspace, pitch_rwd)
+        curve_Roll_rwd.setData(rwd_linspace, roll_rwd)
         curve_P_Loss.setData(episode_linspace,P_loss_data)
         curve_Q_Loss.setData(episode_linspace,Q_loss_data)
         curve_Real_Return.setData(episode_linspace,Real_Return_data)
@@ -217,7 +237,7 @@ def updatePlot():
         pass
 
 if __name__ == '__main__':
-    global q, curve_Trajectory, curve_Trajectory_startPoint, curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_StepReward, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy
+    global q, curve_Trajectory, curve_Trajectory_startPoint, curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_Pitch, curve_Roll, curve_Reward, curve_Forward_vel_rwd, curve_Lateral_vel_rwd, curve_Pitch_rwd, curve_Roll_rwd, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy
     # print('Thread ={}          Function = main()'.format(threading.currentThread().getName()))
     app = QApplication(sys.argv)
 
@@ -241,10 +261,15 @@ if __name__ == '__main__':
     plot_StepVelocity.addLegend()
     plot_StepVelocity.showGrid(x=True, y=True)
 
-    plot_StepReward = grid_layout.addPlot(title="Reward per Step", row=0, col=2)
-    plot_StepReward.showGrid(x=True, y=True)
+    plot_StepOrientation = grid_layout.addPlot(title="Pitch and Roll per Step", row=0, col=2)
+    plot_StepOrientation.addLegend()
+    plot_StepOrientation.showGrid(x=True, y=True)
 
-    plot_P_Loss = grid_layout.addPlot(title="Policy Loss", row=0, col=3, colspan=2)
+    plot_Rewards = grid_layout.addPlot(title="Reward per Step", row=0, col=3)
+    plot_Rewards.addLegend()
+    plot_Rewards.showGrid(x=True, y=True)
+
+    plot_P_Loss = grid_layout.addPlot(title="Policy Loss", row=0, col=4)
     plot_P_Loss.showGrid(x=True, y=True)
 
     plot_Returns = grid_layout.addPlot(title="Real Return vs Predicted Return", row=1, col=0)
@@ -304,7 +329,13 @@ if __name__ == '__main__':
     curve_Trajectory_target = plot_Trajectory.plot(pen=pg.mkPen((255,201,14,255), width=1, style=QtCore.Qt.DashLine))
     curve_ForwardVelocity = plot_StepVelocity.plot(pen=(0,255,0), name='Forward')
     curve_LateralVelocity = plot_StepVelocity.plot(pen=(255,0,0), name='Lateral')
-    curve_StepReward = plot_StepReward.plot(pen=(255,201,14))
+    curve_Pitch = plot_StepOrientation.plot(pen=(0,255,255), name='Pitch')
+    curve_Roll = plot_StepOrientation.plot(pen=(255,0,255), name='Roll')
+    curve_Reward = plot_Rewards.plot(pen=(255,201,14), name='Total')
+    curve_Forward_vel_rwd = plot_Rewards.plot(pen=(0,255,0), name='Forward')
+    curve_Lateral_vel_rwd = plot_Rewards.plot(pen=(255,0,0), name='Lateral')
+    curve_Pitch_rwd = plot_Rewards.plot(pen=(0,255,255), name='Pitch')
+    curve_Roll_rwd = plot_Rewards.plot(pen=(255,0,255), name='Roll')
     curve_Real_Return = plot_Returns.plot(pen=(255,0,0), name='Real')
     curve_Predicted_Return = plot_Returns.plot(pen=(0,255,0), name='Predicted')
     curve_Return_Error = plot_Return_Error.plot(pen=(182,102,247))
