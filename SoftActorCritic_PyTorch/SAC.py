@@ -50,8 +50,8 @@ class SAC_Agent():
 
         self.entropy = torch.tensor(0, dtype=torch.float64).to(self.P_net.device)
 
-        # Create entropy temperature coefficient
-        self.log_alpha = torch.tensor(0, dtype=torch.float64).to(self.P_net.device)
+        # Create entropy temperature coefficient, we store log_alpha and use log_alpha.exp() when needed to force alpha to be always positive
+        self.log_alpha = torch.tensor(np.log(0.1), dtype=torch.float64).to(self.P_net.device)   #Initial alpha of 0.1
         self.log_alpha.requires_grad = True
 
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=0.0003, betas=(0.9, 0.999))

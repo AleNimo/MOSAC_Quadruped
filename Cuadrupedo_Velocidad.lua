@@ -81,13 +81,18 @@ function sysCall_init() -- Executed when the scene is loaded
     paw_llim, paw_ulim = -15.0*math.pi/180.0,  5.0*math.pi/180.0
     jointLowerLimit = {bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim}
     jointUpperLimit = {bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim}
-    max_delta = 0.01   -- Newton
+    max_delta = 0.02   -- Newton
     --max_delta = 0.1   -- Bullet
-    max_delta_t = 0.3
+    max_delta_t = 0.05
 
     -- Get agent handles
     A = {} --Agent's Orientation (unit vector pointing forward)
     A_orth = {} --Agent's Orientation (unit vector pointing to the right, orthogonal)
+    
+    --copies of Agent's Orientation for sysCall_sensing() (running in parallel)
+    A2 = {} 
+    A_orth2 = {}
+
     joints_number = 12
     leg_number = 4
     joint = {}
@@ -105,15 +110,12 @@ function sysCall_init() -- Executed when the scene is loaded
     state = 0 -- state 0 = idle / 1 = moving to intermediate position / 2 = moving to target position / 3 = reset
     r = 0.025
 
-    -- Initialize the pseudo random number generator
+    -- Initialize the pseudo random number generator for the random target direction
     math.randomseed( os.time() )
     math.random(); math.random(); math.random()
-    
+
     -- Random Target Direction for the episode:
-    T = {}
-    T.x = 2 * math.random() - 1
-    T.y = 2 * math.random() - 1
-    
+    T = {}    
 
     --Variables for graphing
     graph = sim.getObject('/Graph')
@@ -121,54 +123,91 @@ function sysCall_init() -- Executed when the scene is loaded
     agentCreated = false --To plot only when there is an agent created (not between episodes where the agent is destroyed)
     step_completed = false --To plot the mean velocities only when each step is completed
     
-    samples = 0 --Number of samples of velocity sensed each step
+    prev_time = 0
+    prev_forward_velocity = 0
+    prev_lateral_velocity = 0
+
+    vel_samples = 0 --Number of samples of velocity sensed each agent step
+    acc_samples = 0 --Number of samples of acceleration sensed each agent step
 
     mean_forward_velocity = 0
     mean_lateral_velocity = 0
 
-    forward_vel_stream = sim.addGraphStream(graph, 'Forward velocity', 'm/s', 0, {0, 1, 0})
-    lateral_vel_stream = sim.addGraphStream(graph, 'Lateral velocity', 'm/s', 0, {1, 0, 0})
+    mean_forward_acc = 0
+    mean_lateral_acc = 0
 
-    mean_forward_vel_stream = sim.addGraphStream(graph, 'Mean Forward velocity', 'm/s', 0, {0, 1, 0.88})
-    mean_lateral_vel_stream = sim.addGraphStream(graph, 'Mean Lateral velocity', 'm/s', 0, {0.98, 0.57, 0})
+    forward_vel_stream = sim.addGraphStream(graph, 'Forward velocity', 'm/s', 0, {0, 1, 0})
+    -- lateral_vel_stream = sim.addGraphStream(graph, 'Lateral velocity', 'm/s', 0, {1, 0, 0})
+
+    -- forward_acc_stream = sim.addGraphStream(graph, 'Forward acceleration', 'm/s^2', 0, {0, 1, 1})
+    -- lateral_acc_stream = sim.addGraphStream(graph, 'Lateral acceleration', 'm/s^2', 0, {1, 1, 0})
+
+    mean_forward_acc_stream = sim.addGraphStream(graph, 'Mean Forward acceleration/10', 'm/s^2', 0, {0, 0.98, 0.57})
+    -- mean_forward_vel_stream = sim.addGraphStream(graph, 'Mean Forward velocity', 'm/s', 0, {0, 1, 0.88})
+    -- mean_lateral_vel_stream = sim.addGraphStream(graph, 'Mean Lateral velocity', 'm/s', 0, {0.98, 0.57, 0}) 
 end
 
-function sysCall_sensing()
+function sysCall_sensing() -- Executed every simulation step
     
     if agentCreated == true then
         --Obtain agents orientation
         orientation = sim.getObjectOrientation(agent, -1)
 
         --Compute the agent's reference unit vectors
-        A.x = math.cos(orientation[3])
-        A.y = math.sin(orientation[3])
+        A2.x = math.cos(orientation[3])
+        A2.y = math.sin(orientation[3])
         
-        A_orth.x = A.y
-        A_orth.y = -A.x
+        A_orth2.x = A2.y
+        A_orth2.y = -A2.x
         
         world_velocity, _ = sim.getObjectVelocity(agent)
+        time = sim.getSimulationTime()
         
         --Compute mean in a recursive manner
-        forward_velocity = world_velocity[1] * A.x + world_velocity[2] * A.y
-        lateral_velocity = world_velocity[1] * A_orth.x + world_velocity[2] * A_orth.y
+        forward_velocity = world_velocity[1] * A2.x + world_velocity[2] * A2.y
+        lateral_velocity = world_velocity[1] * A_orth2.x + world_velocity[2] * A_orth2.y
 
         sim.setGraphStreamValue(graph, forward_vel_stream, forward_velocity)
-        sim.setGraphStreamValue(graph, lateral_vel_stream, lateral_velocity)
+        -- sim.setGraphStreamValue(graph, lateral_vel_stream, lateral_velocity)
 
-        mean_forward_velocity = 1/(samples+ 1) * (mean_forward_velocity * samples + forward_velocity)
-        mean_lateral_velocity = 1/(samples+ 1) * (mean_lateral_velocity * samples + lateral_velocity)
+        if time > 0 then    --to avoid dividing by 0
 
-        samples = samples + 1
+            forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
+            lateral_acceleration = (lateral_velocity - prev_lateral_velocity)/(time - prev_time)
+
+            -- sim.setGraphStreamValue(graph, forward_acc_stream, forward_acceleration)
+            -- sim.setGraphStreamValue(graph, lateral_acc_stream, lateral_acceleration)
+
+            mean_forward_acc = 1/(acc_samples + 1) * (mean_forward_acc * acc_samples + math.abs(forward_acceleration))
+            mean_lateral_acc = 1/(acc_samples + 1) * (mean_lateral_acc * acc_samples + math.abs(lateral_acceleration))
+
+            acc_samples = acc_samples + 1
+        end
+
+        prev_time = time
+        prev_forward_velocity = forward_velocity
+        prev_lateral_velocity = lateral_velocity
+
+        mean_forward_velocity = 1/(vel_samples + 1) * (mean_forward_velocity * vel_samples + forward_velocity)
+        mean_lateral_velocity = 1/(vel_samples + 1) * (mean_lateral_velocity * vel_samples + lateral_velocity)
+
+        vel_samples = vel_samples + 1
 
         if step_completed == true then
 
-            sim.setGraphStreamValue(graph, mean_forward_vel_stream, mean_forward_velocity)
-            sim.setGraphStreamValue(graph, mean_lateral_vel_stream, mean_lateral_velocity)
+            -- sim.setGraphStreamValue(graph, mean_forward_vel_stream, mean_forward_velocity)
+            -- sim.setGraphStreamValue(graph, mean_lateral_vel_stream, mean_lateral_velocity)
+            sim.setGraphStreamValue(graph, mean_forward_acc_stream, mean_forward_acc/10)
+            -- sim.setGraphStreamValue(graph, mean_lateral_acc_stream, mean_lateral_acc)
 
             mean_forward_velocity = 0
             mean_lateral_velocity = 0
 
-            samples = 0
+            mean_forward_acc = 0
+            mean_lateral_acc = 0
+
+            vel_samples = 0
+            acc_samples = 0
 
             step_completed = false
         end
@@ -189,10 +228,20 @@ function sysCall_beforeSimulation() -- Executed just before the simulation start
     jointMidPos = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}
     jointTargetPos = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}
     lastJointPos = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}
---    walk_dir = {1.0, 1.0, 1.0, 1.0}
+    -- walk_dir = {1.0, 1.0, 1.0, 1.0}
     f1, f2, f = 1, 2, 0.0      -- Movement frames
     sequence_step = 0
     state = 0
+
+    --Generate random target direction
+    T.x = 2 * math.random() - 1
+    T.y = 2 * math.random() - 1
+
+    mean_forward_velocity = 0
+    mean_lateral_velocity = 0
+
+    mean_forward_acc = 0
+    mean_lateral_acc = 0
 end
 
 function sysCall_actuation()
@@ -217,17 +266,19 @@ function sysCall_actuation()
         client:send(string.format(Tx_float_length, data[2]/math.pi)) --roll angle
 
         --Compute the signed angle between the target direction and the agent (send the cosine and sine of the angle to avoid discontinuity)
-        --A.x = math.cos(data[3])
-        --A.y = math.sin(data[3])
-        --gamma = math.atan2(T.x * A.y - T.y * A.x, T.x * A.x + T.y * A.y)
-        --client:send(string.format(Tx_float_length, math.cos(gamma)))
-        --client:send(string.format(Tx_float_length, math.sin(gamma)))
+        A.x = math.cos(data[3])
+        A.y = math.sin(data[3])
+        gamma = math.atan2(T.x * A.y - T.y * A.x, T.x * A.x + T.y * A.y)
+        client:send(string.format(Tx_float_length, math.cos(gamma)))
+        client:send(string.format(Tx_float_length, math.sin(gamma)))
 
-        --Send the mean forward and lateral velocities with (reference of the agent)
+        --Send the mean forward and lateral velocities and accelerations with (reference of the agent)
         --Measured and computed in sysCall_sensing
         
         client:send(string.format(Tx_float_length, mean_forward_velocity))
         client:send(string.format(Tx_float_length, mean_lateral_velocity))
+        client:send(string.format(Tx_float_length, mean_forward_acc))
+        --client:send(string.format(Tx_float_length, mean_lateral_acc))
 
         step_completed = true
 
@@ -299,12 +350,12 @@ function sysCall_actuation()
                     walk_pos[f2][4] = { base_pos[4][1]+x0, base_pos[4][2]+y0, base_pos[1][3]-z_rise }
                     sequence_step = 1
                 end
---                for l=1,leg_number,1 do
---                    print("LEG "..l)
---                    print("base: { "..base_pos[l][1]..", "..base_pos[l][2]..", "..base_pos[l][3].." }")
---                    print("pos1: { "..walk_pos[f1][l][1]..", "..walk_pos[f1][l][2]..", "..walk_pos[f1][l][3].." }")
---                    print("pos2: { "..walk_pos[f2][l][1]..", "..walk_pos[f2][l][2]..", "..walk_pos[f2][l][3].." }")
---                end
+                -- for l=1,leg_number,1 do
+                --     print("LEG "..l)
+                --     print("base: { "..base_pos[l][1]..", "..base_pos[l][2]..", "..base_pos[l][3].." }")
+                --     print("pos1: { "..walk_pos[f1][l][1]..", "..walk_pos[f1][l][2]..", "..walk_pos[f1][l][3].." }")
+                --     print("pos2: { "..walk_pos[f2][l][1]..", "..walk_pos[f2][l][2]..", "..walk_pos[f2][l][3].." }")
+                -- end
             end
             --Signal midpoint flag
             state = 1
@@ -329,7 +380,7 @@ function sysCall_actuation()
             last_state, state = state, 0
             for i=1,joints_number,1 do
                 delta = math.abs(jointPos[i] - lastJointPos[i])
---                print(i, delta, jointPos[i], lastJointPos[i])
+                -- print(i, delta, jointPos[i], lastJointPos[i])
                 lastJointPos[i] = jointPos[i]
                 if delta >= 2*math.pi then delta = delta - 2*math.pi end
                 if delta > max_delta then state = last_state end
@@ -347,7 +398,7 @@ function sysCall_actuation()
             end
             -- If so, set the final target position for all joints
             if state == 2 then
---                print("MidPoint reached")
+                -- print("MidPoint reached")
                 for i=1,joints_number,1 do
                     sim.setJointTargetPosition(joint[i], jointTargetPos[i])
                     lastJointPos[i] = jointPos[i]
@@ -362,9 +413,9 @@ function sysCall_actuation()
                 if delta >= 2*math.pi then delta = delta - 2*math.pi end
                 if delta > max_delta then state = 2 end
             end
---            if state == 0 then
---                print("TargetPos reached")
---            end
+            -- if state == 0 then
+            --     print("TargetPos reached")
+            -- end
         end
 
     else -- If state is not 'idle' and mode is direction control
@@ -377,7 +428,7 @@ function sysCall_actuation()
             -- Execute coded leg movement (lineal interpolation between two frames)
             for l=1,leg_number,1 do
                 relative_pos[1] = walk_pos[f1][l][1] * (n-f)/n + walk_pos[f2][l][1] * f/n
---                relative_pos[2] = walk_dir[l] * (walk_pos[f1][l][2] * (n-f)/n + walk_pos[f2][l][2] * f/n)
+                -- relative_pos[2] = walk_dir[l] * (walk_pos[f1][l][2] * (n-f)/n + walk_pos[f2][l][2] * f/n)
                 relative_pos[2] = walk_pos[f1][l][2] * (n-f)/n + walk_pos[f2][l][2] * f/n
                 relative_pos[3] = walk_pos[f1][l][3] * (n-f)/n + walk_pos[f2][l][3] * f/n
                 sim.setObjectPosition(target[l],agent,relative_pos)

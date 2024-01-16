@@ -22,27 +22,40 @@ class Environment:
 
         #Parameters for forward velocity reward
         self.forward_velocity_reward = 0
-        self.__target_velocity = 0.4 # m/s (In the future it could be a changing velocity)
+        self.__target_velocity = 0.2 # m/s (In the future it could be a changing velocity)
         self.__vmax = 2
-        self.__delta_vel = 0.6
-        self.__vmin = -2
+        self.__delta_vel = 0.4
 
-        self.__curvature_forward = -2*self.__vmax/(self.__delta_vel * self.__vmin)
+        self.__k_vel = self.__vmax * 2 / self.__delta_vel
+
+        #Parameters for forward acceleration penalization
+        self.forward_acc_penalty = 0
+        # self.__vmin_acc = -1
+        # self.__curvature_acc = 2
 
         #Parameters for lateral velocity penalization
         self.lateral_velocity_penalty = 0
-        self.__vmin_lat = -1
-        self.__curvature_lateral = 1.5
+        self.__vmin_lat = -2
+        self.__curvature_lateral = 3
         
+        #Parameters for orientation reward
+        self.orientation_reward = 0
+        self.__vmax_ori = 0.5
+        self.__vmin_ori = -0.5
+        self.__curvature_pos = 30
+        self.__curvature_neg = 0.5
+        self.__neutralAngle = 5 * np.pi/180
 
-        # #Parameters for orientation reward
-        # self.__maxDecreaseOrientation = -0.5
-        # self.__curvature = 1
-        # self.__k = self.__maxDecreaseOrientation/(np.exp(-self.__curvature*np.pi)-1)#Auxiliary parameter to simplify equation
+            #Auxiliary parameters to simplify expressions
+        self.__b1 = -np.exp(-self.__curvature_pos*self.__neutralAngle)
+        self.__b2 = -np.exp(-self.__curvature_neg*self.__neutralAngle)
+
+        self.__k1 = self.__vmax_ori/(1+self.__b1)
+        self.__k2 = self.__vmin_ori/(np.exp(-self.__curvature_neg*np.pi)+self.__b2)
         
         #Parameters for flat back reward
         self.flat_back_reward = np.zeros(2)
-        self.__vmin_back = -0.8
+        self.__vmin_back = -2
         self.__curvature_back = 2
 
         #Rewards at the end of the episode (either flipping or reaching the goal)
@@ -96,8 +109,10 @@ class Environment:
         dist_fin = np.sqrt(np.sum(np.square(next_obs[:,0:self.__pos_size]), axis=1, keepdims=True))
 
             # Velocity vector from every state observed
-        forward_velocity = next_obs[:,7]
-        lateral_velocity = next_obs[:,8]
+        forward_velocity = next_obs[:,9]
+        lateral_velocity = next_obs[:,10]
+
+        forward_acceleration = next_obs[:,11]
 
             # Empty vectors to store reward and end flags for every transition
         reward, end = np.zeros((obs.shape[0], 1)), np.zeros((obs.shape[0], 1))
@@ -105,12 +120,23 @@ class Environment:
         for i in range(obs.shape[0]):
 
             '''Reward for forward velocity reaching target velocity'''
-            self.forward_velocity_reward = (self.__vmax - self.__vmin)/(self.__curvature_forward * np.abs(self.__target_velocity - forward_velocity[i]) + 1) + self.__vmin
+            self.forward_velocity_reward = - self.__k_vel * np.abs(self.__target_velocity - forward_velocity[i]) + self.__vmax
 
             # print("forward_velocity = ", forward_velocity[i])
             # print("forward_velocity_penalty = ", forward_velocity_penalty)
 
-            base_reward = self.forward_velocity_reward
+            reward[i] = self.forward_velocity_reward
+
+            '''Penalization for forward acceleration'''
+            if self.forward_velocity_reward > 0:
+                self.forward_acc_penalty = -0.05*np.power(forward_acceleration[i], 4) * self.forward_velocity_reward
+            else:
+                self.forward_acc_penalty = 0
+
+            # print("forward_acceleration = ", forward_acceleration[i])
+            # print("forward_acc_penalty = ", forward_acc_penalty)
+
+            reward[i] += self.forward_acc_penalty
 
             '''Penalization for Lateral velocity'''
             self.lateral_velocity_penalty = -self.__vmin_lat/(self.__curvature_lateral * np.abs(lateral_velocity[i]) + 1) + self.__vmin_lat
@@ -118,28 +144,23 @@ class Environment:
             # print("lateral_velocity = ", lateral_velocity[i])
             # print("lateral_velocity_penalty = ", lateral_velocity_penalty)
 
-            base_reward += self.lateral_velocity_penalty
+            reward[i] += self.lateral_velocity_penalty
 
-            reward[i] = base_reward
+            '''Penalization for Orientation deviating from target direction'''
+            # Compute angle between agents orientation and target direction based on cosine and sine from coppelia:
+            angle_agent2target = np.abs(np.arctan2(next_obs[i,8], next_obs[i,7]))
 
-            # '''Penalization for Orientation deviating from target direction'''
-            # # Compute angle between agents orientation and target direction:
-            # angle_agent2target = np.arctan2(next_obs[i,7], next_obs[i,8])
+            # Compute reward based on angle:
+            if angle_agent2target < self.__neutralAngle:
+                self.orientation_reward = self.__k1*(np.exp(-self.__curvature_pos * angle_agent2target) + self.__b1)
+            else:
+                self.orientation_reward = self.__k2*(np.exp(-self.__curvature_neg * angle_agent2target) + self.__b2)
 
-            # # Compute reward based on angle:
-            # orientation_reward = self.__k*(np.exp(-self.__curvature * angle_agent2target) - 1)
-
-            # if reward[i] < 0:
-            #     reward[i] -= orientation_reward * reward[i]
-            # else:
-            #     reward[i] += orientation_reward * reward[i]
+            reward[i] += self.orientation_reward
 
             '''Flat Back relative reward: pitch and roll close to 0°'''
             for j in range(5, 7):
                 back_angle = np.abs(next_obs[i, j])*np.pi    #angle (in rad) of the back with respect to 0° (horizontal position)
-
-                #if the angle is 0° the reward increases a __maxIncreaseBack of the base reward
-                #if it is __neutralAngleBack or more, base reward is decreased (The mean of the X,Y angles is computed)
 
                 self.flat_back_reward[j-5] = (-self.__vmin_back/(self.__curvature_back * back_angle + 1) + self.__vmin_back)
                 

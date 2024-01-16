@@ -17,28 +17,29 @@ data_type = np.float64
 
 def SAC_Agent_Training(q):
 
-    env = Environment(obs_sp_shape=(21,), act_sp_shape=(12,), dest_pos=(0,0))
+    env = Environment(obs_sp_shape=(24,), act_sp_shape=(12,), dest_pos=(0,0))
 
-    #The 23 values from coppelia, in order:
+    #The 24 values from coppelia, in order:
         #---- Not seen by the agent --------
         #position (x,y,z)
         #target_direction (x,y)
         #-----------------------------------
     
         #pitch and roll of the agent's body
-        ##############cosine and sine of the signed angle between the agent and the target direction (CURRENTLY NOT)
-        #Forward and lateral velocity with the reference frame of the agent
+        #cosine and sine of the signed angle between the agent and the target direction
+        #Mean forward and lateral velocities with the reference frame of the agent
+        #Mean forward acceleration with the reference frame of the agent
         #the 12 joint angles
 
-    load_agent = False
+    load_agent = True
     test_agent = False
-    load_train_history = False   #(if test_agent == True, the train history and the replay buffer are never loaded)
-    load_replay_buffer = False   #(if load_train_history == false, the replay buffer is never loaded)
+    load_train_history = True   #(if test_agent == True, the train history and the replay buffer are never loaded)
+    load_replay_buffer = True   #(if load_train_history == false, the replay buffer is never loaded)
     
     episodes = 20000
     episode = 0
     episode_steps = 200 #Maximum steps allowed per episode
-    save_period = 1000
+    save_period = 500
 
     #The vector received from coppelia contains the x,y,z coordinates and the target direction not used by the agent, only for plotting. Thats why we subtract the 5 values from the vector dimensions
     agent = SAC_Agent('Cuadruped', env.obs_sp_shape[0]-5, env.act_sp_shape[0], replay_buffer_size=1000000)
@@ -54,7 +55,7 @@ def SAC_Agent_Training(q):
     ep_obs = np.zeros((episode_steps+1,) + env.obs_sp_shape, dtype=data_type)   # Episode's observed states
     ep_act = np.zeros((episode_steps,) + env.act_sp_shape, dtype=data_type)     # Episode's actions
     ep_rwd = np.zeros((episode_steps,), dtype=data_type)                        # Episode's rewards
-    ep_ind_rwd = np.zeros((episode_steps, 4), dtype=data_type)                  # Epidose's individual rewards
+    ep_ind_rwd = np.zeros((episode_steps, 6), dtype=data_type)                  # Epidose's individual rewards
     ep_ret = np.zeros((episodes, 3), dtype=data_type)                           # Returns for each episode (real, expected and RMSE)
     ep_loss = np.zeros((episodes, 2), dtype=data_type)                          # Training loss for each episode (Q and P)
     ep_alpha = np.zeros((episodes,), dtype=data_type)                           # Alpha for each episode
@@ -93,7 +94,7 @@ def SAC_Agent_Training(q):
                 # Act in the environment
                 ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
 
-                ep_ind_rwd[step, :] = [env.forward_velocity_reward, env.lateral_velocity_penalty, env.flat_back_reward[0], env.flat_back_reward[1]]
+                ep_ind_rwd[step, :] = [env.forward_velocity_reward, env.lateral_velocity_penalty, env.orientation_reward, env.flat_back_reward[0], env.flat_back_reward[1], env.forward_acc_penalty]
 
                 if done_flag: break
 
@@ -107,7 +108,7 @@ def SAC_Agent_Training(q):
                 # Act in the environment
                 ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
 
-                ep_ind_rwd[step, :] = [env.forward_velocity_reward, env.lateral_velocity_penalty, env.flat_back_reward[0], env.flat_back_reward[1]]
+                ep_ind_rwd[step, :] = [env.forward_velocity_reward, env.lateral_velocity_penalty, env.orientation_reward, env.flat_back_reward[0], env.flat_back_reward[1], env.forward_acc_penalty]
 
                 # Store in replay buffer
                 agent.remember(ep_obs[step][5:], ep_act[step], ep_rwd[step], ep_obs[step+1][5:], done_flag)
@@ -157,9 +158,9 @@ def SAC_Agent_Training(q):
         print("Policy's Entropy: ", ep_entropy[episode])
         print("------------------------------------------")
 
-        q.put((episode, ep_obs[0:ep_len+1], ep_rwd[0:ep_len+1], ep_ind_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1]))
+        q.put((episode, ep_obs[0:ep_len+1], ep_rwd[0:ep_len+1], ep_ind_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1], ep_act[0:ep_len+1]))
         
-        if (episode % save_period == 0 or episode == 50) and test_agent == False:
+        if episode % save_period == 0 and episode != 0 and test_agent == False:
             agent.save_models()
             agent.replay_buffer.save(episode)
             
@@ -168,68 +169,175 @@ def SAC_Agent_Training(q):
         
         episode += 1
 
+body_min, body_max = -10.0, 15.0
+body_mean = (body_min + body_max)/2
+body_range = (body_max - body_min)/2
+
+leg_min, leg_max = -10.0, 40.0
+leg_mean = (leg_min + leg_max)/2
+leg_range = (leg_max - leg_min)/2
+
+paw_min, paw_max = -15.0,  5.0
+paw_mean = (paw_min + paw_max)/2
+paw_range = (paw_max - paw_min)/2
+
 def updatePlot():   
-    global q, curve_Trajectory, curve_Trajectory_startPoint,curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_Pitch, curve_Roll, curve_Reward, curve_Forward_vel_rwd, curve_Lateral_vel_rwd, curve_Pitch_rwd, curve_Roll_rwd, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy
+    global q, curve_Trajectory, curve_Trajectory_startPoint, curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_ForwardAcc, curve_Pitch, \
+        curve_Roll, curve_gamma, curve_Reward, curve_Forward_vel_rwd, curve_Lateral_vel_rwd, curve_Orientation_rwd, curve_Pitch_rwd, curve_Roll_rwd, \
+        curve_Acc_rwd, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy, \
+        curve_FrontBody_right_state, curve_FrontBody_left_state, curve_FrontBody_right_action, curve_FrontBody_left_action, \
+        curve_BackBody_right_state, curve_BackBody_left_state, curve_BackBody_right_action, curve_BackBody_left_action, \
+        curve_FrontLeg_right_state, curve_FrontLeg_left_state, curve_FrontLeg_right_action, curve_FrontLeg_left_action, \
+        curve_BackLeg_right_state, curve_BackLeg_left_state, curve_BackLeg_right_action, curve_BackLeg_left_action, \
+        curve_FrontPaw_right_state, curve_FrontPaw_left_state, curve_FrontPaw_right_action, curve_FrontPaw_left_action, \
+        curve_BackPaw_right_state, curve_BackPaw_left_state, curve_BackPaw_right_action, curve_BackPaw_left_action, \
+        body_joints_state, body_joints_action, leg_joints_state, leg_joints_action, paw_joints_state, paw_joints_action
     # print('Thread ={}          Function = updatePlot()'.format(threading.currentThread().getName()))
     try:  
         results=q.get_nowait()
+
         last_episode = results[0]
         episode_linspace = np.arange(0,last_episode+1,1,dtype=int)
-        
+
+        ####Trajectory update
         Trajectory_x_data = results[1][:,0]
         Trajectory_y_data = results[1][:,1]
 
         target_direction = results[1][0,3:5]    #Currently constant through out the episode
 
+        target_direction = target_direction / np.sqrt(np.sum(np.square(target_direction)))
+
         Trajectory_x_target = np.array([0, target_direction[0]*3])
         Trajectory_y_target = np.array([0, target_direction[1]*3])
-
-        forward_velocity = results[1][:,7]      #For each step of the episode
-        lateral_velocity = results[1][:,8]
-
-        state_linspace = np.arange(0,len(forward_velocity), 1, dtype=int)
-
-        pitch = results[1][:,5]
-        roll = results[1][:,6]
-
-        Step_rwd = results[2]
-
-        rwd_linspace = np.arange(1,len(Step_rwd)+1, 1, dtype=int)   #Because there is no reward in the first state (step 0)
-        
-        forward_velocity_rwd = results[3][:,0]
-        lateral_velocity_rwd = results[3][:,1]
-        pitch_rwd = results[3][:,2]
-        roll_rwd = results[3][:,3]
-
-        Real_Return_data = results[4][:,0]
-        Predicted_Return_data = results[4][:,1]
-        Return_loss_data = results[4][:,2]
-
-        Q_loss_data = results[5][:,0]
-        P_loss_data = results[5][:,1]
-
-        Alpha_data = results[6]
-        
-        Entropy_data = results[7]
 
         curve_Trajectory.setData(Trajectory_x_data,Trajectory_y_data)
         curve_Trajectory_startPoint.setData([Trajectory_x_data[0]], [Trajectory_y_data[0]])
         curve_Trajectory_target.setData(Trajectory_x_target, Trajectory_y_target)
+
+        ####Velocities update
+        forward_velocity = results[1][:,9]      #For each step of the episode
+        lateral_velocity = results[1][:,10]
+
+        state_linspace = np.arange(0,len(forward_velocity), 1, dtype=int)
+
         curve_ForwardVelocity.setData(state_linspace, forward_velocity)
         curve_LateralVelocity.setData(state_linspace, lateral_velocity)
+
+        ####Acceleration update
+        forward_acc = results[1][:,11]
+
+        curve_ForwardAcc.setData(state_linspace, forward_acc)
+
+        ####Inclination and Orientation update
+        pitch = results[1][:,5] * 180 #deg
+        roll = results[1][:,6] * 180 #deg
+        gamma = np.arctan2(results[1][:,8], results[1][:,7]) * 180/np.pi    #Angle between agent and target direction in deg
+
         curve_Pitch.setData(state_linspace, pitch)
         curve_Roll.setData(state_linspace, roll)
-        curve_Reward.setData(rwd_linspace, Step_rwd)
+        curve_gamma.setData(state_linspace, gamma)
+
+        ####Rewards update
+        total_rwd = results[2]
+        forward_velocity_rwd = results[3][:,0]
+        lateral_velocity_rwd = results[3][:,1]
+        orientation_rwd = results[3][:,2]
+        pitch_rwd = results[3][:,3]
+        roll_rwd = results[3][:,4]
+        acc_rwd = results[3][:,5]
+
+        rwd_linspace = np.arange(1,len(total_rwd)+1, 1, dtype=int)   #Because there is no reward in the first state (step 0)
+
+        curve_Reward.setData(rwd_linspace, total_rwd)
         curve_Forward_vel_rwd.setData(rwd_linspace, forward_velocity_rwd)
         curve_Lateral_vel_rwd.setData(rwd_linspace, lateral_velocity_rwd)
+        curve_Orientation_rwd.setData(rwd_linspace, orientation_rwd)
         curve_Pitch_rwd.setData(rwd_linspace, pitch_rwd)
         curve_Roll_rwd.setData(rwd_linspace, roll_rwd)
-        curve_P_Loss.setData(episode_linspace,P_loss_data)
-        curve_Q_Loss.setData(episode_linspace,Q_loss_data)
+        curve_Acc_rwd.setData(rwd_linspace, acc_rwd)
+
+        ####Body joints update
+        body_joints_state = []
+        body_joints_action = []
+        for i in range(4):
+            body_joints_state.append(results[1][:,12+i*3] * body_range + body_mean)
+            body_joints_action.append(results[8][:,i*3] * body_range + body_mean)
+
+        action_linspace = np.arange(1,len(body_joints_action[0])+1,1, dtype=int)    #Because no action has been made in the step 0
+
+        curve_FrontBody_right_state.setData(state_linspace, body_joints_state[0])
+        curve_FrontBody_left_state.setData(state_linspace, body_joints_state[1])
+        curve_FrontBody_right_action.setData(action_linspace, body_joints_action[0])
+        curve_FrontBody_left_action.setData(action_linspace, body_joints_action[1])
+
+        curve_BackBody_right_state.setData(state_linspace, body_joints_state[2])
+        curve_BackBody_left_state.setData(state_linspace, body_joints_state[3])
+        curve_BackBody_right_action.setData(action_linspace, body_joints_action[2])
+        curve_BackBody_left_action.setData(action_linspace, body_joints_action[3])
+
+        ####Leg joints update
+        leg_joints_state = []
+        leg_joints_action = []
+        for i in range(4):
+            leg_joints_state.append(results[1][:,13+i*3] * leg_range + leg_mean)
+            leg_joints_action.append(results[8][:,1+i*3] * leg_range + leg_mean)
+
+        curve_FrontLeg_right_state.setData(state_linspace, leg_joints_state[0])
+        curve_FrontLeg_left_state.setData(state_linspace, leg_joints_state[1])
+        curve_FrontLeg_right_action.setData(action_linspace, leg_joints_action[0])
+        curve_FrontLeg_left_action.setData(action_linspace, leg_joints_action[1])
+
+        curve_BackLeg_right_state.setData(state_linspace, leg_joints_state[2])
+        curve_BackLeg_left_state.setData(state_linspace, leg_joints_state[3])
+        curve_BackLeg_right_action.setData(action_linspace, leg_joints_action[2])
+        curve_BackLeg_left_action.setData(action_linspace, leg_joints_action[3])
+
+        ####Paw joints update
+        paw_joints_state = []
+        paw_joints_action = []
+        for i in range(4):
+            paw_joints_state.append(results[1][:,14+i*3] * paw_range + paw_mean)
+            paw_joints_action.append(results[8][:,2+i*3] * paw_range + paw_mean)
+
+        curve_FrontPaw_right_state.setData(state_linspace, paw_joints_state[0])
+        curve_FrontPaw_left_state.setData(state_linspace, paw_joints_state[1])
+        curve_FrontPaw_right_action.setData(action_linspace, paw_joints_action[0])
+        curve_FrontPaw_left_action.setData(action_linspace, paw_joints_action[1])
+
+        curve_BackPaw_right_state.setData(state_linspace, paw_joints_state[2])
+        curve_BackPaw_left_state.setData(state_linspace, paw_joints_state[3])
+        curve_BackPaw_right_action.setData(action_linspace, paw_joints_action[2])
+        curve_BackPaw_left_action.setData(action_linspace, paw_joints_action[3])
+
+        ####Returns update
+        Real_Return_data = results[4][:,0]
+        Predicted_Return_data = results[4][:,1]
+
         curve_Real_Return.setData(episode_linspace,Real_Return_data)
         curve_Predicted_Return.setData(episode_linspace, Predicted_Return_data)
+
+        ####Returns error update
+        Return_loss_data = results[4][:,2]
+
         curve_Return_Error.setData(episode_linspace,Return_loss_data)
+
+        ####Qloss update
+        Q_loss_data = results[5][:,0]
+
+        curve_Q_Loss.setData(episode_linspace,Q_loss_data)
+
+        ####Ploss update
+        P_loss_data = results[5][:,1]
+
+        curve_P_Loss.setData(episode_linspace,P_loss_data)
+
+        ####Alpha update
+        Alpha_data = results[6]
         curve_Alpha.setData(episode_linspace,Alpha_data)
+        
+        ####Entropy update
+        Entropy_data = results[7]
+
         curve_Entropy.setData(episode_linspace, Entropy_data)
 
     except queue.Empty:
@@ -237,7 +345,6 @@ def updatePlot():
         pass
 
 if __name__ == '__main__':
-    global q, curve_Trajectory, curve_Trajectory_startPoint, curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_Pitch, curve_Roll, curve_Reward, curve_Forward_vel_rwd, curve_Lateral_vel_rwd, curve_Pitch_rwd, curve_Roll_rwd, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy
     # print('Thread ={}          Function = main()'.format(threading.currentThread().getName()))
     app = QApplication(sys.argv)
 
@@ -251,53 +358,14 @@ if __name__ == '__main__':
     # Create window
     
     grid_layout = pg.GraphicsLayoutWidget(title="Cuadruped - Training information")
-    grid_layout.resize(1625,715)
+    grid_layout.resize(1200,800)
     
     pg.setConfigOptions(antialias=True)
 
+############################################### PLOTS #####################################################################
+
+    ####Trajectory plot
     plot_Trajectory = grid_layout.addPlot(title="Trajectory with Target Direction", row=0, col=0)
-
-    plot_StepVelocity = grid_layout.addPlot(title="Forward and lateral velocity per Step", row=0, col=1)
-    plot_StepVelocity.addLegend()
-    plot_StepVelocity.showGrid(x=True, y=True)
-
-    plot_StepOrientation = grid_layout.addPlot(title="Pitch and Roll per Step", row=0, col=2)
-    plot_StepOrientation.addLegend()
-    plot_StepOrientation.showGrid(x=True, y=True)
-
-    plot_Rewards = grid_layout.addPlot(title="Reward per Step", row=0, col=3)
-    plot_Rewards.addLegend()
-    plot_Rewards.showGrid(x=True, y=True)
-
-    plot_P_Loss = grid_layout.addPlot(title="Policy Loss", row=0, col=4)
-    plot_P_Loss.showGrid(x=True, y=True)
-
-    plot_Returns = grid_layout.addPlot(title="Real Return vs Predicted Return", row=1, col=0)
-    plot_Returns.addLegend()
-    plot_Returns.showGrid(x=True, y=True)
-
-    plot_Return_Error = grid_layout.addPlot(title="RMSD of Real and Predicted Return", row=1, col=1)
-    plot_Return_Error.showGrid(x=True, y=True)
-        
-    plot_Q_Loss = grid_layout.addPlot(title="State-Action Value Loss", row=1, col=2)
-    plot_Q_Loss.showGrid(x=True, y=True)
-
-    plot_Alpha = grid_layout.addPlot(title="Alpha (Entropy Regularization Coefficient)", row=1, col=3)
-    plot_Alpha.showGrid(x=True, y=True)
-
-    plot_Entropy = grid_layout.addPlot(title="Policy's Entropy", row=1, col=4)
-    plot_Entropy.showGrid(x=True, y=True)
-
-    grid_layout.ci.layout.setColumnMinimumWidth(0,310)
-    grid_layout.ci.layout.setColumnMinimumWidth(1,310)
-    grid_layout.ci.layout.setColumnMinimumWidth(2,310)
-    grid_layout.ci.layout.setColumnMinimumWidth(3,310)
-    grid_layout.ci.layout.setColumnMinimumWidth(4,310)
-    grid_layout.ci.layout.setRowMinimumHeight(0,340)
-    grid_layout.ci.layout.setRowMinimumHeight(1,340)
-    grid_layout.ci.layout.setSpacing(15)
-
-    # Drawing of the scene in the trajectory plot:
 
         # Point in the center of the scene, target of the agent
     plot_Trajectory.plot([0], [0], pen=None, symbol='o', symbolPen=None, symbolSize=5, symbolBrush=(255, 255, 255, 200))
@@ -323,33 +391,194 @@ if __name__ == '__main__':
 
     plot_Trajectory.setRange(xRange=(-3,3), yRange=(-3,3), padding=None, update=True, disableAutoRange=True)
 
-    #Curves to update them in updatePlot()
+        #Curves to update them in updatePlot()
     curve_Trajectory = plot_Trajectory.plot()
     curve_Trajectory_startPoint = plot_Trajectory.plot(pen=None, symbol='o', symbolPen=None, symbolSize=5, symbolBrush=(0, 255, 0, 150))
     curve_Trajectory_target = plot_Trajectory.plot(pen=pg.mkPen((255,201,14,255), width=1, style=QtCore.Qt.DashLine))
-    curve_ForwardVelocity = plot_StepVelocity.plot(pen=(0,255,0), name='Forward')
-    curve_LateralVelocity = plot_StepVelocity.plot(pen=(255,0,0), name='Lateral')
-    curve_Pitch = plot_StepOrientation.plot(pen=(0,255,255), name='Pitch')
-    curve_Roll = plot_StepOrientation.plot(pen=(255,0,255), name='Roll')
-    curve_Reward = plot_Rewards.plot(pen=(255,201,14), name='Total')
+
+
+    ####Velocity plot
+    plot_Velocity = grid_layout.addPlot(title="Mean forward and lateral velocity (m/s)", row=0, col=1)
+    plot_Velocity.addLegend(offset=(1, 1), verSpacing=-1)
+    plot_Velocity.showGrid(x=True, y=True)
+
+    curve_ForwardVelocity = plot_Velocity.plot(pen=(0,255,0), name='Forward')
+    curve_LateralVelocity = plot_Velocity.plot(pen=(255,0,0), name='Lateral')
+
+
+    ####Acceleration plot
+    plot_Acceleration = grid_layout.addPlot(title="Mean absolute forward acceleration (m/s^2)", row=0, col=2)
+    plot_Acceleration.showGrid(x=True, y=True)
+
+    curve_ForwardAcc = plot_Acceleration.plot(pen=(0,255,0))
+
+
+    ####Inclination plot
+    plot_Inclination = grid_layout.addPlot(title="Pitch and Roll (°)", row=0, col=3)
+    plot_Inclination.addLegend(offset=(1, 1), verSpacing=-1)
+    plot_Inclination.showGrid(x=True, y=True)
+
+    curve_Pitch = plot_Inclination.plot(pen=(0,255,255), name='Pitch')
+    curve_Roll = plot_Inclination.plot(pen=(255,0,255), name='Roll')
+    
+
+    ####Orientation plot
+    plot_Orientation = grid_layout.addPlot(title="Angle to target direction (°)", row=0, col=4)
+    plot_Orientation.showGrid(x=True, y=True)
+
+    curve_gamma = plot_Orientation.plot(pen=(255,127,39), name='Agent2Target')
+
+   
+    ####Rewards plot
+    plot_Rewards = grid_layout.addPlot(title="Total and individual Rewards", row=0, col=5)
+    plot_Rewards.addLegend(offset=(1, 1), verSpacing=-1, horSpacing = 20, labelTextSize = '7pt', colCount=3)
+    plot_Rewards.showGrid(x=True, y=True)
+
+    curve_Reward = plot_Rewards.plot(pen=(255,255,0), name='Total')
     curve_Forward_vel_rwd = plot_Rewards.plot(pen=(0,255,0), name='Forward')
     curve_Lateral_vel_rwd = plot_Rewards.plot(pen=(255,0,0), name='Lateral')
+    curve_Orientation_rwd = plot_Rewards.plot(pen=(255,127,39), name='Orientation')
     curve_Pitch_rwd = plot_Rewards.plot(pen=(0,255,255), name='Pitch')
     curve_Roll_rwd = plot_Rewards.plot(pen=(255,0,255), name='Roll')
+    curve_Acc_rwd = plot_Rewards.plot(pen=(255,255,255), name='Fwd_Acc')
+
+
+    ####Front body joints plot
+    plot_FrontBody = grid_layout.addPlot(title="Front body joints (°)", row=1, col=0)
+    plot_FrontBody.addLegend(offset=(1, 1), verSpacing=-1, colCount=2)
+    plot_FrontBody.showGrid(x=True, y=True)
+
+    curve_FrontBody_right_state = plot_FrontBody.plot(pen=(255,0,0), name='Right (state)')
+    curve_FrontBody_left_state = plot_FrontBody.plot(pen=(0,255,0), name='Left (state)')
+
+    curve_FrontBody_right_action = plot_FrontBody.plot(pen=(255,255,0), name='Right (action)')
+    curve_FrontBody_left_action = plot_FrontBody.plot(pen=(0,255,255), name='Left (action)')
+
+
+    ####Back body joints plot
+    plot_BackBody = grid_layout.addPlot(title="Back body joints (°)", row=1, col=1)
+    plot_BackBody.addLegend(offset=(1, 1), verSpacing=-1, colCount=2)
+    plot_BackBody.showGrid(x=True, y=True)
+
+    curve_BackBody_right_state = plot_BackBody.plot(pen=(255,0,0), name='Right (state)')
+    curve_BackBody_left_state = plot_BackBody.plot(pen=(0,255,0), name='Left (state)')
+
+    curve_BackBody_right_action = plot_BackBody.plot(pen=(255,255,0), name='Right (action)')
+    curve_BackBody_left_action = plot_BackBody.plot(pen=(0,255,255), name='Left (action)')
+
+
+    ####Front leg joints plot
+    plot_FrontLeg = grid_layout.addPlot(title="Front leg joints (°)", row=1, col=2)
+    plot_FrontLeg.addLegend(offset=(1, 1), verSpacing=-1, colCount=2)
+    plot_FrontLeg.showGrid(x=True, y=True)
+
+    curve_FrontLeg_right_state = plot_FrontLeg.plot(pen=(255,0,0), name='Right (state)')
+    curve_FrontLeg_left_state = plot_FrontLeg.plot(pen=(0,255,0), name='Left (state)')
+
+    curve_FrontLeg_right_action = plot_FrontLeg.plot(pen=(255,255,0), name='Right (action)')
+    curve_FrontLeg_left_action = plot_FrontLeg.plot(pen=(0,255,255), name='Left (action)')
+
+
+    ####Back leg joints plot
+    plot_BackLeg = grid_layout.addPlot(title="Back leg joints (°)", row=1, col=3)
+    plot_BackLeg.addLegend(offset=(1, 1), verSpacing=-1, colCount=2)
+    plot_BackLeg.showGrid(x=True, y=True)
+
+    curve_BackLeg_right_state = plot_BackLeg.plot(pen=(255,0,0), name='Right (state)')
+    curve_BackLeg_left_state = plot_BackLeg.plot(pen=(0,255,0), name='Left (state)')
+
+    curve_BackLeg_right_action = plot_BackLeg.plot(pen=(255,255,0), name='Right (action)')
+    curve_BackLeg_left_action = plot_BackLeg.plot(pen=(0,255,255), name='Left (action)')
+
+
+    ####Front paw joints plot
+    plot_FrontPaw = grid_layout.addPlot(title="Front paw joints (°)", row=1, col=4)
+    plot_FrontPaw.addLegend(offset=(1, 1), verSpacing=-1, colCount=2)
+    plot_FrontPaw.showGrid(x=True, y=True)
+
+    curve_FrontPaw_right_state = plot_FrontPaw.plot(pen=(255,0,0), name='Right (state)')
+    curve_FrontPaw_left_state = plot_FrontPaw.plot(pen=(0,255,0), name='Left (state)')
+
+    curve_FrontPaw_right_action = plot_FrontPaw.plot(pen=(255,255,0), name='Right (action)')
+    curve_FrontPaw_left_action = plot_FrontPaw.plot(pen=(0,255,255), name='Left (action)')
+
+
+    ####Back paw joints plot
+    plot_BackPaw = grid_layout.addPlot(title="Back paw joints (°)", row=1, col=5)
+    plot_BackPaw.addLegend(offset=(1, 1), verSpacing=-1, colCount=2)
+    plot_BackPaw.showGrid(x=True, y=True)
+
+    curve_BackPaw_right_state = plot_BackPaw.plot(pen=(255,0,0), name='Right (state)')
+    curve_BackPaw_left_state = plot_BackPaw.plot(pen=(0,255,0), name='Left (state)')
+
+    curve_BackPaw_right_action = plot_BackPaw.plot(pen=(255,255,0), name='Right (action)')
+    curve_BackPaw_left_action = plot_BackPaw.plot(pen=(0,255,255), name='Left (action)')
+
+
+    ####Returns plot
+    plot_Returns = grid_layout.addPlot(title="Real Return vs Predicted Return", row=2, col=0)
+    plot_Returns.addLegend(offset=(1, 1), verSpacing=-1)
+    plot_Returns.showGrid(x=True, y=True)
+
     curve_Real_Return = plot_Returns.plot(pen=(255,0,0), name='Real')
     curve_Predicted_Return = plot_Returns.plot(pen=(0,255,0), name='Predicted')
+
+
+    ####ReturnError plot
+    plot_Return_Error = grid_layout.addPlot(title="RMSD of Real and Predicted Return", row=2, col=1)
+    plot_Return_Error.showGrid(x=True, y=True)
+
     curve_Return_Error = plot_Return_Error.plot(pen=(182,102,247))
+
+
+    ####Qloss plot
+    plot_Q_Loss = grid_layout.addPlot(title="State-Action Value Loss", row=2, col=2)
+    plot_Q_Loss.showGrid(x=True, y=True)
+
     curve_Q_Loss = plot_Q_Loss.plot(pen=(0,255,0))
+
+
+    ####Ploss plot
+    plot_P_Loss = grid_layout.addPlot(title="Policy Loss", row=2, col=3)
+    plot_P_Loss.showGrid(x=True, y=True)
+
     curve_P_Loss = plot_P_Loss.plot(pen=(0,128,255))
+
+
+    ####Alpha plot
+    plot_Alpha = grid_layout.addPlot(title="Alpha (Entropy Regularization Coefficient)", row=2, col=4)
+    plot_Alpha.showGrid(x=True, y=True)
+
     curve_Alpha = plot_Alpha.plot(pen=(255,150,45))
+
+
+    ####Entropy plot
+    plot_Entropy = grid_layout.addPlot(title="Policy's Entropy", row=2, col=5)
+    plot_Entropy.showGrid(x=True, y=True)
+
     curve_Entropy = plot_Entropy.plot(pen=(0,255,255))
+
+####################################################################################################################
     
+    #Force Grid minimum size
+    grid_layout.ci.layout.setColumnMinimumWidth(0,300)
+    grid_layout.ci.layout.setColumnMinimumWidth(1,300)
+    grid_layout.ci.layout.setColumnMinimumWidth(2,300)
+    grid_layout.ci.layout.setColumnMinimumWidth(3,300)
+    grid_layout.ci.layout.setColumnMinimumWidth(4,300)
+    grid_layout.ci.layout.setColumnMinimumWidth(5,300)
+    grid_layout.ci.layout.setRowMinimumHeight(0,335)
+    grid_layout.ci.layout.setRowMinimumHeight(1,335)
+    grid_layout.ci.layout.setRowMinimumHeight(2,335)
+    grid_layout.ci.layout.setHorizontalSpacing(10)
+    grid_layout.ci.layout.setVerticalSpacing(0)
+
     #Timer to update plots every 1 second (if there is new data) in another thread
     timer = QtCore.QTimer()
     timer.timeout.connect(updatePlot)
     timer.start(1000)
     
-    grid_layout.show()
+    grid_layout.showMaximized()
 
     status = app.exec_()
     sys.exit(status)
