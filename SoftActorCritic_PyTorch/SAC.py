@@ -123,7 +123,7 @@ class SAC_Agent():
         self.Q1_target_net.load_checkpoint()
         self.Q2_target_net.load_checkpoint()
         self.log_alpha = torch.load('./Train/Networks/alpha_tensor.pt')
-        self.alpha_optimizer = optim.Adam([self.log_alpha], lr=0.001, betas=(0.9, 0.999))
+        self.alpha_optimizer = optim.Adam([self.log_alpha], lr=0.0003, betas=(0.9, 0.999))
 
     def learn(self, step):
         if self.replay_buffer.mem_counter < self.replay_batch_size:

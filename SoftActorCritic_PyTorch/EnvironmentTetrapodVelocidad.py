@@ -22,16 +22,16 @@ class Environment:
 
         #Parameters for forward velocity reward
         self.forward_velocity_reward = 0
-        self.__target_velocity = 0.2 # m/s (In the future it could be a changing velocity)
+        self.__target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
         self.__vmax = 2
-        self.__delta_vel = 0.4
+        self.__delta_vel = 0.6
+        self.__vmin = -2
 
-        self.__k_vel = self.__vmax * 2 / self.__delta_vel
+        self.__curvature_forward_vel = - 2* self.__vmax / (self.__delta_vel * self.__vmin)
 
         #Parameters for forward acceleration penalization
         self.forward_acc_penalty = 0
-        # self.__vmin_acc = -1
-        # self.__curvature_acc = 2
+        self.__weight_acc = 0.006
 
         #Parameters for lateral velocity penalization
         self.lateral_velocity_penalty = 0
@@ -40,8 +40,8 @@ class Environment:
         
         #Parameters for orientation reward
         self.orientation_reward = 0
-        self.__vmax_ori = 0.5
-        self.__vmin_ori = -0.5
+        self.__vmax_ori = 1
+        self.__vmin_ori = -1
         self.__curvature_pos = 30
         self.__curvature_neg = 0.5
         self.__neutralAngle = 5 * np.pi/180
@@ -58,8 +58,8 @@ class Environment:
         self.__vmin_back = -2
         self.__curvature_back = 2
 
-        #Rewards at the end of the episode (either flipping or reaching the goal)
-        self.__flipping_penalization = -3
+        #Reward for not flipping over
+        self.__not_flipping_reward = 0.5
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -119,17 +119,23 @@ class Environment:
 
         for i in range(obs.shape[0]):
 
+            '''Reward for avoiding critical failure (flipping over)'''
+            reward[i] = self.__not_flipping_reward
+
             '''Reward for forward velocity reaching target velocity'''
-            self.forward_velocity_reward = - self.__k_vel * np.abs(self.__target_velocity - forward_velocity[i]) + self.__vmax
+            if forward_velocity[i] > 0:
+                self.forward_velocity_reward = (self.__vmax - self.__vmin)/(self.__curvature_forward_vel * np.abs(self.__target_velocity - forward_velocity[i]) + 1) + self.__vmin
+            else:
+                self.forward_velocity_reward = 10*forward_velocity[i]
 
             # print("forward_velocity = ", forward_velocity[i])
             # print("forward_velocity_penalty = ", forward_velocity_penalty)
 
-            reward[i] = self.forward_velocity_reward
+            reward[i] += self.forward_velocity_reward
 
             '''Penalization for forward acceleration'''
             if self.forward_velocity_reward > 0:
-                self.forward_acc_penalty = -0.05*np.power(forward_acceleration[i], 4) * self.forward_velocity_reward
+                self.forward_acc_penalty = -self.__weight_acc * np.power(forward_acceleration[i], 4) * self.forward_velocity_reward
             else:
                 self.forward_acc_penalty = 0
 
@@ -152,7 +158,7 @@ class Environment:
 
             # Compute reward based on angle:
             if angle_agent2target < self.__neutralAngle:
-                self.orientation_reward = self.__k1*(np.exp(-self.__curvature_pos * angle_agent2target) + self.__b1)
+                self.orientation_reward = self.__k1*(np.exp(-self.__curvature_pos * angle_agent2target) + self.__b1) * self.forward_velocity_reward
             else:
                 self.orientation_reward = self.__k2*(np.exp(-self.__curvature_neg * angle_agent2target) + self.__b2)
 
@@ -174,7 +180,7 @@ class Environment:
             '''Penalization for flipping downwards'''
             #If the absolute value of X or Y angle is greater than 50° there is a penalization and the episode ends
             if abs(next_obs[i, 5]) >= 0.278 or abs(next_obs[i, 6]) >= 0.278:
-                reward[i] += self.__flipping_penalization
+                reward[i] -= self.__not_flipping_reward
                 end[i] = True
 
             elif dist_fin[i] >= self.__end_cond:
