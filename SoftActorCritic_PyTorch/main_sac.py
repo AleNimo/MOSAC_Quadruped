@@ -60,6 +60,7 @@ def SAC_Agent_Training(q):
     ep_loss = np.zeros((episodes, 2), dtype=data_type)                          # Training loss for each episode (Q and P)
     ep_alpha = np.zeros((episodes,), dtype=data_type)                           # Alpha for each episode
     ep_entropy = np.zeros((episodes,), dtype=data_type)                         # Entropy of the policy for each episode
+    ep_std = np.zeros((episodes,), dtype=data_type)                             # Mean standard deviation of the policy for each episode
 
     if load_train_history and test_agent==False:
         # Check the last episode saved in Progress.txt
@@ -75,6 +76,7 @@ def SAC_Agent_Training(q):
         ep_loss[0:last_episode+1] = loaded_arrays['loss']
         ep_alpha[0:last_episode+1] = loaded_arrays['alpha']
         ep_entropy[0:last_episode+1] = loaded_arrays['entropy']
+        ep_std[0:last_episode+1] = loaded_arrays['std']
 
         if load_replay_buffer:
             agent.replay_buffer.load(last_episode)
@@ -149,6 +151,7 @@ def SAC_Agent_Training(q):
         ep_loss[episode, 1] = agent.P_loss.item()
         ep_alpha[episode] = agent.log_alpha.exp().item()
         ep_entropy[episode] = agent.entropy.item()
+        ep_std[episode] = agent.std.item()
         
         print("Episode: ", episode)
         print("Replay_Buffer_counter: ", agent.replay_buffer.mem_counter)
@@ -158,14 +161,14 @@ def SAC_Agent_Training(q):
         print("Policy's Entropy: ", ep_entropy[episode])
         print("------------------------------------------")
 
-        q.put((episode, ep_obs[0:ep_len+1], ep_rwd[0:ep_len+1], ep_ind_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1], ep_act[0:ep_len+1]))
+        q.put((episode, ep_obs[0:ep_len+1], ep_rwd[0:ep_len+1], ep_ind_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1], ep_act[0:ep_len+1], ep_std[0:episode+1]))
         
         if episode % save_period == 0 and episode != 0 and test_agent == False:
             agent.save_models()
             agent.replay_buffer.save(episode)
             
             filename = './Train/Train_History_episode_{0:07d}'.format(episode)
-            np.savez_compressed(filename, returns = ep_ret[0:episode+1], loss = ep_loss[0:episode+1], alpha = ep_alpha[0:episode+1], entropy = ep_entropy[0:episode+1])
+            np.savez_compressed(filename, returns = ep_ret[0:episode+1], loss = ep_loss[0:episode+1], alpha = ep_alpha[0:episode+1], entropy = ep_entropy[0:episode+1], std = ep_std[0:episode+1])
         
         episode += 1
 
@@ -174,17 +177,19 @@ body_mean = (body_min + body_max)/2
 body_range = (body_max - body_min)/2
 
 leg_min, leg_max = -10.0, 40.0
+# leg_min, leg_max = 0.0, 70.0
 leg_mean = (leg_min + leg_max)/2
 leg_range = (leg_max - leg_min)/2
 
 paw_min, paw_max = -15.0,  5.0
+# paw_min, paw_max = -50.0,  10.0
 paw_mean = (paw_min + paw_max)/2
 paw_range = (paw_max - paw_min)/2
 
 def updatePlot():   
     global q, curve_Trajectory, curve_Trajectory_startPoint, curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_ForwardAcc, curve_Pitch, \
         curve_Roll, curve_gamma, curve_Reward, curve_Forward_vel_rwd, curve_Lateral_vel_rwd, curve_Orientation_rwd, curve_Pitch_rwd, curve_Roll_rwd, \
-        curve_Acc_rwd, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy, \
+        curve_Acc_rwd, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy, curve_Std, \
         curve_FrontBody_right_state, curve_FrontBody_left_state, curve_FrontBody_right_action, curve_FrontBody_left_action, \
         curve_BackBody_right_state, curve_BackBody_left_state, curve_BackBody_right_action, curve_BackBody_left_action, \
         curve_FrontLeg_right_state, curve_FrontLeg_left_state, curve_FrontLeg_right_action, curve_FrontLeg_left_action, \
@@ -339,6 +344,11 @@ def updatePlot():
         Entropy_data = results[7]
 
         curve_Entropy.setData(episode_linspace, Entropy_data)
+
+        ####Standard deviation update
+        Std_data = results[9]
+
+        curve_Std.setData(episode_linspace, Std_data)
 
     except queue.Empty:
         #print("Empty Queue")
@@ -552,11 +562,13 @@ if __name__ == '__main__':
     curve_Alpha = plot_Alpha.plot(pen=(255,150,45))
 
 
-    ####Entropy plot
-    plot_Entropy = grid_layout.addPlot(title="Policy's Entropy", row=2, col=5)
-    plot_Entropy.showGrid(x=True, y=True)
+    ####Entropy and Standard deviation plot
+    plot_Entropy_Std = grid_layout.addPlot(title="Policy's Entropy and Standard deviation", row=2, col=5)
+    plot_Entropy_Std.addLegend(offset=(1, 1), verSpacing=-1)
+    plot_Entropy_Std.showGrid(x=True, y=True)
 
-    curve_Entropy = plot_Entropy.plot(pen=(0,255,255))
+    curve_Entropy = plot_Entropy_Std.plot(pen=(0,255,255), name='Entropy')
+    curve_Std = plot_Entropy_Std.plot(pen=(255,0,0), name='Std')
 
 ####################################################################################################################
     

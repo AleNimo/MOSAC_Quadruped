@@ -101,12 +101,14 @@ class P_Network(nn.Module):
         else:
             actions = probabilities.sample()
 
-        action = torch.tanh(actions)
+        actions_restricted = torch.tanh(actions)
         log_probs = probabilities.log_prob(actions)
-        log_probs -= torch.log(1-action.pow(2)+self.reparam_noise)
+        log_probs -= torch.log(1-actions_restricted.pow(2)+self.reparam_noise)
         log_probs = log_probs.sum(1, keepdim=True)
 
-        return action, log_probs
+        sigma = sigma.mean(1, keepdim=True)
+
+        return actions_restricted, log_probs, sigma
 
     def save_checkpoint(self):
         torch.save(self.state_dict(), self.checkpoint_file)

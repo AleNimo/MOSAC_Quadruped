@@ -50,6 +50,8 @@ class SAC_Agent():
 
         self.entropy = torch.tensor(0, dtype=torch.float64).to(self.P_net.device)
 
+        self.std = torch.tensor(0, dtype=torch.float64).to(self.P_net.device)
+
         # Create entropy temperature coefficient, we store log_alpha and use log_alpha.exp() when needed to force alpha to be always positive
         self.log_alpha = torch.tensor(np.log(0.1), dtype=torch.float64).to(self.P_net.device)   #Initial alpha of 0.1
         self.log_alpha.requires_grad = True
@@ -73,7 +75,7 @@ class SAC_Agent():
         state = torch.tensor([observations]).to(self.P_net.device)
 
         if random:
-            actions,_ = self.P_net.sample_normal(state, reparameterize=False)
+            actions,_,_ = self.P_net.sample_normal(state, reparameterize=False)
         else:
             actions,_ = self.P_net(state)
 
@@ -140,7 +142,7 @@ class SAC_Agent():
         if step % self.update_Q == 0:
             #Update Q networks
             with torch.no_grad():
-                next_action, log_prob = self.P_net.sample_normal(next_state, reparameterize=False)
+                next_action, log_prob, _ = self.P_net.sample_normal(next_state, reparameterize=False)
                 next_Q = self.minimal_Q_target(next_state, next_action)
                 Q_hat = reward + self.discount_factor * (1-done_flag) * (next_Q.view(-1) - self.log_alpha.exp() * log_prob.view(-1))
 
@@ -156,7 +158,9 @@ class SAC_Agent():
 
         if step % self.update_P == 0:
             #Update P networks
-            action, log_prob = self.P_net.sample_normal(state, reparameterize=True)
+            action, log_prob, sigma = self.P_net.sample_normal(state, reparameterize=True)
+
+            self.std = torch.mean(sigma)
 
             self.entropy = torch.mean(-log_prob)
 

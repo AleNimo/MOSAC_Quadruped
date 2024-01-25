@@ -22,16 +22,16 @@ class Environment:
 
         #Parameters for forward velocity reward
         self.forward_velocity_reward = 0
-        self.__target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
+        self.__target_velocity = 0.15 # m/s (In the future it could be a changing velocity)
         self.__vmax = 2
-        self.__delta_vel = 0.6
+        self.__delta_vel = 0.3
         self.__vmin = -2
 
         self.__curvature_forward_vel = - 2* self.__vmax / (self.__delta_vel * self.__vmin)
 
         #Parameters for forward acceleration penalization
         self.forward_acc_penalty = 0
-        self.__weight_acc = 0.006
+        self.__weight_acc = 0.05
 
         #Parameters for lateral velocity penalization
         self.lateral_velocity_penalty = 0
@@ -110,6 +110,7 @@ class Environment:
 
             # Velocity vector from every state observed
         forward_velocity = next_obs[:,9]
+        past_forward_velocity = obs[:,9]
         lateral_velocity = next_obs[:,10]
 
         forward_acceleration = next_obs[:,11]
@@ -126,7 +127,7 @@ class Environment:
             if forward_velocity[i] > 0:
                 self.forward_velocity_reward = (self.__vmax - self.__vmin)/(self.__curvature_forward_vel * np.abs(self.__target_velocity - forward_velocity[i]) + 1) + self.__vmin
             else:
-                self.forward_velocity_reward = 10*forward_velocity[i]
+                self.forward_velocity_reward = self.__vmax / self.__target_velocity * forward_velocity[i]
 
             # print("forward_velocity = ", forward_velocity[i])
             # print("forward_velocity_penalty = ", forward_velocity_penalty)
@@ -134,10 +135,13 @@ class Environment:
             reward[i] += self.forward_velocity_reward
 
             '''Penalization for forward acceleration'''
-            if self.forward_velocity_reward > 0:
-                self.forward_acc_penalty = -self.__weight_acc * np.power(forward_acceleration[i], 4) * self.forward_velocity_reward
-            else:
-                self.forward_acc_penalty = 0
+            self.forward_acc_penalty = 0    #Default is 0 (if past velocity < 0 or past velocity reward < 0)
+            #First compute the reward based on the velocity before action:
+            if past_forward_velocity[i] > 0:
+                past_forward_vel_rwd = (self.__vmax - self.__vmin)/(self.__curvature_forward_vel * np.abs(self.__target_velocity - past_forward_velocity[i]) + 1) + self.__vmin
+
+                if past_forward_vel_rwd > 0:
+                    self.forward_acc_penalty = -self.__weight_acc * np.power(forward_acceleration[i], 4) * past_forward_vel_rwd
 
             # print("forward_acceleration = ", forward_acceleration[i])
             # print("forward_acc_penalty = ", forward_acc_penalty)

@@ -65,7 +65,7 @@ function sysCall_init() -- Executed when the scene is loaded
     Tx_Rx_command_length = 5
     
     -- Reset position
-    reset_pos = {0.0, 0.0, 0.233}
+    reset_pos = {0.0, 0.0, 0.283}
     reset_or = {0.0, 0.0, 0.0}
     
     n = 5.0   -- Number of intermediate frames between two main frames in direction control
@@ -76,14 +76,14 @@ function sysCall_init() -- Executed when the scene is loaded
     --leg_llim, leg_ulim = -40.0*math.pi/180.0, 130.0*math.pi/180.0
     --paw_llim, paw_ulim = -90.0*math.pi/180.0,  30.0*math.pi/180.0
     -- Joints' prefered limits
-    -- bod_llim, bod_ulim = -10.0*math.pi/180.0, 15.0*math.pi/180.0
-    -- leg_llim, leg_ulim = -10.0*math.pi/180.0, 40.0*math.pi/180.0
-    -- paw_llim, paw_ulim = -15.0*math.pi/180.0,  5.0*math.pi/180.0
+    bod_llim, bod_ulim = -10.0*math.pi/180.0, 15.0*math.pi/180.0
+    leg_llim, leg_ulim = -10.0*math.pi/180.0, 40.0*math.pi/180.0
+    paw_llim, paw_ulim = -15.0*math.pi/180.0,  5.0*math.pi/180.0
 
     --Joints' testing limits
-    bod_llim, bod_ulim = -10.0*math.pi/180.0, 15.0*math.pi/180.0
-    leg_llim, leg_ulim = 0.0*math.pi/180.0, 70.0*math.pi/180.0
-    paw_llim, paw_ulim = -50.0*math.pi/180.0,  10.0*math.pi/180.0
+    -- bod_llim, bod_ulim = -10.0*math.pi/180.0, 15.0*math.pi/180.0
+    -- leg_llim, leg_ulim = 0.0*math.pi/180.0, 70.0*math.pi/180.0
+    -- paw_llim, paw_ulim = -50.0*math.pi/180.0,  10.0*math.pi/180.0
     
     jointLowerLimit = {bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim}
     jointUpperLimit = {bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim}
@@ -145,10 +145,10 @@ function sysCall_init() -- Executed when the scene is loaded
     -- forward_vel_stream = sim.addGraphStream(graph, 'Forward velocity', 'm/s', 0, {0, 1, 0})
     -- lateral_vel_stream = sim.addGraphStream(graph, 'Lateral velocity', 'm/s', 0, {1, 0, 0})
 
-    -- forward_acc_stream = sim.addGraphStream(graph, 'Forward acceleration', 'm/s^2', 0, {0, 1, 1})
+    -- forward_acc_stream = sim.addGraphStream(graph, 'Forward acceleration div10', 'm/s^2', 0, {0, 1, 1})
     -- lateral_acc_stream = sim.addGraphStream(graph, 'Lateral acceleration', 'm/s^2', 0, {1, 1, 0})
 
-    -- mean_forward_acc_stream = sim.addGraphStream(graph, 'Mean Forward acceleration/10', 'm/s^2', 0, {0, 0.98, 0.57})
+    -- mean_forward_acc_stream = sim.addGraphStream(graph, 'Mean Forward acceleration div10', 'm/s^2', 0, {1, 0, 1})
     -- mean_forward_vel_stream = sim.addGraphStream(graph, 'Mean Forward velocity', 'm/s', 0, {0, 1, 0.88})
     -- mean_lateral_vel_stream = sim.addGraphStream(graph, 'Mean Lateral velocity', 'm/s', 0, {0.98, 0.57, 0}) 
 end
@@ -181,7 +181,7 @@ function sysCall_sensing() -- Executed every simulation step
             forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
             lateral_acceleration = (lateral_velocity - prev_lateral_velocity)/(time - prev_time)
 
-            -- sim.setGraphStreamValue(graph, forward_acc_stream, forward_acceleration)
+            -- sim.setGraphStreamValue(graph, forward_acc_stream, forward_acceleration/10)
             -- sim.setGraphStreamValue(graph, lateral_acc_stream, lateral_acceleration)
 
             mean_forward_acc = 1/(acc_samples + 1) * (mean_forward_acc * acc_samples + math.abs(forward_acceleration))
