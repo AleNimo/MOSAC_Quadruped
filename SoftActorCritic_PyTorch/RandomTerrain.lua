@@ -3,26 +3,14 @@ function sysCall_init()
     
     h=sim.getObject('.')
     
-    handle_objects = {}
+    f = 8
     
-    a1 = 1
-    a2 = 1
-    a3 = 1
-    a4 = 1
+    px = 0
+    py = 0
     
-    f1 = 0.5
-    f2 = 1
-    f3 = 1.5
-    f4 = 2
-    
-    p1 = 0
-    p2 = 0
-    p3 = 0
-    p4 = 0
-    
-    max_height = 0.15 --(minimum height = 0)
+    max_height = 0.04 --(minimum height = 0)
 
-    points = 64
+    points = 100    --Too much points makes the agent go through the heightfield shape (bug)
 
     length = 6 --meters
 
@@ -49,25 +37,20 @@ end
 function sysCall_beforeSimulation()
     -- is executed before a simulation starts
 
-    p1 = 2*math.pi * math.random()
-    p2 = 2*math.pi * math.random()
-    p3 = 2*math.pi * math.random()
-    p4 = 2*math.pi * math.random()
+    px = 2*math.pi * math.random()
+    py = 2*math.pi * math.random()
 
     local heights = {}
-    for y=1, 64, 1 do
+    for y=1, points, 1 do
         y_ = y*resolution
 
-        for x=1, 64, 1 do
+        for x=1, points, 1 do
             
             x_ = x*resolution
             
-            a = a1 * 0.5 * (math.sin(2*math.pi*f1*x_ + 2*math.pi*p1) + math.sin(2*math.pi*f1*y_ + 2*math.pi*p1))
-            b = a2 * 0.5 * (math.sin(2*math.pi*f2*x_ + 2*math.pi*p2) + math.sin(2*math.pi*f2*y_ + 2*math.pi*p2))
-            c = a3 * 0.5 * (math.sin(2*math.pi*f3*x_ + 2*math.pi*p3) + math.sin(2*math.pi*f3*y_ + 2*math.pi*p3))
-            d = a4 * 0.5 * (math.sin(2*math.pi*f4*x_ + 2*math.pi*p4) + math.sin(2*math.pi*f4*y_ + 2*math.pi*p4))
-            
-            n_height = max_height/2 * ((a + b + c + d)/4 + 1)
+            a = 0.5 * (math.sin(2*math.pi*f*x_ + 2*math.pi*px) + math.sin(2*math.pi*f*y_ + 2*math.pi*py))
+
+            n_height = max_height/2 * (a + 1)
             
             table.insert(heights, n_height)
         end
@@ -78,16 +61,20 @@ function sysCall_beforeSimulation()
     sim.setEngineFloatParam(sim.newton_body_kineticfriction, terrainShape, 1)
     sim.setObjectParent(terrainShape,h,true)
     
-    table.insert(handle_objects, terrainShape)
+    handle_objects = {}
+    handle_objects[1] = terrainShape
+
+    heights = nil
 end
 
 function sysCall_afterSimulation()
     -- is executed before a simulation ends
-
     sim.removeObjects(handle_objects)
+    handle_objects = nil
+    -- collectgarbage()
 end
 
-function sysCall_cleanup()
+function sysCall_cleanup() -- Executed when the scene is closed
     -- do some clean-up here
 end
 
