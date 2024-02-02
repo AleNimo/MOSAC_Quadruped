@@ -106,7 +106,7 @@ function sysCall_init() -- Executed when the scene is loaded
     target = {}
     
     -- Load the agent's model
-    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_corregido.ttm')
+    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_corregido_fastMoving.ttm')
 
     -- Save the agent's model
     agentData = sim.saveModel(agent)
@@ -139,15 +139,18 @@ function sysCall_init() -- Executed when the scene is loaded
     mean_forward_velocity = 0
     mean_lateral_velocity = 0
 
-    mean_forward_acc = 0
-    mean_lateral_acc = 0
+    max_forward_acc = 0
+    -- max_lateral_acc = 0
+    -- mean_forward_acc = 0
+    -- mean_lateral_acc = 0
 
     -- forward_vel_stream = sim.addGraphStream(graph, 'Forward velocity', 'm/s', 0, {0, 1, 0})
     -- lateral_vel_stream = sim.addGraphStream(graph, 'Lateral velocity', 'm/s', 0, {1, 0, 0})
 
     -- forward_acc_stream = sim.addGraphStream(graph, 'Forward acceleration div10', 'm/s^2', 0, {0, 1, 1})
     -- lateral_acc_stream = sim.addGraphStream(graph, 'Lateral acceleration', 'm/s^2', 0, {1, 1, 0})
-
+    
+    -- max_forward_acc_stream = sim.addGraphStream(graph, 'Max Forward acceleration div10', 'm/s^2', 0, {1, 0, 1})
     -- mean_forward_acc_stream = sim.addGraphStream(graph, 'Mean Forward acceleration div10', 'm/s^2', 0, {1, 0, 1})
     -- mean_forward_vel_stream = sim.addGraphStream(graph, 'Mean Forward velocity', 'm/s', 0, {0, 1, 0.88})
     -- mean_lateral_vel_stream = sim.addGraphStream(graph, 'Mean Lateral velocity', 'm/s', 0, {0.98, 0.57, 0}) 
@@ -179,15 +182,20 @@ function sysCall_sensing() -- Executed every simulation step
         if time > 0 then    --to avoid dividing by 0
 
             forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
-            lateral_acceleration = (lateral_velocity - prev_lateral_velocity)/(time - prev_time)
+            -- lateral_acceleration = math.abs(lateral_velocity - prev_lateral_velocity)/(time - prev_time)
 
             -- sim.setGraphStreamValue(graph, forward_acc_stream, forward_acceleration/10)
             -- sim.setGraphStreamValue(graph, lateral_acc_stream, lateral_acceleration)
 
-            mean_forward_acc = 1/(acc_samples + 1) * (mean_forward_acc * acc_samples + math.abs(forward_acceleration))
-            mean_lateral_acc = 1/(acc_samples + 1) * (mean_lateral_acc * acc_samples + math.abs(lateral_acceleration))
 
-            acc_samples = acc_samples + 1
+            -- Absolute spike in acceleration:
+            if math.abs(forward_acceleration) > max_forward_acc then max_forward_acc = math.abs(forward_acceleration) end
+            -- if lateral_acceleration > max_lateral_acc then max_lateral_acc = lateral_acceleration end
+            -- Mean acceleration:
+            -- mean_forward_acc = 1/(acc_samples + 1) * (mean_forward_acc * acc_samples + math.abs(forward_acceleration))
+            -- mean_lateral_acc = 1/(acc_samples + 1) * (mean_lateral_acc * acc_samples + math.abs(lateral_acceleration))
+
+            -- acc_samples = acc_samples + 1
         end
 
         prev_time = time
@@ -205,15 +213,19 @@ function sysCall_sensing() -- Executed every simulation step
             -- sim.setGraphStreamValue(graph, mean_lateral_vel_stream, mean_lateral_velocity)
             -- sim.setGraphStreamValue(graph, mean_forward_acc_stream, mean_forward_acc/10)
             -- sim.setGraphStreamValue(graph, mean_lateral_acc_stream, mean_lateral_acc)
+            -- sim.setGraphStreamValue(graph, max_forward_acc_stream, max_forward_acc/10)
 
             mean_forward_velocity = 0
             mean_lateral_velocity = 0
 
-            mean_forward_acc = 0
-            mean_lateral_acc = 0
+            max_forward_acc = 0
+            -- max_lateral_acc = 0
+
+            -- mean_forward_acc = 0
+            -- mean_lateral_acc = 0
 
             vel_samples = 0
-            acc_samples = 0
+            -- acc_samples = 0
 
             step_completed = false
         end
@@ -246,8 +258,11 @@ function sysCall_beforeSimulation() -- Executed just before the simulation start
     mean_forward_velocity = 0
     mean_lateral_velocity = 0
 
-    mean_forward_acc = 0
-    mean_lateral_acc = 0
+    max_forward_acc = 0
+    -- max_lateral_acc = 0
+
+    -- mean_forward_acc = 0
+    -- mean_lateral_acc = 0
 end
 
 function sysCall_actuation()
@@ -283,8 +298,8 @@ function sysCall_actuation()
         
         client:send(string.format(Tx_float_length, mean_forward_velocity))
         client:send(string.format(Tx_float_length, mean_lateral_velocity))
-        client:send(string.format(Tx_float_length, mean_forward_acc))
-        --client:send(string.format(Tx_float_length, mean_lateral_acc))
+        client:send(string.format(Tx_float_length, max_forward_acc))
+        -- client:send(string.format(Tx_float_length, mean_forward_acc))
 
         step_completed = true
 

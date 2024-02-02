@@ -28,7 +28,7 @@ def SAC_Agent_Training(q):
         #pitch and roll of the agent's body
         #cosine and sine of the signed angle between the agent and the target direction
         #Mean forward and lateral velocities with the reference frame of the agent
-        #Mean forward acceleration with the reference frame of the agent
+        #Maximum absolute forward acceleration measured during the previous step with the reference frame of the agent
         #the 12 joint angles
 
     load_agent = False
