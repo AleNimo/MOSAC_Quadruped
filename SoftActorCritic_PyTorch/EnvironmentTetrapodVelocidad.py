@@ -31,8 +31,8 @@ class Environment:
 
         #Parameters for forward acceleration penalization
         self.forward_acc_penalty = 0
-        self.__max_acc = 4.5 #m/s^2
-        self.__curv_min_acc = -2
+        self.__max_acc = 4 #m/s^2  (Acceleration at which the penalization is -100% of the forward velocity reward)
+        self.__curv_min_acc = 1   #(Curvature of the penalization curve for accelerations between 0 and max_acc)
 
         #Parameters for lateral velocity penalization
         self.lateral_velocity_penalty = 0

@@ -3,7 +3,7 @@ function sysCall_init()
     
     h=sim.getObject('.')
     
-    f = 8
+    f = 25/3
     
     px = 0
     py = 0
@@ -37,8 +37,8 @@ end
 function sysCall_beforeSimulation()
     -- is executed before a simulation starts
 
-    px = 2*math.pi * math.random()
-    py = 2*math.pi * math.random()
+    -- px = 2*math.pi * math.random()
+    -- py = 2*math.pi * math.random()
 
     local heights = {}
     for y=1, points, 1 do
@@ -48,7 +48,8 @@ function sysCall_beforeSimulation()
             
             x_ = x*resolution
             
-            a = 0.5 * (math.sin(2*math.pi*f*x_ + 2*math.pi*px) + math.sin(2*math.pi*f*y_ + 2*math.pi*py))
+            -- a = 0.5 * (math.sin(2*math.pi*f*x_ + 2*math.pi*px) + math.sin(2*math.pi*f*y_ + 2*math.pi*py))
+            a = 0.5 * (math.sin(2*math.pi*f*x_+math.pi/2) + math.sin(2*math.pi*f*y_+math.pi/2))
 
             n_height = max_height/2 * (a + 1)
             

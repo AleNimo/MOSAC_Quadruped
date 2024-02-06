@@ -65,7 +65,7 @@ function sysCall_init() -- Executed when the scene is loaded
     Tx_Rx_command_length = 5
     
     -- Reset position
-    reset_pos = {0.0, 0.0, 0.283}
+    reset_pos = {0.0, 0.0, 0.273}
     reset_or = {0.0, 0.0, 0.0}
     
     n = 5.0   -- Number of intermediate frames between two main frames in direction control
