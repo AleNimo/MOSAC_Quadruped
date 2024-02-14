@@ -22,17 +22,17 @@ class Environment:
 
         #Parameters for forward velocity reward
         self.forward_velocity_reward = 0
-        self.__target_velocity = 0.15 # m/s (In the future it could be a changing velocity)
+        self.__target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
         self.__vmax = 2
-        self.__delta_vel = 0.3
+        self.__delta_vel = 0.6
         self.__vmin = -2
 
         self.__curvature_forward_vel = - 2* self.__vmax / (self.__delta_vel * self.__vmin)
 
         #Parameters for forward acceleration penalization
         self.forward_acc_penalty = 0
-        self.__max_acc = 4 #m/s^2  (Acceleration at which the penalization is -100% of the forward velocity reward)
-        self.__curv_min_acc = 1   #(Curvature of the penalization curve for accelerations between 0 and max_acc)
+        self.__max_acc = 4.5 #m/s^2  (Acceleration at which the penalization is -100% of the forward velocity reward)
+        self.__curv_min_acc = 0.4   #(Curvature of the penalization curve for accelerations between 0 and max_acc)
 
         #Parameters for lateral velocity penalization
         self.lateral_velocity_penalty = 0
@@ -111,7 +111,6 @@ class Environment:
 
             # Velocity vector from every state observed
         forward_velocity = next_obs[:,9]
-        past_forward_velocity = obs[:,9]
         lateral_velocity = next_obs[:,10]
 
         max_forward_acceleration = next_obs[:,11]
@@ -135,17 +134,14 @@ class Environment:
 
             reward[i] += self.forward_velocity_reward
 
-            '''Penalization for peak abs forward acceleration (relative to past forward velocity)'''
-            self.forward_acc_penalty = 0    #Default is 0 (if past velocity < 0 or past velocity reward < 0)
-            #First compute the reward based on the velocity before action:
-            if past_forward_velocity[i] > 0:
-                past_forward_vel_rwd = (self.__vmax - self.__vmin)/(self.__curvature_forward_vel * np.abs(self.__target_velocity - past_forward_velocity[i]) + 1) + self.__vmin
+            '''Penalization for peak abs forward acceleration (relative to forward velocity)'''
+            self.forward_acc_penalty = 0    #Default is 0 (if velocity reward <= 0)
 
-                if past_forward_vel_rwd > 0:
-                    if max_forward_acceleration[i] < self.__max_acc:
-                        self.forward_acc_penalty = self.__curv_min_acc * max_forward_acceleration[i] / (max_forward_acceleration[i] - self.__max_acc * (1 +self.__curv_min_acc)) * past_forward_vel_rwd
-                    else:
-                        self.forward_acc_penalty = -1/np.power(self.__max_acc,4) * np.power(max_forward_acceleration[i], 4) * past_forward_vel_rwd
+            if self.forward_velocity_reward > 0:
+                if max_forward_acceleration[i] < self.__max_acc:
+                    self.forward_acc_penalty = self.__curv_min_acc * max_forward_acceleration[i] / (max_forward_acceleration[i] - self.__max_acc * (1 +self.__curv_min_acc)) * self.forward_velocity_reward
+                else:
+                    self.forward_acc_penalty = -1/np.power(self.__max_acc,4) * np.power(max_forward_acceleration[i], 4) * self.forward_velocity_reward
 
             # print("forward_acceleration = ", forward_acceleration[i])
             # print("forward_acc_penalty = ", forward_acc_penalty)

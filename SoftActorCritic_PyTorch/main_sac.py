@@ -31,10 +31,10 @@ def SAC_Agent_Training(q):
         #Maximum absolute forward acceleration measured during the previous step with the reference frame of the agent
         #the 12 joint angles
 
-    load_agent = False
+    load_agent = True
     test_agent = False
-    load_train_history = False   #(if test_agent == True, the train history and the replay buffer are never loaded)
-    load_replay_buffer = False   #(if load_train_history == false, the replay buffer is never loaded)
+    load_train_history = True   #(if test_agent == True, the train history and the replay buffer are never loaded)
+    load_replay_buffer = True   #(if load_train_history == false, the replay buffer is never loaded)
     
     episodes = 20000
     episode = 0
@@ -172,17 +172,15 @@ def SAC_Agent_Training(q):
         
         episode += 1
 
-body_min, body_max = -10.0, 15.0
+body_min, body_max = -5.0, 15.0
 body_mean = (body_min + body_max)/2
 body_range = (body_max - body_min)/2
 
 leg_min, leg_max = -10.0, 40.0
-# leg_min, leg_max = 0.0, 70.0
 leg_mean = (leg_min + leg_max)/2
 leg_range = (leg_max - leg_min)/2
 
-paw_min, paw_max = -15.0,  5.0
-# paw_min, paw_max = -50.0,  10.0
+paw_min, paw_max = -25.0,  5.0
 paw_mean = (paw_min + paw_max)/2
 paw_range = (paw_max - paw_min)/2
 
@@ -417,7 +415,7 @@ if __name__ == '__main__':
 
 
     ####Acceleration plot
-    plot_Acceleration = grid_layout.addPlot(title="Mean absolute forward acceleration (m/s^2)", row=0, col=2)
+    plot_Acceleration = grid_layout.addPlot(title="Peak absolute forward acceleration (m/s^2)", row=0, col=2)
     plot_Acceleration.showGrid(x=True, y=True)
 
     curve_ForwardAcc = plot_Acceleration.plot(pen=(0,255,0))
