@@ -80,9 +80,9 @@ function sysCall_init() -- Executed when the scene is loaded
     --paw_llim, paw_ulim = -90.0*math.pi/180.0,  30.0*math.pi/180.0
 
     -- Joints' prefered limits
-    -- bod_llim, bod_ulim = -10.0*math.pi/180.0, 15.0*math.pi/180.0
-    -- leg_llim, leg_ulim = -10.0*math.pi/180.0, 40.0*math.pi/180.0
-    -- paw_llim, paw_ulim = -15.0*math.pi/180.0,  5.0*math.pi/180.0
+    bod_llim, bod_ulim = -10.0*math.pi/180.0, 15.0*math.pi/180.0
+    leg_llim, leg_ulim = -10.0*math.pi/180.0, 40.0*math.pi/180.0
+    paw_llim, paw_ulim = -15.0*math.pi/180.0,  5.0*math.pi/180.0
 
     --Joints' testing limits
     -- bod_llim, bod_ulim = -10.0*math.pi/180.0, 15.0*math.pi/180.0
@@ -90,9 +90,9 @@ function sysCall_init() -- Executed when the scene is loaded
     -- paw_llim, paw_ulim = -50.0*math.pi/180.0,  10.0*math.pi/180.0
 
     -- Joints' limits for long leged version
-    bod_llim, bod_ulim = -10.0*math.pi/180.0, 15.0*math.pi/180.0
-    leg_llim, leg_ulim = -10.0*math.pi/180.0, 40.0*math.pi/180.0
-    paw_llim, paw_ulim = -25.0*math.pi/180.0,  5.0*math.pi/180.0
+    -- bod_llim, bod_ulim = -10.0*math.pi/180.0, 15.0*math.pi/180.0
+    -- leg_llim, leg_ulim = -10.0*math.pi/180.0, 40.0*math.pi/180.0
+    -- paw_llim, paw_ulim = -25.0*math.pi/180.0,  5.0*math.pi/180.0
     
     jointLowerLimit = {bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim, bod_llim, leg_llim, paw_llim}
     jointUpperLimit = {bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim, bod_ulim, leg_ulim, paw_ulim}

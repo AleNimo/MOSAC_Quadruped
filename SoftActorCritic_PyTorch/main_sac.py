@@ -32,9 +32,9 @@ def SAC_Agent_Training(q):
         #the 12 joint angles
 
     load_agent = True
-    test_agent = False
-    load_train_history = True   #(if test_agent == True, the train history and the replay buffer are never loaded)
-    load_replay_buffer = True   #(if load_train_history == false, the replay buffer is never loaded)
+    test_agent = True
+    load_train_history = False   #(if test_agent == True, the train history and the replay buffer are never loaded)
+    load_replay_buffer = False   #(if load_train_history == false, the replay buffer is never loaded)
     
     episodes = 20000
     episode = 0
@@ -180,7 +180,7 @@ leg_min, leg_max = -10.0, 40.0
 leg_mean = (leg_min + leg_max)/2
 leg_range = (leg_max - leg_min)/2
 
-paw_min, paw_max = -25.0,  5.0
+paw_min, paw_max = -15.0,  5.0
 paw_mean = (paw_min + paw_max)/2
 paw_range = (paw_max - paw_min)/2
 
