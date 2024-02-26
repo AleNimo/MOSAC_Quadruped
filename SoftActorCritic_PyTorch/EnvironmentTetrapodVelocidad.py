@@ -2,7 +2,7 @@ import numpy as np
 from CoppeliaSocket import CoppeliaSocket
 
 class Environment:
-    def __init__(self, obs_dim, act_dim, dest_pos):
+    def __init__(self, obs_dim, act_dim, rwd_dim):
         '''
         Creates a 3D environment using CoppeliaSim, where an agent capable of choosing its joints' angles tries to find
         the requested destination.
@@ -11,11 +11,10 @@ class Environment:
         :param dest_pos: Destination position that the agent should search
         '''
         self.name = "ComplexAgentSAC"
-        self.obs_dim = obs_dim                        # Observation space shape
-        self.act_dim = act_dim                        # Action space shape
-        self.dest_pos = np.array(dest_pos)                      # Agent's destination
-        self.pos_idx = tuple(i for i in range(len(dest_pos)))   # Position's indexes in the observed state array
-        self.__pos_size = len(dest_pos)                         # Position's size
+        self.obs_dim = obs_dim                        # Observation dimension
+        self.act_dim = act_dim                        # Action dimension
+        self.rwd_dim = rwd_dim                        # Reward dimension
+        self.__pos_size = 2                                     # Position's size
         self.__end_cond = 2.5                                   # End condition
         self.__obs = np.zeros((1,self.obs_dim))           # Observed state
         self.__coppelia = CoppeliaSocket(obs_dim+5)     # Socket to the simulated environment
@@ -31,8 +30,7 @@ class Environment:
 
         #Parameters for forward acceleration penalization
         self.forward_acc_penalty = 0
-        self.__max_acc = 4.5 #m/s^2  (Acceleration at which the penalization is -100% of the forward velocity reward)
-        self.__curv_min_acc = 0.4   #(Curvature of the penalization curve for accelerations between 0 and max_acc)
+        self.__max_acc = 8 #m/s^2  (Acceleration at which the penalization is -1)
 
         #Parameters for lateral velocity penalization
         self.lateral_velocity_penalty = 0
@@ -87,23 +85,23 @@ class Environment:
         # Return the position
         return self.__obs[0:self.__pos_size]
 
-    def act(self, act, pref):
+    def act(self, act):
         ''' Simulates the agent's action in the environment, computes and returns the environment's next state, the
         obtained reward and the termination condition status '''
         # Take the requested action in the simulation and obtain the new state
         next_obs = self.__coppelia.act(act.reshape(-1))
         # Compute the reward
-        reward, end = self.compute_reward_and_end(self.__obs.reshape(1,-1), next_obs.reshape(1,-1), pref)
+        reward, end = self.compute_reward_and_end(self.__obs.reshape(1,-1), next_obs.reshape(1,-1))
         # Update the observed state
         self.__obs[:] = next_obs
         # Return the environment's next state, the obtained reward and the termination condition status
         return next_obs, reward, end
 
-    def compute_reward(self, obs, pref):
-        reward, _ = self.compute_reward_and_end(obs[0:-1], obs[1:], pref)
+    def compute_reward(self, obs):
+        reward, _ = self.compute_reward_and_end(obs[0:-1], obs[1:])
         return reward
 
-    def compute_reward_and_end(self, obs, next_obs, pref):
+    def compute_reward_and_end(self, obs, next_obs):
         # Compute reward for every individual transition (state -> next_state)
 
             # Final distance to evaluate end condition
@@ -116,12 +114,9 @@ class Environment:
         max_forward_acceleration = next_obs[:,11]
 
             # Empty vectors to store reward and end flags for every transition
-        reward, end = np.zeros((obs.shape[0], 1)), np.zeros((obs.shape[0], 1))
+        reward, end = np.zeros((obs.shape[0], self.rwd_dim)), np.zeros((obs.shape[0], 1))
 
         for i in range(obs.shape[0]):
-
-            '''Reward for avoiding critical failure (flipping over)'''
-            reward[i] = self.__not_flipping_reward
 
             '''Reward for forward velocity reaching target velocity'''
             if forward_velocity[i] > 0:
@@ -132,21 +127,12 @@ class Environment:
             # print("forward_velocity = ", forward_velocity[i])
             # print("forward_velocity_penalty = ", forward_velocity_penalty)
 
-            reward[i] += pref[i,0] * self.forward_velocity_reward
+            reward[i,0] = self.forward_velocity_reward
 
             '''Penalization for peak abs forward acceleration'''
-            self.forward_acc_penalty = 0    #Default is 0 (if velocity reward <= 0)
+            self.forward_acc_penalty = -1/self.__max_acc * max_forward_acceleration
 
-            if self.forward_velocity_reward > 0:
-                if max_forward_acceleration[i] < self.__max_acc:
-                    self.forward_acc_penalty = self.__curv_min_acc * max_forward_acceleration[i] / (max_forward_acceleration[i] - self.__max_acc * (1 +self.__curv_min_acc))
-                else:
-                    self.forward_acc_penalty = -1/np.power(self.__max_acc,4) * np.power(max_forward_acceleration[i], 4)
-
-            # print("forward_acceleration = ", forward_acceleration[i])
-            # print("forward_acc_penalty = ", forward_acc_penalty)
-
-            reward[i] += pref[i,1] * self.forward_acc_penalty
+            reward[i,1] = self.forward_acc_penalty
 
             '''Penalization for Lateral velocity'''
             self.lateral_velocity_penalty = -self.__vmin_lat/(self.__curvature_lateral * np.abs(lateral_velocity[i]) + 1) + self.__vmin_lat
@@ -154,7 +140,7 @@ class Environment:
             # print("lateral_velocity = ", lateral_velocity[i])
             # print("lateral_velocity_penalty = ", lateral_velocity_penalty)
 
-            reward[i] += pref[i,2] * self.lateral_velocity_penalty
+            reward[i,2] = self.lateral_velocity_penalty
 
             '''Penalization for Orientation deviating from target direction'''
             # Compute angle between agents orientation and target direction based on cosine and sine from coppelia:
@@ -166,7 +152,7 @@ class Environment:
             else:
                 self.orientation_reward = self.__k2*(np.exp(-self.__curvature_neg * angle_agent2target) + self.__b2)
 
-            reward[i] += pref[i,3] * self.orientation_reward
+            reward[i,3] = self.orientation_reward
 
             '''Flat Back relative reward: pitch and roll close to 0°'''
             for j in range(5, 7):
@@ -174,14 +160,16 @@ class Environment:
 
                 self.flat_back_reward[j-5] = (-self.__vmin_back/(self.__curvature_back * back_angle + 1) + self.__vmin_back)
                 
-                reward[i] += pref[i,4] * self.flat_back_reward[j-5]
+                reward[i,4] += self.flat_back_reward[j-5]
 
                 # print("back_angle ({0}) = {1:.2f}".format(j, back_angle))
                 # print("Flat_back_reward ({0}) = {1:.2f}".format(j, flat_back_reward))
             
             # print("Total_reward = ", reward[i])
+                
+            '''Reward for avoiding critical failure (flipping over)'''
+            reward[i,5] = self.__not_flipping_reward
 
-            '''Penalization for flipping downwards'''
             #If the absolute value of X or Y angle is greater than 50° there is a penalization and the episode ends
             if abs(next_obs[i, 5]) >= 0.278 or abs(next_obs[i, 6]) >= 0.278:
                 reward[i] -= self.__not_flipping_reward

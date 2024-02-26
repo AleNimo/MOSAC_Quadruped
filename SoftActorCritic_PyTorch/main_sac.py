@@ -17,7 +17,7 @@ data_type = np.float64
 
 def SAC_Agent_Training(q):
 
-    env = Environment(obs_dim=19, act_dim=12, dest_pos=(0,0))
+    env = Environment(obs_dim=19, act_dim=12, rwd_dim=6)
 
     #The 24 values from coppelia, in order:
         #---- Not seen by the agent --------
@@ -52,10 +52,9 @@ def SAC_Agent_Training(q):
     if load_agent:
         agent.load_models()
 
-    ep_obs = np.zeros((episode_steps+1, env.obs_dim+5), dtype=data_type)   # Episode's observed states
-    ep_act = np.zeros((episode_steps, env.act_dim,), dtype=data_type)     # Episode's actions
-    ep_rwd = np.zeros((episode_steps,), dtype=data_type)                        # Episode's rewards
-    ep_ind_rwd = np.zeros((episode_steps, 6), dtype=data_type)                  # Epidose's individual rewards
+    ep_obs = np.zeros((episode_steps+1, env.obs_dim+5), dtype=data_type)        # Episode's observed states
+    ep_act = np.zeros((episode_steps, env.act_dim), dtype=data_type)            # Episode's actions
+    ep_rwd = np.zeros((episode_steps, env.rwd_dim), dtype=data_type)            # Episode's rewards
     ep_ret = np.zeros((episodes, 3), dtype=data_type)                           # Returns for each episode (real, expected and RMSE)
     ep_loss = np.zeros((episodes, 2), dtype=data_type)                          # Training loss for each episode (Q and P)
     ep_alpha = np.zeros((episodes,), dtype=data_type)                           # Alpha for each episode
@@ -96,9 +95,7 @@ def SAC_Agent_Training(q):
                 ep_act[step] = agent.choose_action(ep_obs[step][5:], pref, random=False)  #The agent doesn't receive the position and target direction although it is on the ep_obs vector for plotting reasons
 
                 # Act in the environment
-                ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step], pref)
-
-                ep_ind_rwd[step, :] = [env.forward_velocity_reward, env.lateral_velocity_penalty, env.orientation_reward, env.flat_back_reward[0], env.flat_back_reward[1], env.forward_acc_penalty]
+                ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
 
                 if done_flag: break
 
@@ -112,12 +109,10 @@ def SAC_Agent_Training(q):
                 ep_act[step] = agent.choose_action(ep_obs[step][5:], pref)
 
                 # Act in the environment
-                ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step], pref)
-
-                ep_ind_rwd[step, :] = [env.forward_velocity_reward, env.lateral_velocity_penalty, env.orientation_reward, env.flat_back_reward[0], env.flat_back_reward[1], env.forward_acc_penalty]
+                ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
 
                 # Store in replay buffer
-                agent.remember(ep_obs[step][5:], ep_act[step], ep_obs[step+1][5:], done_flag)
+                agent.remember(ep_obs[step][5:], ep_act[step], ep_rwd[step], ep_obs[step+1][5:], done_flag)
 
                 # End episode on termination condition
                 if done_flag: break
@@ -133,17 +128,20 @@ def SAC_Agent_Training(q):
         last_action = agent.choose_action(ep_obs[step+1][5:], pref, random=not(test_agent))
         last_action = torch.tensor([last_action], dtype=torch.float64).to(agent.P_net.device).view(-1)
         last_action = torch.unsqueeze(last_action, 0)
-        
-        aux_rwd = np.copy(ep_rwd)
 
-        if not done_flag: aux_rwd[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
-        for i in range(ep_len-2, -1, -1): aux_rwd[i] = aux_rwd[i] + agent.discount_factor * aux_rwd[i+1]
-        ep_ret[episode, 0] = aux_rwd[0]
+        #Compute total reward from partial rewards and preferences
+        tot_rwd = np.sum(pref * ep_rwd[:,:-1], axis=1) + ep_rwd[:,-1]
+
+        aux_ret = np.copy(tot_rwd)
+
+        if not done_flag: aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+        for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
+        ep_ret[episode, 0] = aux_ret[0]
 
         # Expected return at the start of the episode
         initial_state = torch.tensor([ep_obs[0][5:]], dtype=torch.float64).to(agent.P_net.device)
         initial_action = torch.tensor([ep_act[0]], dtype=torch.float64).to(agent.P_net.device)
-        ep_ret[episode, 1] = agent.minimal_Q(initial_state, initial_action, pref_tensor)
+        ep_ret[episode, 1] = agent.minimal_Q(initial_state, initial_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
         # Root mean square error
         ep_ret[episode, 2] = np.sqrt(np.square(ep_ret[episode,0] - ep_ret[episode, 1]))
@@ -167,7 +165,7 @@ def SAC_Agent_Training(q):
         print("Policy's Entropy: ", ep_entropy[episode])
         print("------------------------------------------")
 
-        q.put((episode, ep_obs[0:ep_len+1], ep_rwd[0:ep_len+1], ep_ind_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1], ep_act[0:ep_len+1], ep_std[0:episode+1]))
+        q.put((episode, ep_obs[0:ep_len+1], tot_rwd[0:ep_len+1], ep_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1], ep_act[0:ep_len+1], ep_std[0:episode+1]))
         
         if episode % save_period == 0 and episode != 0 and test_agent == False:
             agent.save_models()
@@ -192,7 +190,7 @@ paw_range = (paw_max - paw_min)/2
 
 def updatePlot():   
     global q, curve_Trajectory, curve_Trajectory_startPoint, curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_ForwardAcc, curve_Pitch, \
-        curve_Roll, curve_gamma, curve_Reward, curve_Forward_vel_rwd, curve_Lateral_vel_rwd, curve_Orientation_rwd, curve_Pitch_rwd, curve_Roll_rwd, \
+        curve_Roll, curve_gamma, curve_Reward, curve_Forward_vel_rwd, curve_Lateral_vel_rwd, curve_Orientation_rwd, curve_Back_rwd, \
         curve_Acc_rwd, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy, curve_Std, \
         curve_FrontBody_right_state, curve_FrontBody_left_state, curve_FrontBody_right_action, curve_FrontBody_left_action, \
         curve_BackBody_right_state, curve_BackBody_left_state, curve_BackBody_right_action, curve_BackBody_left_action, \
@@ -249,11 +247,10 @@ def updatePlot():
         ####Rewards update
         total_rwd = results[2]
         forward_velocity_rwd = results[3][:,0]
-        lateral_velocity_rwd = results[3][:,1]
-        orientation_rwd = results[3][:,2]
-        pitch_rwd = results[3][:,3]
-        roll_rwd = results[3][:,4]
-        acc_rwd = results[3][:,5]
+        acc_rwd = results[3][:,1]
+        lateral_velocity_rwd = results[3][:,2]
+        orientation_rwd = results[3][:,3]
+        back_rwd = results[3][:,4]        
 
         rwd_linspace = np.arange(1,len(total_rwd)+1, 1, dtype=int)   #Because there is no reward in the first state (step 0)
 
@@ -261,8 +258,7 @@ def updatePlot():
         curve_Forward_vel_rwd.setData(rwd_linspace, forward_velocity_rwd)
         curve_Lateral_vel_rwd.setData(rwd_linspace, lateral_velocity_rwd)
         curve_Orientation_rwd.setData(rwd_linspace, orientation_rwd)
-        curve_Pitch_rwd.setData(rwd_linspace, pitch_rwd)
-        curve_Roll_rwd.setData(rwd_linspace, roll_rwd)
+        curve_Back_rwd.setData(rwd_linspace, back_rwd)
         curve_Acc_rwd.setData(rwd_linspace, acc_rwd)
 
         ####Body joints update
@@ -452,9 +448,8 @@ if __name__ == '__main__':
     curve_Forward_vel_rwd = plot_Rewards.plot(pen=(0,255,0), name='Forward')
     curve_Lateral_vel_rwd = plot_Rewards.plot(pen=(255,0,0), name='Lateral')
     curve_Orientation_rwd = plot_Rewards.plot(pen=(255,127,39), name='Orientation')
-    curve_Pitch_rwd = plot_Rewards.plot(pen=(0,255,255), name='Pitch')
-    curve_Roll_rwd = plot_Rewards.plot(pen=(255,0,255), name='Roll')
-    curve_Acc_rwd = plot_Rewards.plot(pen=(255,255,255), name='Fwd_Acc')
+    curve_Back_rwd = plot_Rewards.plot(pen=(0,255,255), name='Back')
+    curve_Acc_rwd = plot_Rewards.plot(pen=(255,255,255), name='Acc')
 
 
     ####Front body joints plot

@@ -23,7 +23,7 @@ class SAC_Agent():
         self.update_Q = 1
         self.update_P = 1
 
-        self.replay_buffer = ReplayBuffer(replay_buffer_size, self.environment.obs_dim, self.environment.act_dim, self.pref_dim)
+        self.replay_buffer = ReplayBuffer(replay_buffer_size, self.environment.obs_dim, self.environment.act_dim, self.environment.rwd_dim, self.pref_dim)
 
         self.P_net = P_Network(self.environment.obs_dim, self.environment.act_dim, self.pref_dim, hidden1_dim=64, hidden2_dim=32,
                                alfa=0.0003, beta1=0.9, beta2=0.999)
@@ -97,8 +97,8 @@ class SAC_Agent():
 
         return torch.min(Q1, Q2)
 
-    def remember(self, state, action, next_state, done_flag):   #The reward is not saved because it is recalculated every time with a different preference
-        self.replay_buffer.store(state, action, next_state, done_flag)
+    def remember(self, state, action, reward, next_state, done_flag):   #The reward is not saved because it is recalculated every time with a different preference
+        self.replay_buffer.store(state, action, reward, next_state, done_flag)
 
     def update_target_net_parameters(self):
         target_Q1_state_dict = dict(self.Q1_target_net.named_parameters())
@@ -134,18 +134,19 @@ class SAC_Agent():
     def learn(self, step):
         if self.replay_buffer.mem_counter < self.replay_batch_size:
             return
-        state, action, pref, next_state, done_flag = self.replay_buffer.sample(self.replay_batch_size)
-
-        #Recompute the rewards based on the random preferences
-        reward, _ = self.environment.compute_reward_and_end(state, next_state, pref)
+        state, action, partial_rewards, pref, next_state, done_flag = self.replay_buffer.sample(self.replay_batch_size)
 
         #Convert np.arrays to tensors in GPU
         state = torch.tensor(state, dtype=torch.float64).to(self.P_net.device)
         action = torch.tensor(action, dtype=torch.float64).to(self.P_net.device)
         pref = torch.tensor(pref, dtype=torch.float64).to(self.P_net.device)
         next_state = torch.tensor(next_state, dtype=torch.float64).to(self.P_net.device)
-        reward = torch.tensor(reward, dtype=torch.float64).to(self.P_net.device)
+        partial_rewards = torch.tensor(partial_rewards, dtype=torch.float64).to(self.P_net.device)
         done_flag = torch.tensor(done_flag, dtype=torch.float64).to(self.P_net.device)
+
+        #Recompute the total reward based on the random preferences (linear combination)
+        #the "not flipping reward" is not weighted by a preference so its added afterwards
+        reward = torch.sum(pref * partial_rewards[:,:-1], axis=1) + partial_rewards[:,-1]
 
         if step % self.update_Q == 0:
             #Update Q networks
