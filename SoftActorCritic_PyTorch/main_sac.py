@@ -17,7 +17,7 @@ data_type = np.float64
 
 def SAC_Agent_Training(q):
 
-    env = Environment(obs_sp_shape=(24,), act_sp_shape=(12,), dest_pos=(0,0))
+    env = Environment(obs_dim=19, act_dim=12, dest_pos=(0,0))
 
     #The 24 values from coppelia, in order:
         #---- Not seen by the agent --------
@@ -31,8 +31,8 @@ def SAC_Agent_Training(q):
         #Maximum absolute forward acceleration measured during the previous step with the reference frame of the agent
         #the 12 joint angles
 
-    load_agent = True
-    test_agent = True
+    load_agent = False
+    test_agent = False
     load_train_history = False   #(if test_agent == True, the train history and the replay buffer are never loaded)
     load_replay_buffer = False   #(if load_train_history == false, the replay buffer is never loaded)
     
@@ -42,7 +42,7 @@ def SAC_Agent_Training(q):
     save_period = 500
 
     #The vector received from coppelia contains the x,y,z coordinates and the target direction not used by the agent, only for plotting. Thats why we subtract the 5 values from the vector dimensions
-    agent = SAC_Agent('Cuadruped', env.obs_sp_shape[0]-5, env.act_sp_shape[0], replay_buffer_size=1000000)
+    agent = SAC_Agent('Cuadruped', env, pref_dim=5, replay_buffer_size=1000000)
     
     agent.replay_batch_size = 10000
 
@@ -52,8 +52,8 @@ def SAC_Agent_Training(q):
     if load_agent:
         agent.load_models()
 
-    ep_obs = np.zeros((episode_steps+1,) + env.obs_sp_shape, dtype=data_type)   # Episode's observed states
-    ep_act = np.zeros((episode_steps,) + env.act_sp_shape, dtype=data_type)     # Episode's actions
+    ep_obs = np.zeros((episode_steps+1, env.obs_dim+5), dtype=data_type)   # Episode's observed states
+    ep_act = np.zeros((episode_steps, env.act_dim,), dtype=data_type)     # Episode's actions
     ep_rwd = np.zeros((episode_steps,), dtype=data_type)                        # Episode's rewards
     ep_ind_rwd = np.zeros((episode_steps, 6), dtype=data_type)                  # Epidose's individual rewards
     ep_ret = np.zeros((episodes, 3), dtype=data_type)                           # Returns for each episode (real, expected and RMSE)
@@ -89,12 +89,14 @@ def SAC_Agent_Training(q):
         ep_obs[0], done_flag = env.reset(), False
         # Testing
         if test_agent:
+            #Use the user input preference for the test
+            pref = np.array([[1,0,0,0,0]])
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
-                ep_act[step] = agent.choose_action(ep_obs[step][5:], random=False)  #The agent doesn't receive the position and target direction although it is on the ep_obs vector for plotting reasons
+                ep_act[step] = agent.choose_action(ep_obs[step][5:], pref, random=False)  #The agent doesn't receive the position and target direction although it is on the ep_obs vector for plotting reasons
 
                 # Act in the environment
-                ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
+                ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step], pref)
 
                 ep_ind_rwd[step, :] = [env.forward_velocity_reward, env.lateral_velocity_penalty, env.orientation_reward, env.flat_back_reward[0], env.flat_back_reward[1], env.forward_acc_penalty]
 
@@ -103,17 +105,19 @@ def SAC_Agent_Training(q):
             ep_len = step + 1
 
         else:
+            #Generate random preference for the episode
+            pref = np.random.random_sample((1,agent.pref_dim))
             for step in range(episode_steps):
                 # Decide action based on present observed state (random action with mean and std)
-                ep_act[step] = agent.choose_action(ep_obs[step][5:])
+                ep_act[step] = agent.choose_action(ep_obs[step][5:], pref)
 
                 # Act in the environment
-                ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
+                ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step], pref)
 
                 ep_ind_rwd[step, :] = [env.forward_velocity_reward, env.lateral_velocity_penalty, env.orientation_reward, env.flat_back_reward[0], env.flat_back_reward[1], env.forward_acc_penalty]
 
                 # Store in replay buffer
-                agent.remember(ep_obs[step][5:], ep_act[step], ep_rwd[step], ep_obs[step+1][5:], done_flag)
+                agent.remember(ep_obs[step][5:], ep_act[step], ep_obs[step+1][5:], done_flag)
 
                 # End episode on termination condition
                 if done_flag: break
@@ -124,21 +128,22 @@ def SAC_Agent_Training(q):
         # Real return: If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
         last_state = torch.tensor([ep_obs[step+1][5:]], dtype=torch.float64).to(agent.P_net.device).view(-1)
         last_state = torch.unsqueeze(last_state, 0)
+        pref_tensor = torch.tensor(pref, dtype=torch.float64).to(agent.P_net.device)
         
-        last_action = agent.choose_action(ep_obs[step+1][5:], random=not(test_agent))
+        last_action = agent.choose_action(ep_obs[step+1][5:], pref, random=not(test_agent))
         last_action = torch.tensor([last_action], dtype=torch.float64).to(agent.P_net.device).view(-1)
         last_action = torch.unsqueeze(last_action, 0)
         
         aux_rwd = np.copy(ep_rwd)
 
-        if not done_flag: aux_rwd[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action).detach().cpu().numpy().reshape(-1)
+        if not done_flag: aux_rwd[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
         for i in range(ep_len-2, -1, -1): aux_rwd[i] = aux_rwd[i] + agent.discount_factor * aux_rwd[i+1]
         ep_ret[episode, 0] = aux_rwd[0]
 
         # Expected return at the start of the episode
         initial_state = torch.tensor([ep_obs[0][5:]], dtype=torch.float64).to(agent.P_net.device)
         initial_action = torch.tensor([ep_act[0]], dtype=torch.float64).to(agent.P_net.device)
-        ep_ret[episode, 1] = agent.minimal_Q(initial_state, initial_action)
+        ep_ret[episode, 1] = agent.minimal_Q(initial_state, initial_action, pref_tensor)
 
         # Root mean square error
         ep_ret[episode, 2] = np.sqrt(np.square(ep_ret[episode,0] - ep_ret[episode, 1]))
@@ -154,6 +159,7 @@ def SAC_Agent_Training(q):
         ep_std[episode] = agent.std.item()
         
         print("Episode: ", episode)
+        print("Preference vector: ", pref)
         print("Replay_Buffer_counter: ", agent.replay_buffer.mem_counter)
         print("Q_loss: ", ep_loss[episode, 0])
         print("P_loss: ", ep_loss[episode, 1])

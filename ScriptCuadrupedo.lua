@@ -21,12 +21,7 @@ function createAgent ()
     tip[3],target[3] = sim.getObject("/TipBR"),sim.getObject("/TargetBR")
     tip[4],target[4] = sim.getObject("/TipBL"),sim.getObject("/TargetBL")
     
-    -- Get sensor readings
-    accelerometer = sim.getObject('/Accelerometer')
-    accelScript = sim.getScript(sim.scripttype_childscript, accelerometer)
-
-    gyroscope = sim.getObject('/GyroSensor')
-    gyroScript = sim.getScript(sim.scripttype_childscript, gyroscope)
+    -- Get kalman readings
     
     --sim.shapeintparam_respondable_mask
     --local res,collPair=sim.checkCollision(h,sim.handle_all)
@@ -121,7 +116,7 @@ function sysCall_init() -- Executed when the scene is loaded
     target = {}
     
     -- Load the agent's model
-    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_short_leg_accel_gyro.ttm')
+    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_short_leg.ttm')
     -- agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_long_leg.ttm')
 
     -- Save the agent's model
@@ -140,8 +135,6 @@ function sysCall_init() -- Executed when the scene is loaded
     T = {}    
 
     --Variables for graphing
-    accel_graph = sim.getObject('/Accelerometer_graph')
-    gyro_graph = sim.getObject('/Gyroscope_graph')
 
     agentCreated = false --To measure velocity only when there is an agent created (not between episodes where the agent is destroyed)
     step_completed = false --To compute the mean velocities only when each step is completed
@@ -160,14 +153,6 @@ function sysCall_init() -- Executed when the scene is loaded
     -- max_lateral_acc = 0
     -- mean_forward_acc = 0
     -- mean_lateral_acc = 0
-
-    x_accel = sim.addGraphStream(accel_graph, 'x_accel', 'm/s^2', 0, {1, 0, 0})
-    y_accel = sim.addGraphStream(accel_graph, 'y_accel', 'm/s^2', 0, {0, 1, 0})
-    z_accel = sim.addGraphStream(accel_graph, 'z_accel', 'm/s^2', 0, {0, 0, 1})
-
-    x_ang_vel = sim.addGraphStream(gyro_graph, 'x_ang_vel', 'rad/s', 0, {1, 0, 0})
-    y_ang_vel = sim.addGraphStream(gyro_graph, 'y_ang_vel', 'rad/s', 0, {0, 1, 0})
-    z_ang_vel = sim.addGraphStream(gyro_graph, 'z_ang_vel', 'rad/s', 0, {0, 0, 1})
 
     -- forward_vel_stream = sim.addGraphStream(graph, 'Forward velocity', 'm/s', 0, {0, 1, 0})
     -- lateral_vel_stream = sim.addGraphStream(graph, 'Lateral velocity', 'm/s', 0, {1, 0, 0})
@@ -208,32 +193,20 @@ function sysCall_sensing() -- Executed every simulation step
 
         if time > 0 then    --to avoid dividing by 0
 
-            acceleration = sim.callScriptFunction('getAccelData', accelScript)
-
-            -- forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
+            forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
             -- lateral_acceleration = math.abs(lateral_velocity - prev_lateral_velocity)/(time - prev_time)
 
-            sim.setGraphStreamValue(accel_graph, x_accel, acceleration[1])
-            sim.setGraphStreamValue(accel_graph, y_accel, acceleration[2])
-            sim.setGraphStreamValue(accel_graph, z_accel, acceleration[3])
             -- sim.setGraphStreamValue(graph, lateral_acc_stream, lateral_acceleration)
 
 
             -- Absolute spike in acceleration:
-            if math.abs(acceleration[1]) > max_forward_acc then max_forward_acc = math.abs(acceleration[1]) end
+            if math.abs(forward_acceleration) > max_forward_acc then max_forward_acc = math.abs(forward_acceleration) end
             -- if lateral_acceleration > max_lateral_acc then max_lateral_acc = lateral_acceleration end
             -- Mean acceleration:
             -- mean_forward_acc = 1/(acc_samples + 1) * (mean_forward_acc * acc_samples + math.abs(forward_acceleration))
             -- mean_lateral_acc = 1/(acc_samples + 1) * (mean_lateral_acc * acc_samples + math.abs(lateral_acceleration))
 
             -- acc_samples = acc_samples + 1
-
-
-            angular_velocities = sim.callScriptFunction('getGyroData', gyroScript)
-
-            sim.setGraphStreamValue(gyro_graph, x_ang_vel, angular_velocities[1])
-            sim.setGraphStreamValue(gyro_graph, y_ang_vel, angular_velocities[2])
-            sim.setGraphStreamValue(gyro_graph, z_ang_vel, angular_velocities[3])
         end
 
         prev_time = time

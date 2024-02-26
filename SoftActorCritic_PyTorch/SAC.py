@@ -9,9 +9,11 @@ from Networks import Q_Network, P_Network
 import copy
 
 class SAC_Agent():
-    def __init__(self, name, obs_dim, actions_dim, replay_buffer_size):
+    def __init__(self, name, environment, pref_dim, replay_buffer_size):
 
         self.agent_name = name
+        self.environment = environment
+        self.pref_dim = pref_dim
 
         #Default values
         self.discount_factor = 0.95
@@ -21,17 +23,17 @@ class SAC_Agent():
         self.update_Q = 1
         self.update_P = 1
 
-        self.replay_buffer = ReplayBuffer(replay_buffer_size, obs_dim, actions_dim)
+        self.replay_buffer = ReplayBuffer(replay_buffer_size, self.environment.obs_dim, self.environment.act_dim, self.pref_dim)
 
-        self.P_net = P_Network(obs_dim, actions_dim, hidden1_dim=64, hidden2_dim=32,
+        self.P_net = P_Network(self.environment.obs_dim, self.environment.act_dim, self.pref_dim, hidden1_dim=64, hidden2_dim=32,
                                alfa=0.0003, beta1=0.9, beta2=0.999)
 
         self.P_loss = torch.tensor(0, dtype=torch.float64).to(self.P_net.device)
 
-        self.Q1_net = Q_Network(obs_dim, actions_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
+        self.Q1_net = Q_Network(self.environment.obs_dim, self.environment.act_dim, self.pref_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
                                   alfa=0.0003, beta1=0.9, beta2=0.999, name='Q1_net')
 
-        self.Q2_net = Q_Network(obs_dim, actions_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
+        self.Q2_net = Q_Network(self.environment.obs_dim, self.environment.act_dim, self.pref_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
                                   alfa=0.0003, beta1=0.9, beta2=0.999, name='Q2_net')
 
         self.Q_loss = torch.tensor(0, dtype=torch.float64).to(self.Q1_net.device)
@@ -46,7 +48,7 @@ class SAC_Agent():
         self.Q2_target_net.name = 'Q2_target_net'
         self.Q2_target_net.checkpoint_file = self.Q2_target_net.checkpoint_dir + '/' + self.Q2_target_net.name
 
-        self.target_entropy = -actions_dim
+        self.target_entropy = -self.environment.act_dim
 
         self.entropy = torch.tensor(0, dtype=torch.float64).to(self.P_net.device)
 
@@ -71,30 +73,32 @@ class SAC_Agent():
         else:
             os.chdir("./{0:s}".format(self.agent_name))
 
-    def choose_action(self, observations, random = True):
-        state = torch.tensor([observations]).to(self.P_net.device)
+    def choose_action(self, state_numpy, pref_numpy, random = True):
+
+        state = torch.tensor(np.expand_dims(state_numpy, axis=0)).to(self.P_net.device)
+        pref = torch.tensor(pref_numpy).to(self.P_net.device)
 
         if random:
-            actions,_,_ = self.P_net.sample_normal(state, reparameterize=False)
+            actions,_,_ = self.P_net.sample_normal(state, pref, reparameterize=False)
         else:
-            actions,_ = self.P_net(state)
+            actions,_ = self.P_net(state, pref)
 
         return actions.detach().cpu().numpy()
 
-    def minimal_Q(self, state, action):
-        Q1 = self.Q1_net(state, action)
-        Q2 = self.Q2_net(state, action)
+    def minimal_Q(self, state, action, pref):
+        Q1 = self.Q1_net(state, action, pref)
+        Q2 = self.Q2_net(state, action, pref)
 
         return torch.min(Q1, Q2)
 
-    def minimal_Q_target(self, state, action):
-        Q1 = self.Q1_target_net(state, action)
-        Q2 = self.Q2_target_net(state, action)
+    def minimal_Q_target(self, state, action, pref):
+        Q1 = self.Q1_target_net(state, action, pref)
+        Q2 = self.Q2_target_net(state, action, pref)
 
         return torch.min(Q1, Q2)
 
-    def remember(self, state, action, reward, next_state, done_flag):
-        self.replay_buffer.store(state, action, reward, next_state, done_flag)
+    def remember(self, state, action, next_state, done_flag):   #The reward is not saved because it is recalculated every time with a different preference
+        self.replay_buffer.store(state, action, next_state, done_flag)
 
     def update_target_net_parameters(self):
         target_Q1_state_dict = dict(self.Q1_target_net.named_parameters())
@@ -130,23 +134,27 @@ class SAC_Agent():
     def learn(self, step):
         if self.replay_buffer.mem_counter < self.replay_batch_size:
             return
-        state, action, reward, next_state, done_flag = self.replay_buffer.sample(self.replay_batch_size)
+        state, action, pref, next_state, done_flag = self.replay_buffer.sample(self.replay_batch_size)
+
+        #Recompute the rewards based on the random preferences
+        reward, _ = self.environment.compute_reward_and_end(state, next_state, pref)
 
         #Convert np.arrays to tensors in GPU
         state = torch.tensor(state, dtype=torch.float64).to(self.P_net.device)
         action = torch.tensor(action, dtype=torch.float64).to(self.P_net.device)
-        reward = torch.tensor(reward, dtype=torch.float64).to(self.P_net.device)
+        pref = torch.tensor(pref, dtype=torch.float64).to(self.P_net.device)
         next_state = torch.tensor(next_state, dtype=torch.float64).to(self.P_net.device)
+        reward = torch.tensor(reward, dtype=torch.float64).to(self.P_net.device)
         done_flag = torch.tensor(done_flag, dtype=torch.float64).to(self.P_net.device)
 
         if step % self.update_Q == 0:
             #Update Q networks
             with torch.no_grad():
-                next_action, log_prob, _ = self.P_net.sample_normal(next_state, reparameterize=False)
-                next_Q = self.minimal_Q_target(next_state, next_action)
-                Q_hat = reward + self.discount_factor * (1-done_flag) * (next_Q.view(-1) - self.log_alpha.exp() * log_prob.view(-1))
+                next_action, log_prob, _ = self.P_net.sample_normal(next_state, pref, reparameterize=False)
+                next_Q = self.minimal_Q_target(next_state, next_action, pref)
+                Q_hat = reward.view(-1) + self.discount_factor * (1-done_flag) * (next_Q.view(-1) - self.log_alpha.exp() * log_prob.view(-1))   #The view(-1) is to ensure that the computation is with vectors and not matrices (so Q_hat.shape = batch_size and not (batch_size,batch_size))
 
-            Q = self.minimal_Q(state, action).view(-1)
+            Q = self.minimal_Q(state, action, pref).view(-1)
 
             self.Q_loss = F.mse_loss(Q, Q_hat, reduction='mean')
 
@@ -158,13 +166,13 @@ class SAC_Agent():
 
         if step % self.update_P == 0:
             #Update P networks
-            action, log_prob, sigma = self.P_net.sample_normal(state, reparameterize=True)
+            action, log_prob, sigma = self.P_net.sample_normal(state, pref, reparameterize=True)
 
             self.std = torch.mean(sigma)
 
             self.entropy = torch.mean(-log_prob)
 
-            Q = self.minimal_Q(state, action).view(-1)
+            Q = self.minimal_Q(state, action, pref).view(-1)
 
             self.P_loss = torch.mean(self.log_alpha.exp() * log_prob.view(-1) - Q)
 
