@@ -73,7 +73,7 @@ class SAC_Agent():
         else:
             os.chdir("./{0:s}".format(self.agent_name))
 
-    def choose_action(self, state_numpy, pref_numpy, random = True):
+    def choose_action(self, state_numpy, pref_numpy, random = True, tensor = False):
 
         state = torch.tensor(np.expand_dims(state_numpy, axis=0)).to(self.P_net.device)
         pref = torch.tensor(pref_numpy).to(self.P_net.device)
@@ -83,7 +83,10 @@ class SAC_Agent():
         else:
             actions,_ = self.P_net(state, pref)
 
-        return actions.detach().cpu().numpy()
+        #Return as a np.array when acting on the environment
+        if tensor == False: return actions.detach().cpu().numpy()
+        #Return as a tensor only for computing the real return and the agent doesn't complete the episode (falling or reaching target) under 200 steps
+        else:               return actions
 
     def minimal_Q(self, state, action, pref):
         Q1 = self.Q1_net(state, action, pref)
@@ -153,7 +156,8 @@ class SAC_Agent():
             with torch.no_grad():
                 next_action, log_prob, _ = self.P_net.sample_normal(next_state, pref, reparameterize=False)
                 next_Q = self.minimal_Q_target(next_state, next_action, pref)
-                Q_hat = reward.view(-1) + self.discount_factor * (1-done_flag) * (next_Q.view(-1) - self.log_alpha.exp() * log_prob.view(-1))   #The view(-1) is to ensure that the computation is with vectors and not matrices (so Q_hat.shape = batch_size and not (batch_size,batch_size))
+                Q_hat = reward.view(-1) + self.discount_factor * (1-done_flag) * (next_Q.view(-1) - self.log_alpha.exp() * log_prob.view(-1))
+                #The view(-1) is to ensure that the computation is with vectors and not matrices (so Q_hat.shape = batch_size and not (batch_size,batch_size))
 
             Q = self.minimal_Q(state, action, pref).view(-1)
 
@@ -165,8 +169,11 @@ class SAC_Agent():
             self.Q1_net.optimizer.step()
             self.Q2_net.optimizer.step()
 
+            #Update Q target networks
+            self.update_target_net_parameters()
+
         if step % self.update_P == 0:
-            #Update P networks
+            #Update P network
             action, log_prob, sigma = self.P_net.sample_normal(state, pref, reparameterize=True)
 
             self.std = torch.mean(sigma)
@@ -189,5 +196,3 @@ class SAC_Agent():
             Alpha_loss.backward()
 
             self.alpha_optimizer.step()
-
-            self.update_target_net_parameters()

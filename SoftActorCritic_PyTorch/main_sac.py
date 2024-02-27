@@ -31,10 +31,10 @@ def SAC_Agent_Training(q):
         #Maximum absolute forward acceleration measured during the previous step with the reference frame of the agent
         #the 12 joint angles
 
-    load_agent = False
+    load_agent = True
     test_agent = False
-    load_train_history = False   #(if test_agent == True, the train history and the replay buffer are never loaded)
-    load_replay_buffer = False   #(if load_train_history == false, the replay buffer is never loaded)
+    load_train_history = True   #(if test_agent == True, the train history and the replay buffer are never loaded)
+    load_replay_buffer = True   #(if load_train_history == false, the replay buffer is never loaded)
     
     episodes = 20000
     episode = 0
@@ -88,7 +88,7 @@ def SAC_Agent_Training(q):
         ep_obs[0], done_flag = env.reset(), False
         # Testing
         if test_agent:
-            #Use the user input preference for the test
+            #Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back] all values [0;1)
             pref = np.array([[1,0,0,0,0]])
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
@@ -119,37 +119,39 @@ def SAC_Agent_Training(q):
 
         ep_len = step + 1
 
-        # Compute the real and expected returns and the root mean square error:
-        # Real return: If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
-        last_state = torch.tensor([ep_obs[step+1][5:]], dtype=torch.float64).to(agent.P_net.device).view(-1)
-        last_state = torch.unsqueeze(last_state, 0)
+        ######## Compute the real and expected returns and the root mean square error ##########
         pref_tensor = torch.tensor(pref, dtype=torch.float64).to(agent.P_net.device)
+        # Real return: 
+        # Compute total reward from partial rewards and preference of the episode
         
-        last_action = agent.choose_action(ep_obs[step+1][5:], pref, random=not(test_agent))
-        last_action = torch.tensor([last_action], dtype=torch.float64).to(agent.P_net.device).view(-1)
-        last_action = torch.unsqueeze(last_action, 0)
-
-        #Compute total reward from partial rewards and preferences
         tot_rwd = np.sum(pref * ep_rwd[:,:-1], axis=1) + ep_rwd[:,-1]
 
         aux_ret = np.copy(tot_rwd)
 
-        if not done_flag: aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+        # If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
+        # Using the last state, and last action that the policy would have chosen in that state
+        if not done_flag:
+            last_state = torch.tensor(np.expand_dims(ep_obs[step+1][5:], axis=0), dtype=torch.float64).to(agent.P_net.device)
+            last_action = agent.choose_action(ep_obs[step+1][5:], pref, random=not(test_agent), tensor=True)
+            aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+
         for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
         ep_ret[episode, 0] = aux_ret[0]
 
-        # Expected return at the start of the episode
-        initial_state = torch.tensor([ep_obs[0][5:]], dtype=torch.float64).to(agent.P_net.device)
-        initial_action = torch.tensor([ep_act[0]], dtype=torch.float64).to(agent.P_net.device)
+        # Expected return at the start of the episode:
+        initial_state = torch.tensor(np.expand_dims(ep_obs[0][5:], axis=0), dtype=torch.float64).to(agent.P_net.device)
+        initial_action = torch.tensor(np.expand_dims(ep_act[0], axis=0), dtype=torch.float64).to(agent.P_net.device)
         ep_ret[episode, 1] = agent.minimal_Q(initial_state, initial_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
         # Root mean square error
         ep_ret[episode, 2] = np.sqrt(np.square(ep_ret[episode,0] - ep_ret[episode, 1]))
 
+        # Train the agent with batch_size samples for every step made in the episode
         if test_agent == False:
             for step in range(ep_len):
                 agent.learn(step)
 
+        # Store the results of the episodes for plotting and printing on the console
         ep_loss[episode, 0] = agent.Q_loss.item()
         ep_loss[episode, 1] = agent.P_loss.item()
         ep_alpha[episode] = agent.log_alpha.exp().item()
@@ -165,8 +167,10 @@ def SAC_Agent_Training(q):
         print("Policy's Entropy: ", ep_entropy[episode])
         print("------------------------------------------")
 
+        # Send the information for plotting in the other process through a Queue
         q.put((episode, ep_obs[0:ep_len+1], tot_rwd[0:ep_len+1], ep_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1], ep_act[0:ep_len+1], ep_std[0:episode+1]))
         
+        # Save the progress every save_period episodes, unless its being tested
         if episode % save_period == 0 and episode != 0 and test_agent == False:
             agent.save_models()
             agent.replay_buffer.save(episode)
@@ -176,7 +180,8 @@ def SAC_Agent_Training(q):
         
         episode += 1
 
-body_min, body_max = -5.0, 15.0
+#Range of the joints for plotting the denormalized joint angles
+body_min, body_max = -10.0, 15.0
 body_mean = (body_min + body_max)/2
 body_range = (body_max - body_min)/2
 
@@ -358,7 +363,7 @@ if __name__ == '__main__':
     # print('Thread ={}          Function = main()'.format(threading.currentThread().getName()))
     app = QApplication(sys.argv)
 
-    #Create a queue to share data between process
+    #Create a queue to share data between processes
     q = multiprocessing.Queue()
 
     #Create and start the SAC_Agent_Training process
