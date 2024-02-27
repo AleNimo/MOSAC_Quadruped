@@ -82,6 +82,7 @@ class SAC_Agent():
             actions,_,_ = self.P_net.sample_normal(state, pref, reparameterize=False)
         else:
             actions,_ = self.P_net(state, pref)
+            actions = torch.tanh(actions) # Restrict the actions to (-1;1) when sample_normal is not used
 
         #Return as a np.array when acting on the environment
         if tensor == False: return actions.detach().cpu().numpy()
