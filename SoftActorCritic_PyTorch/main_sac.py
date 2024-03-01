@@ -41,8 +41,12 @@ def SAC_Agent_Training(q):
     episode_steps = 200 #Maximum steps allowed per episode
     save_period = 500
 
+    #Preference vector
+    pref_dim = 5
+    pref_max_value = 2
+
     #The vector received from coppelia contains the x,y,z coordinates and the target direction not used by the agent, only for plotting. Thats why we subtract the 5 values from the vector dimensions
-    agent = SAC_Agent('Cuadruped', env, pref_dim=5, replay_buffer_size=1000000)
+    agent = SAC_Agent('Cuadruped', env, pref_dim, pref_max_value, replay_buffer_size=1000000)
     
     agent.replay_batch_size = 10000
 
@@ -88,8 +92,8 @@ def SAC_Agent_Training(q):
         ep_obs[0], done_flag = env.reset(), False
         # Testing
         if test_agent:
-            #Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back] all values [0;1)
-            pref = np.array([[1,0,0,0,0]])
+            #Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back] all values [0;pref_max_value)
+            pref = np.array([[2,0,1,1,1]])
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
                 ep_act[step] = agent.choose_action(ep_obs[step][5:], pref, random=False)  #The agent doesn't receive the position and target direction although it is on the ep_obs vector for plotting reasons
@@ -103,7 +107,7 @@ def SAC_Agent_Training(q):
 
         else:
             #Generate random preference for the episode
-            pref = np.random.random_sample((1,agent.pref_dim))
+            pref = np.random.random_sample((1,agent.pref_dim)) * pref_max_value
             for step in range(episode_steps):
                 # Decide action based on present observed state (random action with mean and std)
                 ep_act[step] = agent.choose_action(ep_obs[step][5:], pref)

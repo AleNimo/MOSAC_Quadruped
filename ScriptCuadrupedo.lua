@@ -21,7 +21,9 @@ function createAgent ()
     tip[3],target[3] = sim.getObject("/TipBR"),sim.getObject("/TargetBR")
     tip[4],target[4] = sim.getObject("/TipBL"),sim.getObject("/TargetBL")
     
-    -- Get kalman readings
+    -- Get sensor readings
+    accelerometer = sim.getObject('/Accelerometer')
+    accelScript = sim.getScript(sim.scripttype_childscript, accelerometer)
     
     --sim.shapeintparam_respondable_mask
     --local res,collPair=sim.checkCollision(h,sim.handle_all)
@@ -116,7 +118,7 @@ function sysCall_init() -- Executed when the scene is loaded
     target = {}
     
     -- Load the agent's model
-    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_short_leg.ttm')
+    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_short_leg_accel.ttm')
     -- agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_long_leg.ttm')
 
     -- Save the agent's model
@@ -193,14 +195,15 @@ function sysCall_sensing() -- Executed every simulation step
 
         if time > 0 then    --to avoid dividing by 0
 
-            forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
+            acceleration = sim.callScriptFunction('getAccelData', accelScript)
+            -- forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
             -- lateral_acceleration = math.abs(lateral_velocity - prev_lateral_velocity)/(time - prev_time)
 
             -- sim.setGraphStreamValue(graph, lateral_acc_stream, lateral_acceleration)
 
 
             -- Absolute spike in acceleration:
-            if math.abs(forward_acceleration) > max_forward_acc then max_forward_acc = math.abs(forward_acceleration) end
+            if math.abs(acceleration[1]) > max_forward_acc then max_forward_acc = math.abs(acceleration[1]) end
             -- if lateral_acceleration > max_lateral_acc then max_lateral_acc = lateral_acceleration end
             -- Mean acceleration:
             -- mean_forward_acc = 1/(acc_samples + 1) * (mean_forward_acc * acc_samples + math.abs(forward_acceleration))

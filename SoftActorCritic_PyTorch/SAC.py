@@ -9,7 +9,7 @@ from Networks import Q_Network, P_Network
 import copy
 
 class SAC_Agent():
-    def __init__(self, name, environment, pref_dim, replay_buffer_size):
+    def __init__(self, name, environment, pref_dim, pref_max_value, replay_buffer_size):
 
         self.agent_name = name
         self.environment = environment
@@ -23,7 +23,7 @@ class SAC_Agent():
         self.update_Q = 1
         self.update_P = 1
 
-        self.replay_buffer = ReplayBuffer(replay_buffer_size, self.environment.obs_dim, self.environment.act_dim, self.environment.rwd_dim, self.pref_dim)
+        self.replay_buffer = ReplayBuffer(replay_buffer_size, self.environment.obs_dim, self.environment.act_dim, self.environment.rwd_dim, self.pref_dim, pref_max_value)
 
         self.P_net = P_Network(self.environment.obs_dim, self.environment.act_dim, self.pref_dim, hidden1_dim=64, hidden2_dim=32,
                                alfa=0.0003, beta1=0.9, beta2=0.999)
