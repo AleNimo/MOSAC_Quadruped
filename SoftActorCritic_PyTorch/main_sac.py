@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from SAC import SAC_Agent
 from EnvironmentTetrapodVelocidad import Environment
+from TrainHistory import TrainHistory
 
 import multiprocessing
 import queue
@@ -13,7 +14,20 @@ import sys
 from PyQt5.QtWidgets import QApplication, QGraphicsEllipseItem, QGraphicsRectItem
 from PyQt5 import QtCore
 
+import atexit   #For saving before termination
+
 data_type = np.float64
+
+# Handler to run if the python process is terminated with keyboard interrupt, or if the socket doesn't respond (simulator or the real robot)
+# IMPORTANT:    if you want to intentionally interrupt the python process, do so only when the agent is interacting with the environment and not when it is learning
+#               otherwise the networks will be saved in an incomplete state.
+def exit_handler(agent, train_history):
+    train_history.episode -= 1
+    agent.save_models()
+    agent.replay_buffer.save(train_history.episode)
+
+    train_history.save()
+
 
 def SAC_Agent_Training(q):
 
@@ -37,7 +51,6 @@ def SAC_Agent_Training(q):
     load_replay_buffer = True   #(if load_train_history == false, the replay buffer is never loaded)
     
     episodes = 20000
-    episode = 0
     episode_steps = 200 #Maximum steps allowed per episode
     save_period = 500
 
@@ -51,7 +64,7 @@ def SAC_Agent_Training(q):
     agent.replay_batch_size = 10000
 
     agent.update_Q = 1  # The Q function is updated every episode
-    agent.update_P = 1  # The policy is updated every 3 episodes
+    agent.update_P = 1  # The policy is updated every 1 episode
 
     if load_agent:
         agent.load_models()
@@ -59,41 +72,29 @@ def SAC_Agent_Training(q):
     ep_obs = np.zeros((episode_steps+1, env.obs_dim+5), dtype=data_type)        # Episode's observed states
     ep_act = np.zeros((episode_steps, env.act_dim), dtype=data_type)            # Episode's actions
     ep_rwd = np.zeros((episode_steps, env.rwd_dim), dtype=data_type)            # Episode's rewards
-    ep_ret = np.zeros((episodes, 3), dtype=data_type)                           # Returns for each episode (real, expected and RMSE)
-    ep_loss = np.zeros((episodes, 2), dtype=data_type)                          # Training loss for each episode (Q and P)
-    ep_alpha = np.zeros((episodes,), dtype=data_type)                           # Alpha for each episode
-    ep_entropy = np.zeros((episodes,), dtype=data_type)                         # Entropy of the policy for each episode
-    ep_std = np.zeros((episodes,), dtype=data_type)                             # Mean standard deviation of the policy for each episode
+    train_history = TrainHistory(max_episodes=episodes)
 
     if load_train_history and test_agent==False:
-        # Check the last episode saved in Progress.txt
-        if not os.path.isfile('./Train/Progress.txt'):
-            print('Progress.txt could not be found')
-            exit
-        with open('./Train/Progress.txt', 'r') as file: last_episode = int(np.loadtxt(file))
-
-        filename = './Train/Train_History_episode_{0:07d}.npz'.format(last_episode)
-        loaded_arrays = np.load(filename)
-
-        ep_ret[0:last_episode+1] = loaded_arrays['returns']
-        ep_loss[0:last_episode+1] = loaded_arrays['loss']
-        ep_alpha[0:last_episode+1] = loaded_arrays['alpha']
-        ep_entropy[0:last_episode+1] = loaded_arrays['entropy']
-        ep_std[0:last_episode+1] = loaded_arrays['std']
+        train_history.load()
 
         if load_replay_buffer:
-            agent.replay_buffer.load(last_episode)
+            agent.replay_buffer.load(train_history.episode)
 
-        episode = last_episode + 1
+        train_history.episode = train_history.episode + 1
 
-    # Training
-    while episode <= episodes:
+    if test_agent == False: atexit.register(exit_handler, agent, train_history)
+
+    while train_history.episode <= episodes:
+
+        print("Episode: ", train_history.episode)
 
         ep_obs[0], done_flag = env.reset(), False
+
         # Testing
         if test_agent:
             #Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back] all values [0;pref_max_value)
             pref = np.array([[2,0,1,1,1]])
+            print("Preference vector: ", pref)
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
                 ep_act[step] = agent.choose_action(ep_obs[step][5:], pref, random=False)  #The agent doesn't receive the position and target direction although it is on the ep_obs vector for plotting reasons
@@ -105,9 +106,11 @@ def SAC_Agent_Training(q):
 
             ep_len = step + 1
 
+        # Training
         else:
             #Generate random preference for the episode
             pref = np.random.random_sample((1,agent.pref_dim)) * pref_max_value
+            print("Preference vector: ", pref)
             for step in range(episode_steps):
                 # Decide action based on present observed state (random action with mean and std)
                 ep_act[step] = agent.choose_action(ep_obs[step][5:], pref)
@@ -127,9 +130,8 @@ def SAC_Agent_Training(q):
         pref_tensor = torch.tensor(pref, dtype=torch.float64).to(agent.P_net.device)
         # Real return: 
         # Compute total reward from partial rewards and preference of the episode
-        
         tot_rwd = np.sum(pref * ep_rwd[:,:-1], axis=1) + ep_rwd[:,-1]
-
+        # Auxiliary array for computing return without overwriting tot_rwd
         aux_ret = np.copy(tot_rwd)
 
         # If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
@@ -140,15 +142,15 @@ def SAC_Agent_Training(q):
             aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
         for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
-        ep_ret[episode, 0] = aux_ret[0]
+        train_history.ep_ret[train_history.episode, 0] = aux_ret[0]
 
         # Expected return at the start of the episode:
         initial_state = torch.tensor(np.expand_dims(ep_obs[0][5:], axis=0), dtype=torch.float64).to(agent.P_net.device)
         initial_action = torch.tensor(np.expand_dims(ep_act[0], axis=0), dtype=torch.float64).to(agent.P_net.device)
-        ep_ret[episode, 1] = agent.minimal_Q(initial_state, initial_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+        train_history.ep_ret[train_history.episode, 1] = agent.minimal_Q(initial_state, initial_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
         # Root mean square error
-        ep_ret[episode, 2] = np.sqrt(np.square(ep_ret[episode,0] - ep_ret[episode, 1]))
+        train_history.ep_ret[train_history.episode, 2] = np.sqrt(np.square(train_history.ep_ret[train_history.episode,0] - train_history.ep_ret[train_history.episode, 1]))
 
         # Train the agent with batch_size samples for every step made in the episode
         if test_agent == False:
@@ -156,33 +158,32 @@ def SAC_Agent_Training(q):
                 agent.learn(step)
 
         # Store the results of the episodes for plotting and printing on the console
-        ep_loss[episode, 0] = agent.Q_loss.item()
-        ep_loss[episode, 1] = agent.P_loss.item()
-        ep_alpha[episode] = agent.log_alpha.exp().item()
-        ep_entropy[episode] = agent.entropy.item()
-        ep_std[episode] = agent.std.item()
+        train_history.ep_loss[train_history.episode, 0] = agent.Q_loss.item()
+        train_history.ep_loss[train_history.episode, 1] = agent.P_loss.item()
+        train_history.ep_alpha[train_history.episode] = agent.log_alpha.exp().item()
+        train_history.ep_entropy[train_history.episode] = agent.entropy.item()
+        train_history.ep_std[train_history.episode] = agent.std.item()
         
-        print("Episode: ", episode)
-        print("Preference vector: ", pref)
         print("Replay_Buffer_counter: ", agent.replay_buffer.mem_counter)
-        print("Q_loss: ", ep_loss[episode, 0])
-        print("P_loss: ", ep_loss[episode, 1])
-        print("Alpha: ", ep_alpha[episode])
-        print("Policy's Entropy: ", ep_entropy[episode])
+        print("Q_loss: ", train_history.ep_loss[train_history.episode, 0])
+        print("P_loss: ", train_history.ep_loss[train_history.episode, 1])
+        print("Alpha: ", train_history.ep_alpha[train_history.episode])
+        print("Policy's Entropy: ", train_history.ep_entropy[train_history.episode])
         print("------------------------------------------")
 
         # Send the information for plotting in the other process through a Queue
-        q.put((episode, ep_obs[0:ep_len+1], tot_rwd[0:ep_len+1], ep_rwd[0:ep_len+1], ep_ret[0:episode+1], ep_loss[0:episode+1], ep_alpha[0:episode+1], ep_entropy[0:episode+1], ep_act[0:ep_len+1], ep_std[0:episode+1]))
+        q.put((train_history.episode, ep_obs[0:ep_len+1], tot_rwd[0:ep_len+1], ep_rwd[0:ep_len+1], train_history.ep_ret[0:train_history.episode+1], \
+               train_history.ep_loss[0:train_history.episode+1], train_history.ep_alpha[0:train_history.episode+1], \
+               train_history.ep_entropy[0:train_history.episode+1], ep_act[0:ep_len+1], train_history.ep_std[0:train_history.episode+1]))
         
         # Save the progress every save_period episodes, unless its being tested
-        if episode % save_period == 0 and episode != 0 and test_agent == False:
+        if train_history.episode % save_period == 0 and train_history.episode != 0 and test_agent == False:
             agent.save_models()
-            agent.replay_buffer.save(episode)
+            agent.replay_buffer.save(train_history.episode)
             
-            filename = './Train/Train_History_episode_{0:07d}'.format(episode)
-            np.savez_compressed(filename, returns = ep_ret[0:episode+1], loss = ep_loss[0:episode+1], alpha = ep_alpha[0:episode+1], entropy = ep_entropy[0:episode+1], std = ep_std[0:episode+1])
+            train_history.save()
         
-        episode += 1
+        train_history.episode += 1
 
 #Range of the joints for plotting the denormalized joint angles
 body_min, body_max = -10.0, 15.0
