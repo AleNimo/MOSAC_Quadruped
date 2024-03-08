@@ -19,8 +19,9 @@ import atexit   #For saving before termination
 data_type = np.float64
 
 # Handler to run if the python process is terminated with keyboard interrupt, or if the socket doesn't respond (simulator or the real robot)
-# IMPORTANT:    if you want to intentionally interrupt the python process, do so only when the agent is interacting with the environment and not when it is learning
+# IMPORTANT:   -If you want to intentionally interrupt the python process, do so only when the agent is interacting with the environment and not when it is learning
 #               otherwise the networks will be saved in an incomplete state.
+#              -If intentionally interrupted, the script takes time to save the training history, so don't close the console window right away
 def exit_handler(agent, train_history):
     train_history.episode -= 1
     agent.save_models()
@@ -46,9 +47,8 @@ def SAC_Agent_Training(q):
         #the 12 joint angles
 
     load_agent = True
-    test_agent = False
-    load_train_history = True   #(if test_agent == True, the train history and the replay buffer are never loaded)
-    load_replay_buffer = True   #(if load_train_history == false, the replay buffer is never loaded)
+    test_agent = True
+    load_replay_buffer_and_history = True   #if test_agent == True, only the train history is loaded (the replay_buffer is not used)
     
     episodes = 20000
     episode_steps = 200 #Maximum steps allowed per episode
@@ -74,14 +74,15 @@ def SAC_Agent_Training(q):
     ep_rwd = np.zeros((episode_steps, env.rwd_dim), dtype=data_type)            # Episode's rewards
     train_history = TrainHistory(max_episodes=episodes)
 
-    if load_train_history and test_agent==False:
+    if load_replay_buffer_and_history:
         train_history.load()
 
-        if load_replay_buffer:
+        if test_agent == False:
             agent.replay_buffer.load(train_history.episode)
 
         train_history.episode = train_history.episode + 1
 
+    # Set the exit_handler only when training
     if test_agent == False: atexit.register(exit_handler, agent, train_history)
 
     while train_history.episode <= episodes:
@@ -93,7 +94,7 @@ def SAC_Agent_Training(q):
         # Testing
         if test_agent:
             #Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back] all values [0;pref_max_value)
-            pref = np.array([[2,0,1,1,1]])
+            pref = np.array([[2,1,1,1,1]])
             print("Preference vector: ", pref)
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
@@ -124,65 +125,69 @@ def SAC_Agent_Training(q):
                 # End episode on termination condition
                 if done_flag: break
 
-        ep_len = step + 1
+            ep_len = step + 1
 
-        ######## Compute the real and expected returns and the root mean square error ##########
-        pref_tensor = torch.tensor(pref, dtype=torch.float64).to(agent.P_net.device)
-        # Real return: 
         # Compute total reward from partial rewards and preference of the episode
         tot_rwd = np.sum(pref * ep_rwd[:,:-1], axis=1) + ep_rwd[:,-1]
-        # Auxiliary array for computing return without overwriting tot_rwd
-        aux_ret = np.copy(tot_rwd)
+        
+        if test_agent:
+            # Send the information for plotting in the other process through a Queue
+            q.put(( test_agent, ep_obs[0:ep_len+1], tot_rwd[0:ep_len+1], ep_rwd[0:ep_len+1],  ep_act[0:ep_len+1] ))
 
-        # If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
-        # Using the last state, and last action that the policy would have chosen in that state
-        if not done_flag:
-            last_state = torch.tensor(np.expand_dims(ep_obs[step+1][5:], axis=0), dtype=torch.float64).to(agent.P_net.device)
-            last_action = agent.choose_action(ep_obs[step+1][5:], pref, random=not(test_agent), tensor=True)
-            aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+        else:
+            ######## Compute the real and expected returns and the root mean square error ##########
+            # Real return:
+            # Auxiliary array for computing return without overwriting tot_rwd
+            aux_ret = np.copy(tot_rwd)
+            pref_tensor = torch.tensor(pref, dtype=torch.float64).to(agent.P_net.device)
 
-        for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
-        train_history.ep_ret[train_history.episode, 0] = aux_ret[0]
+            # If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
+            # Using the last state, and last action that the policy would have chosen in that state
+            if not done_flag:
+                last_state = torch.tensor(np.expand_dims(ep_obs[step+1][5:], axis=0), dtype=torch.float64).to(agent.P_net.device)
+                last_action = agent.choose_action(ep_obs[step+1][5:], pref, random=not(test_agent), tensor=True)
+                aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
-        # Expected return at the start of the episode:
-        initial_state = torch.tensor(np.expand_dims(ep_obs[0][5:], axis=0), dtype=torch.float64).to(agent.P_net.device)
-        initial_action = torch.tensor(np.expand_dims(ep_act[0], axis=0), dtype=torch.float64).to(agent.P_net.device)
-        train_history.ep_ret[train_history.episode, 1] = agent.minimal_Q(initial_state, initial_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+            for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
+            train_history.ep_ret[train_history.episode, 0] = aux_ret[0]
 
-        # Root mean square error
-        train_history.ep_ret[train_history.episode, 2] = np.sqrt(np.square(train_history.ep_ret[train_history.episode,0] - train_history.ep_ret[train_history.episode, 1]))
+            # Expected return at the start of the episode:
+            initial_state = torch.tensor(np.expand_dims(ep_obs[0][5:], axis=0), dtype=torch.float64).to(agent.P_net.device)
+            initial_action = torch.tensor(np.expand_dims(ep_act[0], axis=0), dtype=torch.float64).to(agent.P_net.device)
+            train_history.ep_ret[train_history.episode, 1] = agent.minimal_Q(initial_state, initial_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
-        # Train the agent with batch_size samples for every step made in the episode
-        if test_agent == False:
+            # Root mean square error
+            train_history.ep_ret[train_history.episode, 2] = np.sqrt(np.square(train_history.ep_ret[train_history.episode,0] - train_history.ep_ret[train_history.episode, 1]))
+
+            ######### Train the agent with batch_size samples for every step made in the episode ##########
             for step in range(ep_len):
                 agent.learn(step)
 
-        # Store the results of the episodes for plotting and printing on the console
-        train_history.ep_loss[train_history.episode, 0] = agent.Q_loss.item()
-        train_history.ep_loss[train_history.episode, 1] = agent.P_loss.item()
-        train_history.ep_alpha[train_history.episode] = agent.log_alpha.exp().item()
-        train_history.ep_entropy[train_history.episode] = agent.entropy.item()
-        train_history.ep_std[train_history.episode] = agent.std.item()
-        
-        print("Replay_Buffer_counter: ", agent.replay_buffer.mem_counter)
-        print("Q_loss: ", train_history.ep_loss[train_history.episode, 0])
-        print("P_loss: ", train_history.ep_loss[train_history.episode, 1])
-        print("Alpha: ", train_history.ep_alpha[train_history.episode])
-        print("Policy's Entropy: ", train_history.ep_entropy[train_history.episode])
-        print("------------------------------------------")
-
-        # Send the information for plotting in the other process through a Queue
-        q.put((train_history.episode, ep_obs[0:ep_len+1], tot_rwd[0:ep_len+1], ep_rwd[0:ep_len+1], train_history.ep_ret[0:train_history.episode+1], \
-               train_history.ep_loss[0:train_history.episode+1], train_history.ep_alpha[0:train_history.episode+1], \
-               train_history.ep_entropy[0:train_history.episode+1], ep_act[0:ep_len+1], train_history.ep_std[0:train_history.episode+1]))
-        
-        # Save the progress every save_period episodes, unless its being tested
-        if train_history.episode % save_period == 0 and train_history.episode != 0 and test_agent == False:
-            agent.save_models()
-            agent.replay_buffer.save(train_history.episode)
+            # Store the results of the episodes for plotting and printing on the console
+            train_history.ep_loss[train_history.episode, 0] = agent.Q_loss.item()
+            train_history.ep_loss[train_history.episode, 1] = agent.P_loss.item()
+            train_history.ep_alpha[train_history.episode] = agent.log_alpha.exp().item()
+            train_history.ep_entropy[train_history.episode] = agent.entropy.item()
+            train_history.ep_std[train_history.episode] = agent.std.item()
             
-            train_history.save()
+            print("Replay_Buffer_counter: ", agent.replay_buffer.mem_counter)
+            print("Q_loss: ", train_history.ep_loss[train_history.episode, 0])
+            print("P_loss: ", train_history.ep_loss[train_history.episode, 1])
+            print("Alpha: ", train_history.ep_alpha[train_history.episode])
+            print("Policy's Entropy: ", train_history.ep_entropy[train_history.episode])
+
+            # Send the information for plotting in the other process through a Queue
+            q.put(( test_agent, ep_obs[0:ep_len+1], tot_rwd[0:ep_len+1], ep_rwd[0:ep_len+1],  ep_act[0:ep_len+1], \
+                    train_history.episode, train_history.ep_ret[0:train_history.episode+1], train_history.ep_loss[0:train_history.episode+1], \
+                    train_history.ep_alpha[0:train_history.episode+1], train_history.ep_entropy[0:train_history.episode+1], train_history.ep_std[0:train_history.episode+1]))            
         
+            # Save the progress every save_period episodes, unless its being tested
+            if train_history.episode % save_period == 0 and train_history.episode != 0:
+                agent.save_models()
+                agent.replay_buffer.save(train_history.episode)
+                
+                train_history.save()
+        print("------------------------------------------")
         train_history.episode += 1
 
 #Range of the joints for plotting the denormalized joint angles
@@ -213,8 +218,7 @@ def updatePlot():
     try:  
         results=q.get_nowait()
 
-        last_episode = results[0]
-        episode_linspace = np.arange(0,last_episode+1,1,dtype=int)
+        test_agent = results[0]
 
         ####Trajectory update
         Trajectory_x_data = results[1][:,0]
@@ -276,7 +280,7 @@ def updatePlot():
         body_joints_action = []
         for i in range(4):
             body_joints_state.append(results[1][:,12+i*3] * body_range + body_mean)
-            body_joints_action.append(results[8][:,i*3] * body_range + body_mean)
+            body_joints_action.append(results[4][:,i*3] * body_range + body_mean)
 
         action_linspace = np.arange(1,len(body_joints_action[0])+1,1, dtype=int)    #Because no action has been made in the step 0
 
@@ -295,7 +299,7 @@ def updatePlot():
         leg_joints_action = []
         for i in range(4):
             leg_joints_state.append(results[1][:,13+i*3] * leg_range + leg_mean)
-            leg_joints_action.append(results[8][:,1+i*3] * leg_range + leg_mean)
+            leg_joints_action.append(results[4][:,1+i*3] * leg_range + leg_mean)
 
         curve_FrontLeg_right_state.setData(state_linspace, leg_joints_state[0])
         curve_FrontLeg_left_state.setData(state_linspace, leg_joints_state[1])
@@ -312,7 +316,7 @@ def updatePlot():
         paw_joints_action = []
         for i in range(4):
             paw_joints_state.append(results[1][:,14+i*3] * paw_range + paw_mean)
-            paw_joints_action.append(results[8][:,2+i*3] * paw_range + paw_mean)
+            paw_joints_action.append(results[4][:,2+i*3] * paw_range + paw_mean)
 
         curve_FrontPaw_right_state.setData(state_linspace, paw_joints_state[0])
         curve_FrontPaw_left_state.setData(state_linspace, paw_joints_state[1])
@@ -324,41 +328,46 @@ def updatePlot():
         curve_BackPaw_right_action.setData(action_linspace, paw_joints_action[2])
         curve_BackPaw_left_action.setData(action_linspace, paw_joints_action[3])
 
-        ####Returns update
-        Real_Return_data = results[4][:,0]
-        Predicted_Return_data = results[4][:,1]
+        if test_agent == False:
+            last_episode = results[5]
+            episode_linspace = np.arange(0,last_episode+1,1,dtype=int)
 
-        curve_Real_Return.setData(episode_linspace,Real_Return_data)
-        curve_Predicted_Return.setData(episode_linspace, Predicted_Return_data)
+            ####Returns update
+            Real_Return_data = results[6][:,0]
+            Predicted_Return_data = results[6][:,1]
 
-        ####Returns error update
-        Return_loss_data = results[4][:,2]
+            
+            curve_Real_Return.setData(episode_linspace,Real_Return_data)
+            curve_Predicted_Return.setData(episode_linspace, Predicted_Return_data)
 
-        curve_Return_Error.setData(episode_linspace,Return_loss_data)
+            ####Returns error update
+            Return_loss_data = results[6][:,2]
 
-        ####Qloss update
-        Q_loss_data = results[5][:,0]
+            curve_Return_Error.setData(episode_linspace,Return_loss_data)
 
-        curve_Q_Loss.setData(episode_linspace,Q_loss_data)
+            ####Qloss update
+            Q_loss_data = results[7][:,0]
 
-        ####Ploss update
-        P_loss_data = results[5][:,1]
+            curve_Q_Loss.setData(episode_linspace,Q_loss_data)
 
-        curve_P_Loss.setData(episode_linspace,P_loss_data)
+            ####Ploss update
+            P_loss_data = results[7][:,1]
 
-        ####Alpha update
-        Alpha_data = results[6]
-        curve_Alpha.setData(episode_linspace,Alpha_data)
-        
-        ####Entropy update
-        Entropy_data = results[7]
+            curve_P_Loss.setData(episode_linspace,P_loss_data)
 
-        curve_Entropy.setData(episode_linspace, Entropy_data)
+            ####Alpha update
+            Alpha_data = results[8]
+            curve_Alpha.setData(episode_linspace,Alpha_data)
+            
+            ####Entropy update
+            Entropy_data = results[9]
 
-        ####Standard deviation update
-        Std_data = results[9]
+            curve_Entropy.setData(episode_linspace, Entropy_data)
 
-        curve_Std.setData(episode_linspace, Std_data)
+            ####Standard deviation update
+            Std_data = results[10]
+
+            curve_Std.setData(episode_linspace, Std_data)
 
     except queue.Empty:
         #print("Empty Queue")
