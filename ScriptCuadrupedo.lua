@@ -22,8 +22,7 @@ function createAgent ()
     tip[4],target[4] = sim.getObject("/TipBL"),sim.getObject("/TargetBL")
     
     -- Get sensor readings
-    accelerometer = sim.getObject('/Accelerometer')
-    accelScript = sim.getScript(sim.scripttype_childscript, accelerometer)
+    -- quadrupedScript = sim.getScript(sim.scripttype_childscript, agent)
     
     --sim.shapeintparam_respondable_mask
     --local res,collPair=sim.checkCollision(h,sim.handle_all)
@@ -106,10 +105,8 @@ function sysCall_init() -- Executed when the scene is loaded
 
     -- Get agent handles
     A = {} --Agent's Orientation (unit vector pointing forward)
-    A_orth = {} --Agent's Orientation (unit vector pointing to the right, orthogonal)
-    
-    --copies of Agent's Orientation for sysCall_sensing() (running in parallel)
     A2 = {}
+    A_orth = {}
 
     joints_number = 12
     leg_number = 4
@@ -118,7 +115,7 @@ function sysCall_init() -- Executed when the scene is loaded
     target = {}
     
     -- Load the agent's model
-    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_short_leg_accel.ttm')
+    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_short_leg.ttm')
     -- agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_long_leg.ttm')
 
     -- Save the agent's model
@@ -133,89 +130,95 @@ function sysCall_init() -- Executed when the scene is loaded
     math.randomseed( os.time() )
     math.random(); math.random(); math.random()
 
-    -- Random Target Direction for the episode:
-    T = {}    
-
-    --Variables for graphing
+    -- Random Target step rotation for the step:
+    target_step_rotation = 0
 
     agentCreated = false --To measure velocity only when there is an agent created (not between episodes where the agent is destroyed)
     step_completed = false --To compute the mean velocities only when each step is completed
     
+    step_counter = 0
+
     prev_time = 0
     prev_forward_velocity = 0
     prev_lateral_velocity = 0
 
+    forward_velocity = 0
+    lateral_velocity = 0
+
     vel_samples = 0 --Number of samples of velocity sensed each agent step
-    acc_samples = 0 --Number of samples of acceleration sensed each agent step
 
     mean_forward_velocity = 0
     mean_lateral_velocity = 0
 
+    forward_acceleration = 0
+    lateral_acceleration = 0
     max_forward_acc = 0
-    -- max_lateral_acc = 0
-    -- mean_forward_acc = 0
-    -- mean_lateral_acc = 0
 
-    -- forward_vel_stream = sim.addGraphStream(graph, 'Forward velocity', 'm/s', 0, {0, 1, 0})
-    -- lateral_vel_stream = sim.addGraphStream(graph, 'Lateral velocity', 'm/s', 0, {1, 0, 0})
+    -- kalman_graph = sim.getObject('/Kalman_graph')
+    -- accel_corr_graph = sim.getObject('/Acc_corr_graph')
+    -- vel_graph = sim.getObject('/Vel_graph')
 
-    -- forward_acc_stream = sim.addGraphStream(graph, 'Forward acceleration div10', 'm/s^2', 0, {0, 1, 1})
-    -- lateral_acc_stream = sim.addGraphStream(graph, 'Lateral acceleration', 'm/s^2', 0, {1, 1, 0})
-    
-    -- max_forward_acc_stream = sim.addGraphStream(graph, 'Max Forward acceleration div10', 'm/s^2', 0, {1, 0, 1})
-    -- mean_forward_acc_stream = sim.addGraphStream(graph, 'Mean Forward acceleration div10', 'm/s^2', 0, {1, 0, 1})
-    -- mean_forward_vel_stream = sim.addGraphStream(graph, 'Mean Forward velocity', 'm/s', 0, {0, 1, 0.88})
-    -- mean_lateral_vel_stream = sim.addGraphStream(graph, 'Mean Lateral velocity', 'm/s', 0, {0.98, 0.57, 0}) 
+    -- yaw_stream = sim.addGraphStream(kalman_graph, 'yaw_copp', 'rad', 0, {1, 1, 0})
+    -- pitch_stream = sim.addGraphStream(kalman_graph, 'pitch_copp', 'rad', 0, {0, 1, 1})
+    -- roll_stream = sim.addGraphStream(kalman_graph, 'roll_copp', 'rad', 0, {1, 0, 1})
+
+    -- x_accel_corr = sim.addGraphStream(accel_corr_graph, 'x_accel_copp', 'm/s^2', 0, {1, 1, 0})
+    -- y_accel_corr = sim.addGraphStream(accel_corr_graph, 'y_accel_copp', 'm/s^2', 0, {0, 1, 1})
+
+    -- x_vel = sim.addGraphStream(vel_graph, 'x_vel_copp', 'm/s', 0, {1, 1, 0})
+    -- y_vel = sim.addGraphStream(vel_graph, 'y_vel_copp', 'm/s', 0, {0, 1, 1})
 end
 
 function sysCall_sensing() -- Executed every simulation step
     
     if agentCreated == true then
 
+        world_velocity, _ = sim.getObjectVelocity(agent)
+        time = sim.getSimulationTime()
 
         --Obtain agents orientation
         orientation = sim.getObjectOrientation(agent, -1)
 
+        -- sim.setGraphStreamValue(kalman_graph, yaw_stream, -orientation[3]*180/math.pi)
+        -- sim.setGraphStreamValue(kalman_graph, pitch_stream, -orientation[2]*180/math.pi)
+        -- sim.setGraphStreamValue(kalman_graph, roll_stream, orientation[1]*180/math.pi)
+
         --Compute the agent's reference unit vectors
         A2.x = math.cos(orientation[3])
         A2.y = math.sin(orientation[3])
-        
+
         A_orth.x = A2.y
         A_orth.y = -A2.x
-        
-        world_velocity, _ = sim.getObjectVelocity(agent)
-        time = sim.getSimulationTime()
-        
-        --Compute mean in a recursive manner
+
         forward_velocity = world_velocity[1] * A2.x + world_velocity[2] * A2.y
         lateral_velocity = world_velocity[1] * A_orth.x + world_velocity[2] * A_orth.y
 
-        -- sim.setGraphStreamValue(graph, forward_vel_stream, forward_velocity)
-        -- sim.setGraphStreamValue(graph, lateral_vel_stream, lateral_velocity)
+        -- sim.setGraphStreamValue(vel_graph, x_vel, forward_velocity)
+        -- sim.setGraphStreamValue(vel_graph, y_vel, lateral_velocity)
+        
+        -- attitude = sim.callScriptFunction('getAttitude', quadrupedScript) --attitude = {yaw, pitch, roll}
+        
+        -- velocity = sim.callScriptFunction('getVelocity', quadrupedScript)
 
-        if time > 0 then    --to avoid dividing by 0
+        -- forward_velocity=velocity[1]
+        -- lateral_velocity=velocity[2]
 
-            acceleration = sim.callScriptFunction('getAccelData', accelScript)
-            -- forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
-            -- lateral_acceleration = math.abs(lateral_velocity - prev_lateral_velocity)/(time - prev_time)
+        -- forward_acceleration = sim.callScriptFunction('getAcceleration', quadrupedScript)
 
-            -- sim.setGraphStreamValue(graph, lateral_acc_stream, lateral_acceleration)
+        if time > 0 then
+            forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
+            lateral_acceleration = (lateral_velocity - prev_lateral_velocity)/(time - prev_time)
 
-
+            -- sim.setGraphStreamValue(accel_corr_graph, x_accel_corr, forward_acceleration)
+            -- sim.setGraphStreamValue(accel_corr_graph, y_accel_corr, lateral_acceleration)
             -- Absolute spike in acceleration:
-            if math.abs(acceleration[1]) > max_forward_acc then max_forward_acc = math.abs(acceleration[1]) end
-            -- if lateral_acceleration > max_lateral_acc then max_lateral_acc = lateral_acceleration end
-            -- Mean acceleration:
-            -- mean_forward_acc = 1/(acc_samples + 1) * (mean_forward_acc * acc_samples + math.abs(forward_acceleration))
-            -- mean_lateral_acc = 1/(acc_samples + 1) * (mean_lateral_acc * acc_samples + math.abs(lateral_acceleration))
-
-            -- acc_samples = acc_samples + 1
+            if math.abs(forward_acceleration) > max_forward_acc then max_forward_acc = math.abs(forward_acceleration) end
         end
-
         prev_time = time
         prev_forward_velocity = forward_velocity
         prev_lateral_velocity = lateral_velocity
-
+        
+        --Compute mean in a recursive manner
         mean_forward_velocity = 1/(vel_samples + 1) * (mean_forward_velocity * vel_samples + forward_velocity)
         mean_lateral_velocity = 1/(vel_samples + 1) * (mean_lateral_velocity * vel_samples + lateral_velocity)
 
@@ -223,25 +226,14 @@ function sysCall_sensing() -- Executed every simulation step
 
         if step_completed == true then
 
-            -- sim.setGraphStreamValue(graph, mean_forward_vel_stream, mean_forward_velocity)
-            -- sim.setGraphStreamValue(graph, mean_lateral_vel_stream, mean_lateral_velocity)
-
-            -- sim.setGraphStreamValue(graph, mean_forward_acc_stream, mean_forward_acc/10)
-            -- sim.setGraphStreamValue(graph, mean_lateral_acc_stream, mean_lateral_acc)
-
-            -- sim.setGraphStreamValue(graph, max_forward_acc_stream, max_forward_acc/10)
+            step_counter = step_counter + 1
 
             mean_forward_velocity = 0
             mean_lateral_velocity = 0
 
             max_forward_acc = 0
-            -- max_lateral_acc = 0
-
-            -- mean_forward_acc = 0
-            -- mean_lateral_acc = 0
 
             vel_samples = 0
-            -- acc_samples = 0
 
             step_completed = false
         end
@@ -267,18 +259,15 @@ function sysCall_beforeSimulation() -- Executed just before the simulation start
     sequence_step = 0
     state = 0
 
-    --Generate random target direction
-    T.x = 2 * math.random() - 1
-    T.y = 2 * math.random() - 1
-
+    --Generate first random target step rotation
+    target_step_rotation = 0
+    step_counter = 0
+    prev_forward_velocity = 0
+    prev_lateral_velocity = 0
     mean_forward_velocity = 0
     mean_lateral_velocity = 0
 
     max_forward_acc = 0
-    -- max_lateral_acc = 0
-
-    -- mean_forward_acc = 0
-    -- mean_lateral_acc = 0
 end
 
 function sysCall_actuation()
@@ -286,40 +275,55 @@ function sysCall_actuation()
         -- Do nothing
     elseif state == 0 then -- If state is 'idle'
         --sim.pauseSimulation()
-        --Send the agent's status
-        --Obtain and send the object world position (change the second parameter from -1 to another handle to get a relative position)
-        --This are used to plot the agents trajectory and target direction but are not used in the agents state vector
 
+        --Send the agent's measurements
+
+        ----------First the measurements only made in the simulation for the training (only for the reward and plotting)
+        
+        --World position (change the second parameter from -1 to another handle to get a relative position)
         data = sim.getObjectPosition(agent, -1)
         client:send(string.format(Tx_float_length, data[1])) --x
         client:send(string.format(Tx_float_length, data[2])) --y
         client:send(string.format(Tx_float_length, data[3])) --z
-        client:send(string.format(Tx_float_length, T.x)) --Target direction x
-        client:send(string.format(Tx_float_length, T.y)) --Target direction y
 
-        --Obtain and send the object world orientation (change the second parameter from -1 to another handle to get a relative position)
-        data = sim.getObjectOrientation(agent, -1)
-        client:send(string.format(Tx_float_length, data[1]/math.pi)) --pitch angle
-        client:send(string.format(Tx_float_length, data[2]/math.pi)) --roll angle
-
-        --Compute the signed angle between the target direction and the agent (send the cosine and sine of the angle to avoid discontinuity)
-        A.x = math.cos(data[3])
-        A.y = math.sin(data[3])
-        gamma = math.atan2(T.x * A.y - T.y * A.x, T.x * A.x + T.y * A.y)
-        client:send(string.format(Tx_float_length, math.cos(gamma)))
-        client:send(string.format(Tx_float_length, math.sin(gamma)))
-
-        --Send the mean forward and lateral velocities and accelerations with (reference of the agent)
+        --Mean forward and lateral velocities and peak absolute forward acceleration with reference of the agent
         --Measured and computed in sysCall_sensing
-        
         client:send(string.format(Tx_float_length, mean_forward_velocity))
         client:send(string.format(Tx_float_length, mean_lateral_velocity))
         client:send(string.format(Tx_float_length, max_forward_acc))
-        -- client:send(string.format(Tx_float_length, mean_forward_acc))
 
         step_completed = true
 
-        --Send the joints positions
+        --Object world orientation (change the second parameter from -1 to another handle to get a relative position)
+        data = sim.getObjectOrientation(agent, -1)
+        client:send(string.format(Tx_float_length, data[3]))  --Yaw angle for the reward
+
+        ----------Finally the measurements used for the observation state of the agent
+        --Target Rotation for the step
+        client:send(string.format(Tx_float_length, target_step_rotation))
+        
+        --Generate next random target step rotation (std = 30°)
+        if (step_counter >= 250) and (step_counter % 10 == 0) then
+            local u1 = math.random() --uniform distribution
+            local u2 = math.random()
+            target_step_rotation = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2) * 1/12 --Gaussian distribution (0 mean and 1/12 std -> 15°)
+
+            --Clip the target step rotation to +/- 30°
+            target_step_rotation = math.max(-1/6, math.min(1/6, target_step_rotation))
+        end
+
+        --Pitch and roll angles of the back (world reference)
+        client:send(string.format(Tx_float_length, data[1]/math.pi)) --pitch angle
+        client:send(string.format(Tx_float_length, data[2]/math.pi)) --roll angle
+        -- client:send(string.format(Tx_float_length, attitude[2]/math.pi)) --pitch angle
+        -- client:send(string.format(Tx_float_length, attitude[3]/math.pi)) --roll angle
+
+        --Pitch and roll angular velocities of the back (world reference)
+        _, data = sim.getObjectVelocity(agent)
+        client:send(string.format(Tx_float_length, data[1]/math.pi)) --pitch angular_vel
+        client:send(string.format(Tx_float_length, data[2]/math.pi)) --roll angular_vel
+
+        --Joints angular positions
         for i=1,joints_number,1 do
             jointPos[i] = (sim.getJointPosition(joint[i]) - (jointUpperLimit[i]+jointLowerLimit[i])/2) / ((jointUpperLimit[i]-jointLowerLimit[i])/2)
             client:send(string.format(Tx_float_length, jointPos[i]))

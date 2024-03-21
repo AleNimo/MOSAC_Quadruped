@@ -2,7 +2,7 @@ import numpy as np
 import os
 
 class ReplayBuffer():
-    def __init__(self, max_size, obs_dim, actions_dim, reward_dim, pref_dim, pref_max_value):
+    def __init__(self, max_size, obs_dim, actions_dim, reward_dim, pref_max_vector, pref_min_vector):
         self.mem_size = max_size
         self.mem_counter = 0
         self.state_memory = np.zeros((self.mem_size, obs_dim))
@@ -11,8 +11,9 @@ class ReplayBuffer():
         self.next_state_memory = np.zeros((self.mem_size, obs_dim))
         self.done_flag_memory = np.zeros(self.mem_size, dtype=np.bool_)
 
-        self.pref_dim = pref_dim
-        self.pref_max_value = pref_max_value
+        self.pref_dim = pref_max_vector.size
+        self.pref_max_vector = pref_max_vector
+        self.pref_min_vector = pref_min_vector
 
     def store(self, state, action, reward, next_state, done_flag):
         if self.mem_counter == self.mem_size:
@@ -36,7 +37,7 @@ class ReplayBuffer():
         states = self.state_memory[batch_index]
         actions = self.action_memory[batch_index]
         rewards = self.reward_memory[batch_index]
-        pref = np.random.random_sample((batch_size, self.pref_dim)) * self.pref_max_value     #To generate #batch_size vectors of #pref_dim random numbers from [0;self.pref_max_value)
+        pref = np.random.random_sample((batch_size, self.pref_dim)) * (self.pref_max_vector-self.pref_min_vector) + self.pref_min_vector #To generate #batch_size vectors of #pref_dim random numbers between min and max values
         next_states = self.next_state_memory[batch_index]
         done_flags = self.done_flag_memory[batch_index]
 

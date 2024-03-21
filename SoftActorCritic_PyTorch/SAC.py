@@ -9,11 +9,10 @@ from Networks import Q_Network, P_Network
 import copy
 
 class SAC_Agent():
-    def __init__(self, name, environment, pref_dim, pref_max_value, replay_buffer_size):
+    def __init__(self, name, environment, pref_max_vector, pref_min_vector, replay_buffer_size):
 
         self.agent_name = name
         self.environment = environment
-        self.pref_dim = pref_dim
 
         #Default values
         self.discount_factor = 0.95
@@ -23,17 +22,19 @@ class SAC_Agent():
         self.update_Q = 1
         self.update_P = 1
 
-        self.replay_buffer = ReplayBuffer(replay_buffer_size, self.environment.obs_dim, self.environment.act_dim, self.environment.rwd_dim, self.pref_dim, pref_max_value)
+        pref_dim = pref_max_vector.size
 
-        self.P_net = P_Network(self.environment.obs_dim, self.environment.act_dim, self.pref_dim, hidden1_dim=64, hidden2_dim=32,
+        self.replay_buffer = ReplayBuffer(replay_buffer_size, self.environment.obs_dim, self.environment.act_dim, self.environment.rwd_dim, pref_max_vector, pref_min_vector)
+
+        self.P_net = P_Network(self.environment.obs_dim, self.environment.act_dim, pref_dim, hidden1_dim=64, hidden2_dim=32,
                                alfa=0.0003, beta1=0.9, beta2=0.999)
 
         self.P_loss = torch.tensor(0, dtype=torch.float64).to(self.P_net.device)
 
-        self.Q1_net = Q_Network(self.environment.obs_dim, self.environment.act_dim, self.pref_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
+        self.Q1_net = Q_Network(self.environment.obs_dim, self.environment.act_dim, pref_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
                                   alfa=0.0003, beta1=0.9, beta2=0.999, name='Q1_net')
 
-        self.Q2_net = Q_Network(self.environment.obs_dim, self.environment.act_dim, self.pref_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
+        self.Q2_net = Q_Network(self.environment.obs_dim, self.environment.act_dim, pref_dim, hidden1_dim=128, hidden2_dim=64, hidden3_dim=32,
                                   alfa=0.0003, beta1=0.9, beta2=0.999, name='Q2_net')
 
         self.Q_loss = torch.tensor(0, dtype=torch.float64).to(self.Q1_net.device)

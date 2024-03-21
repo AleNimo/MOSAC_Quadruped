@@ -32,34 +32,35 @@ def exit_handler(agent, train_history):
 
 def SAC_Agent_Training(q):
 
-    env = Environment(obs_dim=19, act_dim=12, rwd_dim=6)
+    env = Environment(sim_measurement=7, obs_dim=17, act_dim=12, rwd_dim=6)
 
     #The 24 values from coppelia, in order:
-        #---- Not seen by the agent --------
+        #---- The first 7 not seen by the agent but used in the reward (simulation only measurements)--------
         #position (x,y,z)
-        #target_direction (x,y)
-        #-----------------------------------
-    
-        #pitch and roll of the agent's body
-        #cosine and sine of the signed angle between the agent and the target direction
         #Mean forward and lateral velocities with the reference frame of the agent
         #Maximum absolute forward acceleration measured during the previous step with the reference frame of the agent
+        #yaw of the agent's body
+        
+        #---- The last 17 seen by the agent in the state vector (observation dimension)------------------------------
+        #yaw of the agent's body
+        #pitch and roll of the agent's body
+        #pitch and roll angular velocities of the agent's body
         #the 12 joint angles
 
-    load_agent = True
-    test_agent = True
-    load_replay_buffer_and_history = True   #if test_agent == True, only the train history is loaded (the replay_buffer is not used)
+    load_agent = False
+    test_agent = False
+    load_replay_buffer_and_history = False   #if test_agent == True, only the train history is loaded (the replay_buffer is not used)
     
     episodes = 20000
-    episode_steps = 200 #Maximum steps allowed per episode
+    episode_steps = 500 #Maximum steps allowed per episode
     save_period = 500
 
-    #Preference vector
-    pref_dim = 5
-    pref_max_value = 2
+    #Preference vector maximum and minimum values
+    pref_max_vector = np.array([2, 1, 1, 1, 1])
+    pref_min_vector = np.array([0.5, 0, 0, 0, 0])
+    pref_dim = pref_max_vector.size
 
-    #The vector received from coppelia contains the x,y,z coordinates and the target direction not used by the agent, only for plotting. Thats why we subtract the 5 values from the vector dimensions
-    agent = SAC_Agent('Cuadruped', env, pref_dim, pref_max_value, replay_buffer_size=1000000)
+    agent = SAC_Agent('Cuadruped', env, pref_max_vector, pref_min_vector, replay_buffer_size=1000000)
     
     agent.replay_batch_size = 10000
 
@@ -69,7 +70,7 @@ def SAC_Agent_Training(q):
     if load_agent:
         agent.load_models()
 
-    ep_obs = np.zeros((episode_steps+1, env.obs_dim+5), dtype=data_type)        # Episode's observed states
+    ep_obs = np.zeros((episode_steps+1, env.obs_dim+env.sim_measurement), dtype=data_type)        # Episode's observed states
     ep_act = np.zeros((episode_steps, env.act_dim), dtype=data_type)            # Episode's actions
     ep_rwd = np.zeros((episode_steps, env.rwd_dim), dtype=data_type)            # Episode's rewards
     train_history = TrainHistory(max_episodes=episodes)
@@ -94,11 +95,11 @@ def SAC_Agent_Training(q):
         # Testing
         if test_agent:
             #Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back] all values [0;pref_max_value)
-            pref = np.array([[2,1,1,1,1]])
+            pref = np.array([[0.5,1,1,1,1]])
             print("Preference vector: ", pref)
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
-                ep_act[step] = agent.choose_action(ep_obs[step][5:], pref, random=False)  #The agent doesn't receive the position and target direction although it is on the ep_obs vector for plotting reasons
+                ep_act[step] = agent.choose_action(ep_obs[step][env.sim_measurement:], pref, random=False)  #The agent doesn't receive the position and target direction although it is on the ep_obs vector for plotting reasons
 
                 # Act in the environment
                 ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
@@ -110,17 +111,17 @@ def SAC_Agent_Training(q):
         # Training
         else:
             #Generate random preference for the episode
-            pref = np.random.random_sample((1,agent.pref_dim)) * pref_max_value
+            pref = np.random.random_sample((1,pref_dim)) * (pref_max_vector-pref_min_vector) + pref_min_vector
             print("Preference vector: ", pref)
             for step in range(episode_steps):
                 # Decide action based on present observed state (random action with mean and std)
-                ep_act[step] = agent.choose_action(ep_obs[step][5:], pref)
+                ep_act[step] = agent.choose_action(ep_obs[step][env.sim_measurement:], pref)
 
                 # Act in the environment
                 ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
 
                 # Store in replay buffer
-                agent.remember(ep_obs[step][5:], ep_act[step], ep_rwd[step], ep_obs[step+1][5:], done_flag)
+                agent.remember(ep_obs[step][env.sim_measurement:], ep_act[step], ep_rwd[step], ep_obs[step+1][env.sim_measurement:], done_flag)
 
                 # End episode on termination condition
                 if done_flag: break
@@ -144,15 +145,15 @@ def SAC_Agent_Training(q):
             # If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
             # Using the last state, and last action that the policy would have chosen in that state
             if not done_flag:
-                last_state = torch.tensor(np.expand_dims(ep_obs[step+1][5:], axis=0), dtype=torch.float64).to(agent.P_net.device)
-                last_action = agent.choose_action(ep_obs[step+1][5:], pref, random=not(test_agent), tensor=True)
+                last_state = torch.tensor(np.expand_dims(ep_obs[step+1][env.sim_measurement:], axis=0), dtype=torch.float64).to(agent.P_net.device)
+                last_action = agent.choose_action(ep_obs[step+1][env.sim_measurement:], pref, random=not(test_agent), tensor=True)
                 aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
             for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
             train_history.ep_ret[train_history.episode, 0] = aux_ret[0]
 
             # Expected return at the start of the episode:
-            initial_state = torch.tensor(np.expand_dims(ep_obs[0][5:], axis=0), dtype=torch.float64).to(agent.P_net.device)
+            initial_state = torch.tensor(np.expand_dims(ep_obs[0][env.sim_measurement:], axis=0), dtype=torch.float64).to(agent.P_net.device)
             initial_action = torch.tensor(np.expand_dims(ep_act[0], axis=0), dtype=torch.float64).to(agent.P_net.device)
             train_history.ep_ret[train_history.episode, 1] = agent.minimal_Q(initial_state, initial_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
@@ -204,8 +205,8 @@ paw_mean = (paw_min + paw_max)/2
 paw_range = (paw_max - paw_min)/2
 
 def updatePlot():   
-    global q, curve_Trajectory, curve_Trajectory_startPoint, curve_Trajectory_target, curve_ForwardVelocity, curve_LateralVelocity, curve_ForwardAcc, curve_Pitch, \
-        curve_Roll, curve_gamma, curve_Reward, curve_Forward_vel_rwd, curve_Lateral_vel_rwd, curve_Orientation_rwd, curve_Back_rwd, \
+    global q, curve_Trajectory, curve_Trajectory_startPoint, curve_ForwardVelocity, curve_LateralVelocity, curve_ForwardAcc, curve_Pitch, \
+        curve_Roll, curve_TargetRotation, curve_AgentRotation, curve_Reward, curve_Forward_vel_rwd, curve_Lateral_vel_rwd, curve_Orientation_rwd, curve_Back_rwd, \
         curve_Acc_rwd, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy, curve_Std, \
         curve_FrontBody_right_state, curve_FrontBody_left_state, curve_FrontBody_right_action, curve_FrontBody_left_action, \
         curve_BackBody_right_state, curve_BackBody_left_state, curve_BackBody_right_action, curve_BackBody_left_action, \
@@ -224,39 +225,37 @@ def updatePlot():
         Trajectory_x_data = results[1][:,0]
         Trajectory_y_data = results[1][:,1]
 
-        target_direction = results[1][0,3:5]    #Currently constant through out the episode
-
-        target_direction = target_direction / np.sqrt(np.sum(np.square(target_direction)))
-
-        Trajectory_x_target = np.array([0, target_direction[0]*3])
-        Trajectory_y_target = np.array([0, target_direction[1]*3])
-
         curve_Trajectory.setData(Trajectory_x_data,Trajectory_y_data)
         curve_Trajectory_startPoint.setData([Trajectory_x_data[0]], [Trajectory_y_data[0]])
-        curve_Trajectory_target.setData(Trajectory_x_target, Trajectory_y_target)
 
         ####Velocities update
-        forward_velocity = results[1][:,9]      #For each step of the episode
-        lateral_velocity = results[1][:,10]
+        forward_velocity = results[1][:,3]      #For each step of the episode
+        lateral_velocity = results[1][:,4]
 
         state_linspace = np.arange(0,len(forward_velocity), 1, dtype=int)
+        next_state_linspace = np.arange(0,len(forward_velocity), 1, dtype=int)
 
         curve_ForwardVelocity.setData(state_linspace, forward_velocity)
         curve_LateralVelocity.setData(state_linspace, lateral_velocity)
 
         ####Acceleration update
-        forward_acc = results[1][:,11]
+        forward_acc = results[1][:,5]
 
         curve_ForwardAcc.setData(state_linspace, forward_acc)
 
-        ####Inclination and Orientation update
-        pitch = results[1][:,5] * 180 #deg
-        roll = results[1][:,6] * 180 #deg
-        gamma = np.arctan2(results[1][:,8], results[1][:,7]) * 180/np.pi    #Angle between agent and target direction in deg
+        ####Inclination update
+        pitch = results[1][:,8] * 180 #deg
+        roll = results[1][:,9] * 180 #deg
 
         curve_Pitch.setData(state_linspace, pitch)
         curve_Roll.setData(state_linspace, roll)
-        curve_gamma.setData(state_linspace, gamma)
+
+        ####Rotation update
+        agents_rotation = results[1][1:,6] - results[1][:-1,6] * 180/np.pi #deg
+        target_rotation = results[1][:,7] * 180 #deg
+
+        curve_TargetRotation.setData(state_linspace, target_rotation)
+        curve_AgentRotation.setData(next_state_linspace, agents_rotation)
 
         ####Rewards update
         total_rwd = results[2]
@@ -394,7 +393,7 @@ if __name__ == '__main__':
 ############################################### PLOTS #####################################################################
 
     ####Trajectory plot
-    plot_Trajectory = grid_layout.addPlot(title="Trajectory with Target Direction", row=0, col=0)
+    plot_Trajectory = grid_layout.addPlot(title="Trajectory", row=0, col=0)
 
         # Point in the center of the scene, target of the agent
     plot_Trajectory.plot([0], [0], pen=None, symbol='o', symbolPen=None, symbolSize=5, symbolBrush=(255, 255, 255, 200))
@@ -423,8 +422,6 @@ if __name__ == '__main__':
         #Curves to update them in updatePlot()
     curve_Trajectory = plot_Trajectory.plot()
     curve_Trajectory_startPoint = plot_Trajectory.plot(pen=None, symbol='o', symbolPen=None, symbolSize=5, symbolBrush=(0, 255, 0, 150))
-    curve_Trajectory_target = plot_Trajectory.plot(pen=pg.mkPen((255,201,14,255), width=1, style=QtCore.Qt.DashLine))
-
 
     ####Velocity plot
     plot_Velocity = grid_layout.addPlot(title="Mean forward and lateral velocity (m/s)", row=0, col=1)
@@ -452,10 +449,11 @@ if __name__ == '__main__':
     
 
     ####Orientation plot
-    plot_Orientation = grid_layout.addPlot(title="Angle to target direction (°)", row=0, col=4)
+    plot_Orientation = grid_layout.addPlot(title="Target step rotation vs Agent's step rotation (°)", row=0, col=4)
     plot_Orientation.showGrid(x=True, y=True)
 
-    curve_gamma = plot_Orientation.plot(pen=(255,127,39), name='Agent2Target')
+    curve_TargetRotation = plot_Orientation.plot(pen=(255,201,14), name='Target')
+    curve_AgentRotation = plot_Orientation.plot(pen=(255,127,39), name='Agent')
 
    
     ####Rewards plot
