@@ -57,6 +57,9 @@ function destroyAgent ()
 end
 
 function sysCall_init() -- Executed when the scene is loaded
+    sim = require('sim')
+    simIK = require('simIK')
+
     local HOST, PORT = "127.0.0.1", 57175
     local socket = require('socket')
 

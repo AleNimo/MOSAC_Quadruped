@@ -47,9 +47,9 @@ def SAC_Agent_Training(q):
         #pitch and roll angular velocities of the agent's body
         #the 12 joint angles
 
-    load_agent = False
+    load_agent = True
     test_agent = False
-    load_replay_buffer_and_history = False   #if test_agent == True, only the train history is loaded (the replay_buffer is not used)
+    load_replay_buffer_and_history = True   #if test_agent == True, only the train history is loaded (the replay_buffer is not used)
     
     episodes = 20000
     episode_steps = 500 #Maximum steps allowed per episode
@@ -233,7 +233,7 @@ def updatePlot():
         lateral_velocity = results[1][:,4]
 
         state_linspace = np.arange(0,len(forward_velocity), 1, dtype=int)
-        next_state_linspace = np.arange(0,len(forward_velocity), 1, dtype=int)
+        next_state_linspace = np.arange(1,len(forward_velocity), 1, dtype=int)
 
         curve_ForwardVelocity.setData(state_linspace, forward_velocity)
         curve_LateralVelocity.setData(state_linspace, lateral_velocity)
@@ -251,7 +251,23 @@ def updatePlot():
         curve_Roll.setData(state_linspace, roll)
 
         ####Rotation update
-        agents_rotation = results[1][1:,6] - results[1][:-1,6] * 180/np.pi #deg
+        next_angle = results[1][1:,6] * 180/np.pi
+        previous_angle = results[1][:-1,6] * 180/np.pi
+        agents_rotation = (next_angle - previous_angle)
+        #Correcting any posible discontinuities:
+            #Boolean mask to detect if there are discontinuities (change in sign with great values, +180 <-> -180, ignoring -5 <-> +5 for example):
+        peak_mask = ((next_angle * previous_angle) < 0) & (np.abs(next_angle) > 100)
+        
+            #Boolean mask to detect if the rotation should be positive (next angle becomes negative if it increments beyond the limit):
+        pos_mask = (next_angle<0) & peak_mask
+
+            #Boolean mask to detect if the rotation should be negative (next angle becomes positive if it decrements beyond the limit):
+        neg_mask = (next_angle>0) & peak_mask
+
+            #Apply corrections:
+        agents_rotation = agents_rotation + 360*pos_mask - 360*neg_mask
+        
+
         target_rotation = results[1][:,7] * 180 #deg
 
         curve_TargetRotation.setData(state_linspace, target_rotation)
@@ -394,30 +410,25 @@ if __name__ == '__main__':
 
     ####Trajectory plot
     plot_Trajectory = grid_layout.addPlot(title="Trajectory", row=0, col=0)
+    plot_Trajectory.setAspectLocked()
 
-        # Point in the center of the scene, target of the agent
+        # Point in the center of the scene
     plot_Trajectory.plot([0], [0], pen=None, symbol='o', symbolPen=None, symbolSize=5, symbolBrush=(255, 255, 255, 200))
 
-        # Circule to delimitate scene of trajectory plot
-    scene_limit = QGraphicsEllipseItem(-3, -3, 6, 6)  # x, y, width, height
-    scene_limit.setPen(pg.mkPen((255, 255, 255, 255), width=2))
+        # Square to delimitate floor of the scene
+    scene_limit = QGraphicsRectItem(-12.5, -12.5, 25, 25)
+    scene_limit.setPen(pg.mkPen((255,255,255,100), width=2))
     scene_limit.setBrush(pg.mkBrush(None))
 
-        # Square to delimitate the zone where de agent can appear (Currently not used)
-    square = QGraphicsRectItem(-2, -2, 4, 4)
-    square.setPen(pg.mkPen((255,255,255,100), width=1, style=QtCore.Qt.DashLine))
-    square.setBrush(pg.mkBrush(None))
-
         # Circule to delimitate the end condition of the episode (the goal to reach)
-    end_limit = QGraphicsEllipseItem(-2.5, -2.5, 5, 5)  # x, y, width, height
+    end_limit = QGraphicsEllipseItem(-11, -11, 22, 22)
     end_limit.setPen(pg.mkPen((0, 255, 0, 100), width=1, style=QtCore.Qt.DashLine))
     end_limit.setBrush(pg.mkBrush(None))
 
     plot_Trajectory.addItem(scene_limit)
-    plot_Trajectory.addItem(square)
     plot_Trajectory.addItem(end_limit)
 
-    plot_Trajectory.setRange(xRange=(-3,3), yRange=(-3,3), padding=None, update=True, disableAutoRange=True)
+    plot_Trajectory.setRange(xRange=(-14,14), yRange=(-14,14), padding=None, update=True, disableAutoRange=True)
 
         #Curves to update them in updatePlot()
     curve_Trajectory = plot_Trajectory.plot()
@@ -450,6 +461,7 @@ if __name__ == '__main__':
 
     ####Orientation plot
     plot_Orientation = grid_layout.addPlot(title="Target step rotation vs Agent's step rotation (°)", row=0, col=4)
+    plot_Orientation.addLegend(offset=(1, 1), verSpacing=-1)
     plot_Orientation.showGrid(x=True, y=True)
 
     curve_TargetRotation = plot_Orientation.plot(pen=(255,201,14), name='Target')
@@ -595,10 +607,10 @@ if __name__ == '__main__':
     grid_layout.ci.layout.setColumnMinimumWidth(3,300)
     grid_layout.ci.layout.setColumnMinimumWidth(4,300)
     grid_layout.ci.layout.setColumnMinimumWidth(5,300)
-    grid_layout.ci.layout.setRowMinimumHeight(0,335)
-    grid_layout.ci.layout.setRowMinimumHeight(1,335)
-    grid_layout.ci.layout.setRowMinimumHeight(2,335)
-    grid_layout.ci.layout.setHorizontalSpacing(10)
+    grid_layout.ci.layout.setRowMinimumHeight(0,315)
+    grid_layout.ci.layout.setRowMinimumHeight(1,315)
+    grid_layout.ci.layout.setRowMinimumHeight(2,315)
+    grid_layout.ci.layout.setHorizontalSpacing(5)
     grid_layout.ci.layout.setVerticalSpacing(0)
 
     #Timer to update plots every 1 second (if there is new data) in another thread
@@ -606,7 +618,8 @@ if __name__ == '__main__':
     timer.timeout.connect(updatePlot)
     timer.start(1000)
     
-    grid_layout.showMaximized()
+    
+    grid_layout.show()
 
     status = app.exec_()
     sys.exit(status)

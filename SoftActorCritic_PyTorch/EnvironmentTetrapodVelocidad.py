@@ -15,7 +15,7 @@ class Environment:
         self.obs_dim = obs_dim                                      # Observation dimension
         self.act_dim = act_dim                                      # Action dimension
         self.rwd_dim = rwd_dim                                      # Reward dimension
-        self.__end_cond = 11                                        # End condition
+        self.__end_cond = 11                                        # End condition (radius in meters)
         self.__obs = np.zeros((1,self.obs_dim))                     # Observed state
         self.__coppelia = CoppeliaSocket(obs_dim+sim_measurement)   # Socket to the simulated environment
 
@@ -39,7 +39,7 @@ class Environment:
         
         #Parameters for orientation reward
         self.rotation_penalty = 0
-        self.__vmin_rotation = -2.5
+        self.__vmin_rotation = -4
         self.__curvature_rotation = 4
         
         #Parameters for flat back reward
@@ -120,6 +120,12 @@ class Environment:
             '''Penalization for deviating from target step rotation'''
             # compute rotation made in one step:
             agent_rotation = next_obs[i,6] - obs[i,6]
+            #correct if there are any discontinuities:
+            if (next_obs[i,6] * obs[i,6] < 0) and (np.abs(next_obs[i,6]) > 100*np.pi/180):
+                
+                if next_obs[i,6] < 0: agent_rotation += 2*np.pi
+                else: agent_rotation -= 2*np.pi
+
             target_rotation = next_obs[i,7] * np.pi
 
             rotation_error = np.abs(target_rotation - agent_rotation)
