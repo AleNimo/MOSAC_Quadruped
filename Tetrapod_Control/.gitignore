@@ -179,3 +179,4 @@ generated/
 
 
 simulator/msvs/.vs
+/Debug/
