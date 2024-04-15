@@ -88,6 +88,8 @@ void Error_Handler(void);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
+#define SPI_Ready_Pin GPIO_PIN_7
+#define SPI_Ready_GPIO_Port GPIOD
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
 #define LD2_Pin GPIO_PIN_7

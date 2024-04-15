@@ -1,0 +1,27 @@
+--cpu=Cortex-M4.fp.sp
+"control_cuadrupedo_nucleof401re\startup_stm32f401xe.o"
+"control_cuadrupedo_nucleof401re\main.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_it.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_msp.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_spi.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_rcc.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_rcc_ex.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_flash.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_flash_ex.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_flash_ramfunc.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_gpio.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_dma_ex.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_dma.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_pwr.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_pwr_ex.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_cortex.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_exti.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_tim.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_tim_ex.o"
+"control_cuadrupedo_nucleof401re\stm32f4xx_hal_uart.o"
+"control_cuadrupedo_nucleof401re\system_stm32f4xx.o"
+--strict --scatter "Control_Cuadrupedo_NucleoF401RE\Control_Cuadrupedo_NucleoF401RE.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "Control_Cuadrupedo_NucleoF401RE.map" -o Control_Cuadrupedo_NucleoF401RE\Control_Cuadrupedo_NucleoF401RE.axf

@@ -31,7 +31,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define DATA_TX 0
+#define DATA_RX 1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,8 +45,6 @@ ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
 SPI_HandleTypeDef hspi3;
-DMA_HandleTypeDef hdma_spi3_tx;
-DMA_HandleTypeDef hdma_spi3_rx;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
@@ -56,10 +55,10 @@ UART_HandleTypeDef huart3;
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
+uint16_t buffer_out_spi[13] = {10,1,2,3,4,5,6,7,8,9,10,11,12};	//Target rotation, servo angles
+uint16_t buffer_in_spi[12] = {0};
 
-uint16_t joint_angle[12] = {0};
-
-uint16_t pwm_duty[12] = {0};
+//uint16_t joint_angle[12] = {0};
 
 /* USER CODE END PV */
 
@@ -139,14 +138,8 @@ int main(void)
   HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_4);
-
-
-  //HAL_ADC_Start_IT(&hadc1);
 	
-	
-	HAL_ADC_Start_DMA(&hadc1,(uint32_t*)joint_angle,12);		
-	
-	HAL_SPI_Receive_DMA(&hspi3,(uint8_t*)pwm_duty,24);
+	//HAL_ADC_Start_DMA(&hadc1,(uint32_t*)joint_angle,12);		
 	
 	
 
@@ -155,8 +148,28 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	uint8_t state = DATA_TX;
   while (1)
   {
+		switch(state)
+		{
+			case DATA_TX:
+				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
+				HAL_Delay(100);
+				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET);	//POSIBLE PROBLEMA ACÁ (tiempo que tarda el master en iniciar desde que lee el 1 en el GPIO)
+				HAL_SPI_Transmit(&hspi3, (uint8_t*) buffer_out_spi, 13, HAL_MAX_DELAY);
+				
+				state = DATA_RX;
+				break;
+			case DATA_RX:
+				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
+				HAL_Delay(100);
+				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET);	//IDEM PROBLEMA ANTERIOR
+				HAL_SPI_Receive(&hspi3, (uint8_t*) buffer_in_spi, 12, HAL_MAX_DELAY);
+			
+				state = DATA_TX;
+				break;
+		}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -688,15 +701,8 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
-  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
-  /* DMA1_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
-  /* DMA1_Stream5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA2_Stream4_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream4_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream4_IRQn);
@@ -728,6 +734,9 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
+
   /*Configure GPIO pin : USER_Btn_Pin */
   GPIO_InitStruct.Pin = USER_Btn_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
@@ -754,6 +763,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USB_OverCurrent_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : SPI_Ready_Pin */
+  GPIO_InitStruct.Pin = SPI_Ready_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(SPI_Ready_GPIO_Port, &GPIO_InitStruct);
+
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
@@ -764,22 +780,26 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-
+/*
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 
 	if(hadc == &hadc1)
 	{
-		HAL_SPI_Transmit_DMA(&hspi3,(uint8_t*)joint_angle,24);
+		//HAL_SPI_Transmit_DMA(&hspi3,(uint8_t*)prueba,12);
+		//HAL_SPI_Receive_DMA(&hspi3,(uint8_t*)pwm_duty,12);
 	}
-	
+
 }
 uint8_t start_conversion = 0;
+uint8_t rx = 0;
+
+
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
 	if(hspi == &hspi3)
 	{
-		start_conversion = 1;				
+		tx = 1;
 
 	}
 }
@@ -788,11 +808,18 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 {
 	if(hspi == &hspi3)
 	{
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pwm_duty[0]);
-		
-		HAL_SPI_Receive_DMA(&hspi3,(uint8_t*)pwm_duty,24);			
-		
+		//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pwm_duty[0]);
+		rx = 1;
+		//HAL_SPI_Receive_DMA(&hspi3,(uint8_t*)pwm_duty,12);
+	}
+}
 
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+	if(hspi == &hspi3)
+	{
+		rx = 1;
+		
 	}
 }
 
@@ -801,19 +828,18 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 
     if(GPIO_Pin == USER_Btn_Pin)
-    {			
-				if(start_conversion == 1)
-				{					
-					HAL_ADC_Start_DMA(&hadc1,(uint32_t*)joint_angle,12);
-					start_conversion = 0;	
-				}
-			
+    {
+			HAL_SPI_Transmit(&hspi3, (uint8_t*) buffer_out_spi, 13, HAL_MAX_DELAY);
+			//HAL_SPI_TransmitReceive(&hspi3, (uint8_t*)prueba, (uint8_t*)pwm_duty, 12, HAL_MAX_DELAY);
     }
 		
+		if(GPIO_Pin == Slave_ready_Pin)
+		{
+			HAL_SPI_Receive(&hspi3, (uint8_t*) buffer_in_spi, 12, HAL_MAX_DELAY);
+		}
+		
 }
-
-
-
+*/
 /* USER CODE END 4 */
 
 /**
