@@ -48,7 +48,7 @@ SPI_HandleTypeDef hspi2;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-uint16_t buffer_in_spi[12] = {0};
+uint16_t buffer_in_spi[13] = {0};
 uint16_t buffer_out_spi[12] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};	//Actions
 
 //uint16_t joint_angle[12] = {0};
