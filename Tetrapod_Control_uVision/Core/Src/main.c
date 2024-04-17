@@ -21,7 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <math.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,8 +32,14 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define DATA_TX 0
-#define DATA_RX 1
+//states
+#define TX_RASPBERRY 0
+#define RX_RASPBERRY 1
+#define STEP				 3
+
+//Parameters of the time-out algorithm
+#define MAX_DELTA_TIME	50000	//microseconds
+#define MAX_DELTA_ANGLE	0.02	//radians
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -49,6 +56,7 @@ SPI_HandleTypeDef hspi3;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim5;
 
 UART_HandleTypeDef huart3;
 
@@ -56,9 +64,14 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
 uint16_t buffer_out_spi[5] = {1,3,5,7,9};	//Target rotation, servo angles
-uint16_t buffer_in_spi[5] = {0};
+uint16_t target_joint_angle[12] = {0};	//Buffer in SPI
 
-//uint16_t joint_angle[12] = {0};
+uint8_t conv_cplt = 0;
+uint16_t joint_angle[12] = {0};	//ADC measurement
+uint16_t last_joint_angle[12] = {0};
+
+uint32_t time = 0;
+uint32_t last_time = 0;
 
 /* USER CODE END PV */
 
@@ -73,6 +86,7 @@ static void MX_ADC1_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_SPI3_Init(void);
+static void MX_TIM5_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -119,6 +133,7 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM4_Init();
   MX_SPI3_Init();
+  MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
 	HAL_TIM_Base_Start(&htim2);
 	HAL_TIM_Base_Start(&htim2);
@@ -139,35 +154,64 @@ int main(void)
   HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_4);
 	
-	//HAL_ADC_Start_DMA(&hadc1,(uint32_t*)joint_angle,12);		
 	
-	
-
+	HAL_TIM_Base_Stop(&htim5);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	uint8_t state = DATA_TX;
+	//For state machine
+	uint8_t state = TX_RASPBERRY;
+	
+	//For step time-out algorithm
+	uint8_t joint;	//index
+	uint16_t delta = 0;
+	
   while (1)
   {
 		switch(state)
 		{
-			case DATA_TX:
+			case TX_RASPBERRY:
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
 				HAL_Delay(100);
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET);	//POSIBLE PROBLEMA ACÁ (tiempo que tarda el master en iniciar desde que lee el 1 en el GPIO)
 				HAL_SPI_Transmit(&hspi3, (uint8_t*) buffer_out_spi, 5, HAL_MAX_DELAY);
 				
-				state = DATA_RX;
+				state = RX_RASPBERRY;
 				break;
-			case DATA_RX:
+			case RX_RASPBERRY:
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
 				HAL_Delay(100);
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET);	//IDEM PROBLEMA ANTERIOR
-				HAL_SPI_Receive(&hspi3, (uint8_t*) buffer_in_spi, 5, HAL_MAX_DELAY);
+				HAL_SPI_Receive(&hspi3, (uint8_t*) target_joint_angle, 12, HAL_MAX_DELAY);
 			
-				state = DATA_TX;
+				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, target_joint_angle[0]);	//EVALUAR SI LOS SERVOS SE MANEJAN ABRUPTAMENTE (TARGET DE UNA) O DE FORMA SUAVIZADA
+			
+				HAL_ADC_Start_DMA(&hadc1,(uint32_t*)last_joint_angle,12);
+			
+				HAL_TIM_Base_Start(&htim5);
+				last_time = __HAL_TIM_GetCounter(&htim5);
+			
+				state = STEP;
+				break;
+			case STEP:
+				if(conv_cplt == 1)	//if there is new data
+				{
+					conv_cplt = 0;
+					HAL_ADC_Start_DMA(&hadc1,(uint32_t*)joint_angle,12);	//start new convertion for next evaluation
+					time = __HAL_TIM_GetCounter(&htim5);
+			
+					if(time >= (last_time + MAX_DELTA_TIME))
+					{
+						last_time = time;
+						for(joint=0; joint<12; joint++)
+						{
+
+						}
+					}
+
+				}
 				break;
 		}
     /* USER CODE END WHILE */
@@ -625,6 +669,51 @@ static void MX_TIM4_Init(void)
 }
 
 /**
+  * @brief TIM5 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM5_Init(void)
+{
+
+  /* USER CODE BEGIN TIM5_Init 0 */
+
+  /* USER CODE END TIM5_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM5_Init 1 */
+
+  /* USER CODE END TIM5_Init 1 */
+  htim5.Instance = TIM5;
+  htim5.Init.Prescaler = 96-1;
+  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim5.Init.Period = 4294967295;
+  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM5_Init 2 */
+
+  /* USER CODE END TIM5_Init 2 */
+
+}
+
+/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -780,17 +869,27 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-/*
+uint8_t first_measurement = 1;
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 
 	if(hadc == &hadc1)
 	{
-		//HAL_SPI_Transmit_DMA(&hspi3,(uint8_t*)prueba,12);
-		//HAL_SPI_Receive_DMA(&hspi3,(uint8_t*)pwm_duty,12);
+		if(first_measurement)
+		{
+			first_measurement = 0;
+			memcpy(last_joint_angle, joint_angle, 12*2);
+			
+		}
+		else
+		{
+			conv_cplt = 1;
+		}
 	}
 
 }
+
+/*
 uint8_t start_conversion = 0;
 uint8_t rx = 0;
 
