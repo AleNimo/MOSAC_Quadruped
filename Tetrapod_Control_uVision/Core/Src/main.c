@@ -55,8 +55,8 @@ UART_HandleTypeDef huart3;
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
-uint16_t buffer_out_spi[13] = {10,1,2,3,4,5,6,7,8,9,10,11,12};	//Target rotation, servo angles
-uint16_t buffer_in_spi[12] = {0};
+uint16_t buffer_out_spi[5] = {1,3,5,7,9};	//Target rotation, servo angles
+uint16_t buffer_in_spi[5] = {0};
 
 //uint16_t joint_angle[12] = {0};
 
@@ -157,7 +157,7 @@ int main(void)
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
 				HAL_Delay(100);
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET);	//POSIBLE PROBLEMA ACÁ (tiempo que tarda el master en iniciar desde que lee el 1 en el GPIO)
-				HAL_SPI_Transmit(&hspi3, (uint8_t*) buffer_out_spi, 13, HAL_MAX_DELAY);
+				HAL_SPI_Transmit(&hspi3, (uint8_t*) buffer_out_spi, 5, HAL_MAX_DELAY);
 				
 				state = DATA_RX;
 				break;
@@ -165,7 +165,7 @@ int main(void)
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
 				HAL_Delay(100);
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET);	//IDEM PROBLEMA ANTERIOR
-				HAL_SPI_Receive(&hspi3, (uint8_t*) buffer_in_spi, 12, HAL_MAX_DELAY);
+				HAL_SPI_Receive(&hspi3, (uint8_t*) buffer_in_spi, 5, HAL_MAX_DELAY);
 			
 				state = DATA_TX;
 				break;

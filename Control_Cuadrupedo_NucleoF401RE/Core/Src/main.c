@@ -48,8 +48,8 @@ SPI_HandleTypeDef hspi2;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-uint16_t buffer_in_spi[13] = {0};
-uint16_t buffer_out_spi[12] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};	//Actions
+uint16_t buffer_in_spi[5] = {0};
+//uint16_t buffer_out_spi[5] = {0};	//Actions
 
 //uint16_t joint_angle[12] = {0};
 
@@ -114,7 +114,8 @@ int main(void)
 			case WAITING_NUCLEO_DATA:
 				if(HAL_GPIO_ReadPin(SPI_Ready_GPIO_Port, SPI_Ready_Pin) == 1)
 				{
-					HAL_SPI_Receive(&hspi2, (uint8_t*)buffer_in_spi, 13, HAL_MAX_DELAY);
+					//HAL_Delay(100);
+					HAL_SPI_Receive(&hspi2, (uint8_t*)buffer_in_spi, 5, HAL_MAX_DELAY);
 					state = WAITING_FALLING_EDGE;
 				}
 				break;
@@ -127,7 +128,8 @@ int main(void)
 			case WAITING_TO_TX:
 				if(HAL_GPIO_ReadPin(SPI_Ready_GPIO_Port, SPI_Ready_Pin) == 1)
 				{
-					HAL_SPI_Transmit(&hspi2, (uint8_t*)buffer_out_spi, 12, HAL_MAX_DELAY);
+					//HAL_Delay(100);
+					HAL_SPI_Transmit(&hspi2, (uint8_t*)buffer_in_spi, 5, HAL_MAX_DELAY);
 					state = WAITING_FALLING_EDGE_2;
 				}
 				break;
