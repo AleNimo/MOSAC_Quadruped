@@ -32,19 +32,35 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define M_PI 3.14159265358979323846
+
+//Number of joints
+#define JOINTS 1
+
+//Number of ADC measurements for average
+#define N_SAMPLES 10
+
 //states
 #define TX_RASPBERRY 0
 #define RX_RASPBERRY 1
 #define STEP				 3
 
+//Parameters to transform voltage from pot to Radians
+#define K_POT 68.027*M_PI/180
+#define BIAS_POT -23.4354*M_PI/180
+
+//Parameters to transform Radians values to PWM (Ton in microseconds)
+#define K_TON 100.0/9.0 * (180/M_PI)
+#define BIAS_TON	500
+
 //Parameters of the time-out algorithm
-#define MAX_DELTA_TIME	50000	//microseconds
-#define MAX_DELTA_ANGLE	0.02	//radians
+#define MAX_DELTA_TIME	100	//miliseconds	(150 microseconds is the delay between 2 average measurements)
+#define MAX_DELTA_ANGLE	0.035	//radians		(960 micro radians is the quantum of the ADC in angle. 680 micro radians is the minimum change detectable measuring with 150us of delay and the speed of the servo)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define __round(x) ((x)>=0?(uint16_t)((x)+0.5):(uint16_t)((x)-0.5))
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -63,15 +79,44 @@ UART_HandleTypeDef huart3;
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
-uint16_t buffer_out_spi[5] = {1,3,5,7,9};	//Target rotation, servo angles
-uint16_t target_joint_angle[12] = {0};	//Buffer in SPI
-
+//Flags globales
+uint8_t init_last_joint_angle = 0;
 uint8_t conv_cplt = 0;
-uint16_t joint_angle[12] = {0};	//ADC measurement
-uint16_t last_joint_angle[12] = {0};
+uint8_t angulo_ready = 0;
 
-uint32_t time = 0;
-uint32_t last_time = 0;
+//Buffers globales
+//	SPI (SI NO USAMOS DMA NO HACE FALTA GLOBAL)
+uint16_t buffer_out_spi[12] = {1,3,5,7,9};	//Target rotation, servo angles
+float target_joint_angle[12] = {0};	//Buffer in SPI
+
+//	ADC-DMA
+uint16_t joint_angle_dma[12] = {0};	//ADC measurement with DMA
+
+uint32_t joint_angle[12] = {0};	//Accumulator for average
+
+uint32_t last_joint_angle[12] = {0};
+
+
+uint8_t cant_med = 0;
+
+//Ticks de timer
+uint16_t time = 0;
+
+//VARIABLES PARA DEBUG///////
+uint16_t delay_button = 0;
+//uint32_t counter = 0;
+//uint32_t last_counter = 0;
+//uint32_t delay_counter = 0;
+/////////////////////////////
+
+
+
+//VARIABLES QUE NO DEBEN SER GLOBALES
+uint8_t any_stopped_joint = 0;
+float delta = 0;
+float f_joint_angle = 0;
+float f_last_joint_angle = 0;
+uint8_t counter_target_reached = 0;
 
 /* USER CODE END PV */
 
@@ -88,7 +133,8 @@ static void MX_TIM4_Init(void);
 static void MX_SPI3_Init(void);
 static void MX_TIM5_Init(void);
 /* USER CODE BEGIN PFP */
-
+float adc2rad(uint32_t);
+uint16_t rad2ton_us(float);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -154,63 +200,118 @@ int main(void)
   HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_4);
 	
-	
-	HAL_TIM_Base_Stop(&htim5);
+	HAL_TIM_Base_Start_IT(&htim5);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	
 	//For state machine
 	uint8_t state = TX_RASPBERRY;
 	
 	//For step time-out algorithm
 	uint8_t joint;	//index
-	uint16_t delta = 0;
+
+	uint8_t target_reached;
+	
+	
 	
   while (1)
   {
 		switch(state)
 		{
 			case TX_RASPBERRY:
+				//Request master to transmit target step rotation and joint angles
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
 				HAL_Delay(100);
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET);	//POSIBLE PROBLEMA ACÁ (tiempo que tarda el master en iniciar desde que lee el 1 en el GPIO)
-				HAL_SPI_Transmit(&hspi3, (uint8_t*) buffer_out_spi, 5, HAL_MAX_DELAY);
-				
+				//HAL_SPI_Transmit(&hspi3, (uint8_t*) buffer_out_spi, 5, HAL_MAX_DELAY);
+			
 				state = RX_RASPBERRY;
 				break;
 			case RX_RASPBERRY:
+				//Request master to receive the next action
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
 				HAL_Delay(100);
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET);	//IDEM PROBLEMA ANTERIOR
-				HAL_SPI_Receive(&hspi3, (uint8_t*) target_joint_angle, 12, HAL_MAX_DELAY);
+				//HAL_SPI_Receive(&hspi3, (uint8_t*) target_joint_angle, sizeof(target_joint_angle), HAL_MAX_DELAY);
 			
-				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, target_joint_angle[0]);	//EVALUAR SI LOS SERVOS SE MANEJAN ABRUPTAMENTE (TARGET DE UNA) O DE FORMA SUAVIZADA
-			
-				HAL_ADC_Start_DMA(&hadc1,(uint32_t*)last_joint_angle,12);
-			
-				HAL_TIM_Base_Start(&htim5);
-				last_time = __HAL_TIM_GetCounter(&htim5);
-			
-				state = STEP;
+				if(angulo_ready)
+				{
+					//Update PWM of the servos
+					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, rad2ton_us(target_joint_angle[0]));	//EVALUAR SI LOS SERVOS SE MANEJAN ABRUPTAMENTE (TARGET DE UNA) O DE FORMA SUAVIZADA
+				
+					//Initialize last_joints to compute the deltas in the next state
+					init_last_joint_angle = 1;
+					HAL_ADC_Start_DMA(&hadc1,(uint32_t*)joint_angle_dma,12);
+					time = MAX_DELTA_TIME;
+					state = STEP;
+					angulo_ready = 0;
+					HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 0);
+					HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0);
+				}
 				break;
 			case STEP:
 				if(conv_cplt == 1)	//if there is new data
 				{
 					conv_cplt = 0;
-					HAL_ADC_Start_DMA(&hadc1,(uint32_t*)joint_angle,12);	//start new convertion for next evaluation
-					time = __HAL_TIM_GetCounter(&htim5);
-			
-					if(time >= (last_time + MAX_DELTA_TIME))
+					//Check if all joints reached the target
+					target_reached = 1;
+					for(joint = 0; joint < JOINTS; joint++)
 					{
-						last_time = time;
-						for(joint=0; joint<12; joint++)
+						f_joint_angle = adc2rad(joint_angle[joint]);
+						delta = fabs( f_joint_angle - target_joint_angle[joint] );
+						
+						if(delta > MAX_DELTA_ANGLE) target_reached = 0;
+					}
+					
+					if(target_reached)
+					{
+						counter_target_reached++;
+						
+						if(counter_target_reached == 10)
 						{
-
+							counter_target_reached = 0;
+							HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 1);
+							state = TX_RASPBERRY;
+							break;
+						}
+						else
+							time = MAX_DELTA_TIME;
+					}
+					else	//TIME-OUT detection
+					{
+						counter_target_reached = 0;
+						any_stopped_joint = 0;
+						for(joint = 0; joint < JOINTS; joint++)
+						{
+							f_joint_angle = adc2rad(joint_angle[joint]);
+							f_last_joint_angle = adc2rad(last_joint_angle[joint]);
+							
+							delta = fabs( f_joint_angle - f_last_joint_angle );
+							
+							if(delta < MAX_DELTA_ANGLE) any_stopped_joint = 1;
+						}
+						if(any_stopped_joint)
+						{
+							if(time==0)
+							{
+								__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
+								HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 1);
+								state = TX_RASPBERRY;
+								break;
+							}
+						}
+						else
+						{
+							time = MAX_DELTA_TIME;
+							memcpy(last_joint_angle, joint_angle, sizeof(joint_angle));
 						}
 					}
-
+					
+					memset(joint_angle, 0, sizeof(joint_angle));	//Reset accumulator before next measurement
+					HAL_ADC_Start_DMA(&hadc1,(uint32_t*)joint_angle_dma,12);
 				}
 				break;
 		}
@@ -500,13 +601,14 @@ static void MX_TIM2_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 500;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
+  sConfigOC.Pulse = 0;
   if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
@@ -689,7 +791,7 @@ static void MX_TIM5_Init(void)
   htim5.Instance = TIM5;
   htim5.Init.Prescaler = 96-1;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim5.Init.Period = 4294967295;
+  htim5.Init.Period = 1000;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
@@ -869,76 +971,88 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-uint8_t first_measurement = 1;
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 
 	if(hadc == &hadc1)
-	{
-		if(first_measurement)
+	{	
+		cant_med++;
+		
+		for(uint8_t joint=0; joint<JOINTS; joint++) joint_angle[joint] += joint_angle_dma[joint];
+
+		if(cant_med == N_SAMPLES)
 		{
-			first_measurement = 0;
-			memcpy(last_joint_angle, joint_angle, 12*2);
-			
+			/*Para medir tiempo entre muestras promediadas en microsegundos
+			counter = __HAL_TIM_GetCounter(&htim5);
+			delay_counter = counter - last_counter;
+			last_counter = counter;
+			*/
+
+			//reset counter and accumulator
+			cant_med = 0;
+
+			if(init_last_joint_angle)
+			{
+				init_last_joint_angle = 0;
+				
+				memcpy(last_joint_angle, joint_angle, sizeof(joint_angle));
+				
+				HAL_ADC_Start_DMA(&hadc1,(uint32_t*)joint_angle_dma,12);
+			}
+			else
+				conv_cplt = 1;
 		}
 		else
 		{
-			conv_cplt = 1;
+			HAL_ADC_Start_DMA(&hadc1,(uint32_t*)joint_angle_dma,12);
 		}
 	}
-
 }
 
-/*
-uint8_t start_conversion = 0;
-uint8_t rx = 0;
-
-
-void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if(hspi == &hspi3)
+	if(htim == &htim5)
 	{
-		tx = 1;
-
+		if(time > 0) time--;
+		if(delay_button > 0) delay_button--;
 	}
 }
 
-void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
-{
-	if(hspi == &hspi3)
-	{
-		//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pwm_duty[0]);
-		rx = 1;
-		//HAL_SPI_Receive_DMA(&hspi3,(uint8_t*)pwm_duty,12);
-	}
-}
-
-void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
-{
-	if(hspi == &hspi3)
-	{
-		rx = 1;
-		
-	}
-}
-
+int8_t sign = 1;
+uint16_t ton;
+float angulo_salida = 0;
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-
     if(GPIO_Pin == USER_Btn_Pin)
     {
-			HAL_SPI_Transmit(&hspi3, (uint8_t*) buffer_out_spi, 13, HAL_MAX_DELAY);
-			//HAL_SPI_TransmitReceive(&hspi3, (uint8_t*)prueba, (uint8_t*)pwm_duty, 12, HAL_MAX_DELAY);
+			if(delay_button == 0)
+			{
+				if(angulo_salida >= M_PI) sign = -1;
+				else if(angulo_salida <= 0) sign = 1;
+				angulo_salida += sign*9.0* M_PI/180;
+				
+				target_joint_angle[0] = angulo_salida;
+				
+				angulo_ready = 1;
+				
+				delay_button = 500;
+			}
     }
-		
-		if(GPIO_Pin == Slave_ready_Pin)
-		{
-			HAL_SPI_Receive(&hspi3, (uint8_t*) buffer_in_spi, 12, HAL_MAX_DELAY);
-		}
-		
 }
-*/
+
+//Convert ADC_value of ACCUMULATED measurement to angle in radians
+float adc2rad(uint32_t adc_value)
+{
+	float v_pot = (adc_value * 3.3 / 4095) / N_SAMPLES;
+	return v_pot * K_POT + BIAS_POT;
+}
+uint16_t rad2ton_us(float rad_value)
+{
+	return __round(rad_value * K_TON + BIAS_TON);
+}
+
+
 /* USER CODE END 4 */
 
 /**

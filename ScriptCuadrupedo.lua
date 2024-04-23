@@ -1,4 +1,5 @@
--- sim.adjustView
+testing = true
+
 function createAgent ()
     -- Restore the agent
     agent=sim.loadModel(agentData)
@@ -56,9 +57,29 @@ function destroyAgent ()
     sim.removeModel(agent)
 end
 
+function sliderChange(ui,id,newVal)
+    targetRotSlider = newVal
+end
+
 function sysCall_init() -- Executed when the scene is loaded
     sim = require('sim')
     simIK = require('simIK')
+    
+    if testing then
+        --Slider for selecting target step rotation when testing
+        simUI=require('simUI')
+
+        xml = [[
+            <ui title="Target Rotation Step" size="500,50" closeable="true" resizable="true">
+                <label text="" id="1" wordwrap="true" />
+                <hslider tick-position="above" tick-interval="1" minimum="-10" maximum="10" on-change="sliderChange" />
+            </ui>
+        ]]
+
+        ui=simUI.create(xml)
+        simUI.setLabelText(ui,1,string.format('Target Step Rotation = 0 %s', utf8.char(176)))
+        targetRotSlider = 0
+    end
 
     local HOST, PORT = "127.0.0.1", 57175
     local socket = require('socket')
@@ -305,14 +326,20 @@ function sysCall_actuation()
         --Target Rotation for the step
         client:send(string.format(Tx_float_length, target_step_rotation))
         
-        --Generate next random target step rotation (std = 30°)
-        if (step_counter >= 250) and (step_counter % 10 == 0) then
-            local u1 = math.random() --uniform distribution
-            local u2 = math.random()
-            target_step_rotation = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2) * 1/12 --Gaussian distribution (0 mean and 1/12 std -> 15°)
+        if testing then
+            --Use value from slider (converting to radians normalized by pi)
+            simUI.setLabelText(ui,1,string.format('Target Step Rotation = %d %s',targetRotSlider, utf8.char(176)))
+            target_step_rotation = targetRotSlider / 180
+        else
+            --Generate next random target step rotation (std = 5?)
+            if (step_counter >= 50) and (step_counter % 50 == 0) then
+                local u1 = math.random() --uniform distribution
+                local u2 = math.random()
+                target_step_rotation = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2) * 1/36 --Gaussian distribution (0 mean and 1/36 std -> 5?)
 
-            --Clip the target step rotation to +/- 30°
-            target_step_rotation = math.max(-1/6, math.min(1/6, target_step_rotation))
+                --Clip the target step rotation to +/- 10?
+                target_step_rotation = math.max(-1/18, math.min(1/18, target_step_rotation))
+            end
         end
 
         --Pitch and roll angles of the back (world reference)
@@ -488,13 +515,12 @@ end
 function sysCall_afterSimulation() -- Executed just before the simulation ends
     -- Destroy the inverse kinematics environment
     if state ~= 3 then simIK.eraseEnvironment(ikEnv) end
-
-    collectgarbage()
 end
 
 function sysCall_cleanup() -- Executed when the scene is closed
     -- Close the communication socket
     client:close()
+    simUI.destroy(ui)
 end
 
 function sysCall_nonSimulation() -- Executed when the simulation is not running
