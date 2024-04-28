@@ -26,7 +26,8 @@ const uint16_t ADC_VALUES[2][21] =
 		30290,
 		31843,
 		33341,
-		35009
+		35009,
+		36182
 	},
 	//servo going up
 	{
