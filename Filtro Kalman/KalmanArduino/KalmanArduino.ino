@@ -248,8 +248,8 @@ void setup() {
   fir_wy.setFilterCoeffs(coef_w);
   fir_wz.setFilterCoeffs(coef_w);
 
-  Wire.begin(0x1);  
-  Wire.onRequest(Send_IMU);
+  Wire.begin(0x1);            //I2C communication
+  Wire.onRequest(Send_IMU);   //Function to call when master starts communication
 
 
 }
@@ -452,10 +452,10 @@ Matrix<4,1,double>Euler3212EP(Matrix<3,1,double> e)
 void Send_IMU(void)
 {
   
-  imu_data[0] = roll;
-  imu_data[1] = pitch;
-  imu_data[2] = wx;
-  imu_data[3] = wy;
+  imu_data[0] = pitch;
+  imu_data[1] = roll;
+  imu_data[2] = wy;
+  imu_data[3] = wx;
 
   Serial.print(imu_data[0],10);
   Serial.print(",");
@@ -471,5 +471,5 @@ void Send_IMU(void)
   byte imu_data[16] = {0};
   for(char i = 0 ; i<16;i++) imu_data[i] = i;
   */
-  Wire.write((byte*)imu_data,sizeof(imu_data));  
+  Wire.write((byte*)imu_data,sizeof(imu_data));
 }

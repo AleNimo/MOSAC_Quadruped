@@ -23,7 +23,7 @@ function createAgent ()
     tip[4],target[4] = sim.getObject("/TipBL"),sim.getObject("/TargetBL")
     
     -- Get sensor readings
-    -- quadrupedScript = sim.getScript(sim.scripttype_childscript, agent)
+    quadrupedScript = sim.getScript(sim.scripttype_childscript, agent)
     
     --sim.shapeintparam_respondable_mask
     --local res,collPair=sim.checkCollision(h,sim.handle_all)
@@ -139,7 +139,7 @@ function sysCall_init() -- Executed when the scene is loaded
     target = {}
     
     -- Load the agent's model
-    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_short_leg.ttm')
+    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_short_leg_kalman.ttm')
     -- agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Quadruped_long_leg.ttm')
 
     -- Save the agent's model
@@ -178,19 +178,8 @@ function sysCall_init() -- Executed when the scene is loaded
     lateral_acceleration = 0
     max_forward_acc = 0
 
-    -- kalman_graph = sim.getObject('/Kalman_graph')
-    -- accel_corr_graph = sim.getObject('/Acc_corr_graph')
-    -- vel_graph = sim.getObject('/Vel_graph')
-
-    -- yaw_stream = sim.addGraphStream(kalman_graph, 'yaw_copp', 'rad', 0, {1, 1, 0})
-    -- pitch_stream = sim.addGraphStream(kalman_graph, 'pitch_copp', 'rad', 0, {0, 1, 1})
-    -- roll_stream = sim.addGraphStream(kalman_graph, 'roll_copp', 'rad', 0, {1, 0, 1})
-
-    -- x_accel_corr = sim.addGraphStream(accel_corr_graph, 'x_accel_copp', 'm/s^2', 0, {1, 1, 0})
-    -- y_accel_corr = sim.addGraphStream(accel_corr_graph, 'y_accel_copp', 'm/s^2', 0, {0, 1, 1})
-
-    -- x_vel = sim.addGraphStream(vel_graph, 'x_vel_copp', 'm/s', 0, {1, 1, 0})
-    -- y_vel = sim.addGraphStream(vel_graph, 'y_vel_copp', 'm/s', 0, {0, 1, 1})
+    attitude = {0, 0}
+    ang_vel = {0, 0}
 end
 
 function sysCall_sensing() -- Executed every simulation step
@@ -247,6 +236,10 @@ function sysCall_sensing() -- Executed every simulation step
         mean_lateral_velocity = 1/(vel_samples + 1) * (mean_lateral_velocity * vel_samples + lateral_velocity)
 
         vel_samples = vel_samples + 1
+
+        attitude = sim.callScriptFunction('getAttitude', quadrupedScript)
+
+        ang_vel = sim.callScriptFunction('getAngularVelocities', quadrupedScript)
 
         if step_completed == true then
 
@@ -341,17 +334,13 @@ function sysCall_actuation()
                 target_step_rotation = math.max(-1/18, math.min(1/18, target_step_rotation))
             end
         end
-
         --Pitch and roll angles of the back (world reference)
-        client:send(string.format(Tx_float_length, data[1]/math.pi)) --pitch angle
-        client:send(string.format(Tx_float_length, data[2]/math.pi)) --roll angle
-        -- client:send(string.format(Tx_float_length, attitude[2]/math.pi)) --pitch angle
-        -- client:send(string.format(Tx_float_length, attitude[3]/math.pi)) --roll angle
+        client:send(string.format(Tx_float_length, attitude[1]/math.pi)) --pitch angle
+        client:send(string.format(Tx_float_length, attitude[2]/math.pi)) --roll angle
 
         --Pitch and roll angular velocities of the back (world reference)
-        _, data = sim.getObjectVelocity(agent)
-        client:send(string.format(Tx_float_length, data[1]/math.pi)) --pitch angular_vel
-        client:send(string.format(Tx_float_length, data[2]/math.pi)) --roll angular_vel
+        client:send(string.format(Tx_float_length, ang_vel[1]/math.pi)) --pitch angular_vel
+        client:send(string.format(Tx_float_length, ang_vel[2]/math.pi)) --roll angular_vel
 
         --Joints angular positions
         for i=1,joints_number,1 do
