@@ -2,7 +2,7 @@ import os
 import numpy as np
 import torch
 from SAC import SAC_Agent
-from EnvironmentTetrapodVelocidad import Environment
+from Environment import Environment
 from TrainHistory import TrainHistory
 
 import multiprocessing
@@ -42,21 +42,21 @@ def SAC_Agent_Training(q):
         #yaw of the agent's body
         
         #---- The last 17 seen by the agent in the state vector (observation dimension)------------------------------
-        #yaw of the agent's body
+        #target step rotation of the agent's body
         #pitch and roll of the agent's body
         #pitch and roll angular velocities of the agent's body
         #the 12 joint angles
 
     load_agent = True
-    test_agent = False
+    test_agent = True
     load_replay_buffer_and_history = True   #if test_agent == True, only the train history is loaded (the replay_buffer is not used)
     
     episodes = 20000
-    episode_steps = 500 #Maximum steps allowed per episode
+    episode_steps = 200 #Maximum steps allowed per episode
     save_period = 500
 
-    #Preference vector maximum and minimum values
-    pref_max_vector = np.array([2, 1, 1, 1, 1])
+    #Preference vector maximum and minimum values - [vel_forward, acceleration, vel_lateral, orientation, flat_back]
+    pref_max_vector = np.array([2, 1, 1, 2, 1])
     pref_min_vector = np.array([0.5, 0, 0, 0, 0])
     pref_dim = pref_max_vector.size
 
@@ -94,8 +94,8 @@ def SAC_Agent_Training(q):
 
         # Testing
         if test_agent:
-            #Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back] all values [0;pref_max_value)
-            pref = np.array([[0.5,1,1,1,1]])
+            #Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back]
+            pref = np.array([[1,1,1,1,1]])
             print("Preference vector: ", pref)
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
