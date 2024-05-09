@@ -1,4 +1,4 @@
-testing = true
+testing = false
 
 function createAgent ()
     -- Restore the agent
@@ -139,7 +139,7 @@ function sysCall_init() -- Executed when the scene is loaded
     target = {}
     
     -- Load the agent's model
-    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/Models/Quadruped_kalman.ttm')
+    agent=sim.loadModel(sim.getStringParam(sim.stringparam_scene_path)..'/../Models/Quadruped_kalman.ttm')
 
     -- Save the agent's model
     agentData = sim.saveModel(agent)
@@ -149,12 +149,14 @@ function sysCall_init() -- Executed when the scene is loaded
     state = 0 -- state 0 = idle / 1 = moving to intermediate position / 2 = moving to target position / 3 = reset
     r = 0.025
 
-    -- Initialize the pseudo random number generator for the random target direction
+    -- Initialize the pseudo random number generator
     math.randomseed( os.time() )
     math.random(); math.random(); math.random()
 
     -- Random Target step rotation for the step:
     target_step_rotation = 0
+
+    JOINT_MAX_NOISE = 3 --degrees
 
     agentCreated = false --To measure velocity only when there is an agent created (not between episodes where the agent is destroyed)
     step_completed = false --To compute the mean velocities only when each step is completed
@@ -343,7 +345,8 @@ function sysCall_actuation()
 
         --Joints angular positions
         for i=1,joints_number,1 do
-            jointPos[i] = (sim.getJointPosition(joint[i]) - (jointUpperLimit[i]+jointLowerLimit[i])/2) / ((jointUpperLimit[i]-jointLowerLimit[i])/2)
+            added_noise = (math.random() * 2 - 1) * JOINT_MAX_NOISE * math.pi/180   -- [-JOINT_MAX_NOISE;JOINT_MAX_NOISE] in radians
+            jointPos[i] = (sim.getJointPosition(joint[i]) + added_noise - (jointUpperLimit[i]+jointLowerLimit[i])/2) / ((jointUpperLimit[i]-jointLowerLimit[i])/2)
             client:send(string.format(Tx_float_length, jointPos[i]))
         end
 
@@ -508,7 +511,7 @@ end
 function sysCall_cleanup() -- Executed when the scene is closed
     -- Close the communication socket
     client:close()
-    simUI.destroy(ui)
+    if testing then simUI.destroy(ui) end
 end
 
 function sysCall_nonSimulation() -- Executed when the simulation is not running
