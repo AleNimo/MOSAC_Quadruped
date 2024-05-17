@@ -345,8 +345,10 @@ function sysCall_actuation()
 
         --Joints angular positions
         for i=1,joints_number,1 do
-            added_noise = (math.random() * 2 - 1) * JOINT_MAX_NOISE * math.pi/180   -- [-JOINT_MAX_NOISE;JOINT_MAX_NOISE] in radians
-            jointPos[i] = (sim.getJointPosition(joint[i]) + added_noise - (jointUpperLimit[i]+jointLowerLimit[i])/2) / ((jointUpperLimit[i]-jointLowerLimit[i])/2)
+            --without noise in joints for now
+            --added_noise = (math.random() * 2 - 1) * JOINT_MAX_NOISE * math.pi/180   -- [-JOINT_MAX_NOISE;JOINT_MAX_NOISE] in radians
+            --jointPos[i] = (sim.getJointPosition(joint[i]) + added_noise - (jointUpperLimit[i]+jointLowerLimit[i])/2) / ((jointUpperLimit[i]-jointLowerLimit[i])/2)
+            jointPos[i] = (sim.getJointPosition(joint[i]) - (jointUpperLimit[i]+jointLowerLimit[i])/2) / ((jointUpperLimit[i]-jointLowerLimit[i])/2)
             client:send(string.format(Tx_float_length, jointPos[i]))
         end
 

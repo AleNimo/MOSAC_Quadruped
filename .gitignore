@@ -1,8 +1,8 @@
 # Custom directories ignore
-Tetrapod/
-Cuadruped/
+Train/
 .vscode/
-MotionTestCuadruped.py
+P_net
+
 
 ######## Keil projects #######
 # From https://github.com/mrshrdlu/gitignore-keil/blob/master/keil.gitignore

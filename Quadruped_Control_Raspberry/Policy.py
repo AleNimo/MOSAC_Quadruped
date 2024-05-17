@@ -7,7 +7,7 @@ data_type = torch.float64
 
 
 class P_Network(nn.Module):
-    def __init__(self, obs_dim, actions_dim, pref_dim, hidden1_dim, hidden2_dim, chkpt_dir = './PolicyNet'):
+    def __init__(self, obs_dim, actions_dim, pref_dim, hidden1_dim, hidden2_dim, chkpt_dir = './P_net'):
         super(P_Network, self).__init__()
         self.obs_dim = obs_dim
         self.hidden1_dim = hidden1_dim
@@ -26,7 +26,7 @@ class P_Network(nn.Module):
 
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-        print("Device for " + self.name + ": ", self.device)
+        print("Device for policy network: ", self.device)
 
         self.to(self.device)
     
@@ -35,6 +35,7 @@ class P_Network(nn.Module):
         aux = F.relu(aux)
         
         aux = self.hidden2(aux)
+     
         aux = F.relu(aux)
         
         mu = self.mu(aux)
@@ -45,4 +46,4 @@ class P_Network(nn.Module):
         return mu, sigma
     
     def load_checkpoint(self):
-        self.load_state_dict(torch.load(self.checkpoint_file))
+        self.load_state_dict(torch.load(self.checkpoint_dir, map_location=self.device))

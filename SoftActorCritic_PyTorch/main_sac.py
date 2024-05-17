@@ -422,7 +422,7 @@ if __name__ == '__main__':
 
         # Circule to delimitate the end condition of the episode (the goal to reach)
     end_limit = QGraphicsEllipseItem(-11, -11, 22, 22)
-    end_limit.setPen(pg.mkPen((0, 255, 0, 100), width=1, style=QtCore.Qt.DashLine))
+    end_limit.setPen(pg.mkPen((0, 255, 0, 100), width=1, style=QtCore.Qt.DashLine)) # type: ignore
     end_limit.setBrush(pg.mkBrush(None))
 
     plot_Trajectory.addItem(scene_limit)
@@ -474,11 +474,11 @@ if __name__ == '__main__':
     plot_Rewards.showGrid(x=True, y=True)
 
     curve_Reward = plot_Rewards.plot(pen=(255,255,0), name='Total')
-    curve_Forward_vel_rwd = plot_Rewards.plot(pen=(0,255,0), name='Forward')
-    curve_Lateral_vel_rwd = plot_Rewards.plot(pen=(255,0,0), name='Lateral')
-    curve_Orientation_rwd = plot_Rewards.plot(pen=(255,127,39), name='Orientation')
-    curve_Back_rwd = plot_Rewards.plot(pen=(0,255,255), name='Back')
-    curve_Acc_rwd = plot_Rewards.plot(pen=(255,255,255), name='Acc')
+    curve_Forward_vel_rwd = plot_Rewards.plot(pen=(0,255,0), name='Fwd_Vel')
+    curve_Lateral_vel_rwd = plot_Rewards.plot(pen=(255,0,0), name='Lat_Vel')
+    curve_Orientation_rwd = plot_Rewards.plot(pen=(255,127,39), name='Rotation')
+    curve_Back_rwd = plot_Rewards.plot(pen=(0,255,255), name='Tilt')
+    curve_Acc_rwd = plot_Rewards.plot(pen=(255,255,255), name='Fwd_Acc')
 
 
     ####Front body joints plot
@@ -489,8 +489,8 @@ if __name__ == '__main__':
     curve_FrontBody_right_state = plot_FrontBody.plot(pen=(0,120,191), name='Right (state)')
     curve_FrontBody_left_state = plot_FrontBody.plot(pen=(255,127,39), name='Left (state)')
 
-    curve_FrontBody_right_action = plot_FrontBody.plot(pen=pg.mkPen(color=(1,188,239), style=QtCore.Qt.DotLine), name='Right (action)')
-    curve_FrontBody_left_action = plot_FrontBody.plot(pen=pg.mkPen(color=(255,89,143), style=QtCore.Qt.DotLine), name='Left (action)')
+    curve_FrontBody_right_action = plot_FrontBody.plot(pen=pg.mkPen(color=(1,188,239), style=QtCore.Qt.DotLine), name='Right (action)') # type: ignore
+    curve_FrontBody_left_action = plot_FrontBody.plot(pen=pg.mkPen(color=(255,89,143), style=QtCore.Qt.DotLine), name='Left (action)') # type: ignore
 
 
     ####Back body joints plot
@@ -501,8 +501,8 @@ if __name__ == '__main__':
     curve_BackBody_right_state = plot_BackBody.plot(pen=(252,198,4), name='Right (state)')
     curve_BackBody_left_state = plot_BackBody.plot(pen=(116,80,167), name='Left (state)')
 
-    curve_BackBody_right_action = plot_BackBody.plot(pen=pg.mkPen(color=(255,129,6), style=QtCore.Qt.DotLine), name='Right (action)')
-    curve_BackBody_left_action = plot_BackBody.plot(pen=pg.mkPen(color=(1,188,239), style=QtCore.Qt.DotLine), name='Left (action)')
+    curve_BackBody_right_action = plot_BackBody.plot(pen=pg.mkPen(color=(255,129,6), style=QtCore.Qt.DotLine), name='Right (action)') # type: ignore
+    curve_BackBody_left_action = plot_BackBody.plot(pen=pg.mkPen(color=(1,188,239), style=QtCore.Qt.DotLine), name='Left (action)') # type: ignore
 
 
     ####Front leg joints plot
@@ -513,8 +513,8 @@ if __name__ == '__main__':
     curve_FrontLeg_right_state = plot_FrontLeg.plot(pen=(55,194,50), name='Right (state)')
     curve_FrontLeg_left_state = plot_FrontLeg.plot(pen=(254,107,177), name='Left (state)')
 
-    curve_FrontLeg_right_action = plot_FrontLeg.plot(pen=pg.mkPen(color=(247,237,0), style=QtCore.Qt.DotLine), name='Right (action)')
-    curve_FrontLeg_left_action = plot_FrontLeg.plot(pen=pg.mkPen(color=(186,24,248), style=QtCore.Qt.DotLine), name='Left (action)')
+    curve_FrontLeg_right_action = plot_FrontLeg.plot(pen=pg.mkPen(color=(247,237,0), style=QtCore.Qt.DotLine), name='Right (action)') # type: ignore
+    curve_FrontLeg_left_action = plot_FrontLeg.plot(pen=pg.mkPen(color=(186,24,248), style=QtCore.Qt.DotLine), name='Left (action)') # type: ignore
 
 
     ####Back leg joints plot
@@ -525,8 +525,8 @@ if __name__ == '__main__':
     curve_BackLeg_right_state = plot_BackLeg.plot(pen=(0,120,191), name='Right (state)')
     curve_BackLeg_left_state = plot_BackLeg.plot(pen=(255,127,39), name='Left (state)')
 
-    curve_BackLeg_right_action = plot_BackLeg.plot(pen=pg.mkPen(color=(1,188,239), style=QtCore.Qt.DotLine), name='Right (action)')
-    curve_BackLeg_left_action = plot_BackLeg.plot(pen=pg.mkPen(color=(255,89,143), style=QtCore.Qt.DotLine), name='Left (action)')
+    curve_BackLeg_right_action = plot_BackLeg.plot(pen=pg.mkPen(color=(1,188,239), style=QtCore.Qt.DotLine), name='Right (action)') # type: ignore
+    curve_BackLeg_left_action = plot_BackLeg.plot(pen=pg.mkPen(color=(255,89,143), style=QtCore.Qt.DotLine), name='Left (action)') # type: ignore
 
 
     ####Front paw joints plot
@@ -537,8 +537,8 @@ if __name__ == '__main__':
     curve_FrontPaw_right_state = plot_FrontPaw.plot(pen=(252,198,4), name='Right (state)')
     curve_FrontPaw_left_state = plot_FrontPaw.plot(pen=(116,80,167), name='Left (state)')
 
-    curve_FrontPaw_right_action = plot_FrontPaw.plot(pen=pg.mkPen(color=(255,129,6), style=QtCore.Qt.DotLine), name='Right (action)')
-    curve_FrontPaw_left_action = plot_FrontPaw.plot(pen=pg.mkPen(color=(1,188,239), style=QtCore.Qt.DotLine), name='Left (action)')
+    curve_FrontPaw_right_action = plot_FrontPaw.plot(pen=pg.mkPen(color=(255,129,6), style=QtCore.Qt.DotLine), name='Right (action)') # type: ignore
+    curve_FrontPaw_left_action = plot_FrontPaw.plot(pen=pg.mkPen(color=(1,188,239), style=QtCore.Qt.DotLine), name='Left (action)') # type: ignore
 
 
     ####Back paw joints plot
@@ -549,8 +549,8 @@ if __name__ == '__main__':
     curve_BackPaw_right_state = plot_BackPaw.plot(pen=(55,194,50), name='Right (state)')
     curve_BackPaw_left_state = plot_BackPaw.plot(pen=(254,107,177), name='Left (state)')
 
-    curve_BackPaw_right_action = plot_BackPaw.plot(pen=pg.mkPen(color=(247,237,0), style=QtCore.Qt.DotLine), name='Right (action)')
-    curve_BackPaw_left_action = plot_BackPaw.plot(pen=pg.mkPen(color=(186,24,248), style=QtCore.Qt.DotLine), name='Left (action)')
+    curve_BackPaw_right_action = plot_BackPaw.plot(pen=pg.mkPen(color=(247,237,0), style=QtCore.Qt.DotLine), name='Right (action)') # type: ignore
+    curve_BackPaw_left_action = plot_BackPaw.plot(pen=pg.mkPen(color=(186,24,248), style=QtCore.Qt.DotLine), name='Left (action)') # type: ignore
 
 
     ####Returns plot
