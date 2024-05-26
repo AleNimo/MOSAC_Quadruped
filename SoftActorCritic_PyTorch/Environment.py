@@ -23,14 +23,14 @@ class Environment:
         self.forward_velocity_reward = 0
         self.__target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
         self.__vmax = 2
-        self.__delta_vel = 0.6
+        self.__delta_vel = 2 * self.__target_velocity
         self.__vmin = -6
 
         self.__curvature_forward_vel = - 2* self.__vmax / (self.__delta_vel * self.__vmin)
 
         #Parameters for forward acceleration penalization
         self.forward_acc_penalty = 0
-        self.__max_acc = 8 #m/s^2  (Acceleration at which the penalization is -1)
+        self.__max_acc = 4.5 #m/s^2  (Acceleration at which the penalization is -1)
 
         #Parameters for lateral velocity penalization
         self.lateral_velocity_penalty = 0
@@ -45,7 +45,7 @@ class Environment:
         #Parameters for flat back reward
         self.flat_back_penalty = np.zeros(2)
         self.__vmin_back = -2
-        self.__curvature_back = 2
+        self.__curvature_back = 3
 
         #Reward for not flipping over
         self.__not_flipping_reward = 0.5
@@ -105,7 +105,10 @@ class Environment:
             reward[i,0] = self.forward_velocity_reward
 
             '''Penalization for peak abs forward acceleration'''
-            self.forward_acc_penalty = -1/self.__max_acc * max_forward_acceleration
+            if max_forward_acceleration[i] < self.__max_acc:
+                self.forward_acc_penalty = -max_forward_acceleration[i]/self.__max_acc
+            else:
+                self.forward_acc_penalty = -np.power(max_forward_acceleration[i], 4)/np.power(self.__max_acc, 4)
 
             reward[i,1] = self.forward_acc_penalty
 

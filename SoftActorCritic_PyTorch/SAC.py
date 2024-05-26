@@ -22,7 +22,11 @@ class SAC_Agent():
         self.update_Q = 1
         self.update_P = 1
 
-        pref_dim = pref_max_vector.size
+        if np.array_equal(pref_max_vector, pref_min_vector):    #Without multi-objective approach
+            print("Training without Multi-Objective approach")
+            pref_dim = 0
+        else:
+            pref_dim = pref_max_vector.size
 
         self.replay_buffer = ReplayBuffer(replay_buffer_size, self.environment.obs_dim, self.environment.act_dim, self.environment.rwd_dim, pref_max_vector, pref_min_vector)
 
@@ -119,21 +123,26 @@ class SAC_Agent():
         self.Q1_target_net.load_state_dict(Q1_state_dict)
         self.Q2_target_net.load_state_dict(Q2_state_dict)
 
-    def save_models(self):
-        self.P_net.save_checkpoint()
-        self.Q1_net.save_checkpoint()
-        self.Q2_net.save_checkpoint()
-        self.Q1_target_net.save_checkpoint()
-        self.Q2_target_net.save_checkpoint()
-        torch.save(self.log_alpha, './Train/Networks/alpha_tensor.pt')
+    def save_models(self, episode):
+        self.P_net.save_checkpoint(episode)
+        self.Q1_net.save_checkpoint(episode)
+        self.Q2_net.save_checkpoint(episode)
+        self.Q1_target_net.save_checkpoint(episode)
+        self.Q2_target_net.save_checkpoint(episode)
+        torch.save(self.log_alpha, './Train/Networks/alpha_episode_{0:07d}.pt'.format(episode))
 
     def load_models(self):
-        self.P_net.load_checkpoint()
-        self.Q1_net.load_checkpoint()
-        self.Q2_net.load_checkpoint()
-        self.Q1_target_net.load_checkpoint()
-        self.Q2_target_net.load_checkpoint()
-        self.log_alpha = torch.load('./Train/Networks/alpha_tensor.pt')
+        if not os.path.isfile('./Train/Progress.txt'):
+            print('Progress.txt could not be found')
+            exit
+        with open('./Train/Progress.txt', 'r') as file: episode = int(np.loadtxt(file))
+
+        self.P_net.load_checkpoint(episode)
+        self.Q1_net.load_checkpoint(episode)
+        self.Q2_net.load_checkpoint(episode)
+        self.Q1_target_net.load_checkpoint(episode)
+        self.Q2_target_net.load_checkpoint(episode)
+        self.log_alpha = torch.load('./Train/Networks/alpha_episode_{0:07d}.pt'.format(episode))
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=0.0003, betas=(0.9, 0.999))
 
     def learn(self, step):

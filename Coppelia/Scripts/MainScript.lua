@@ -1,4 +1,5 @@
-testing = false
+slider = false
+programmed_target_rotation = false
 
 function createAgent ()
     -- Restore the agent
@@ -324,6 +325,21 @@ function sysCall_actuation()
             --Use value from slider (converting to radians normalized by pi)
             simUI.setLabelText(ui,1,string.format('Target Step Rotation = %d %s',targetRotSlider, utf8.char(176)))
             target_step_rotation = targetRotSlider / 180
+
+        elseif programmed_target_rotation then
+            if(step_counter >= 80) and (step_counter <100) then
+                target_step_rotation = -6/180
+            elseif (step_counter >= 100) and (step_counter < 120) then
+                target_step_rotation = 5/180
+            elseif (step_counter >= 120) and (step_counter < 140) then
+                target_step_rotation = 0
+            elseif (step_counter >= 140) and (step_counter < 160) then
+                target_step_rotation = -10/180
+            elseif (step_counter >= 160) and (step_counter < 180) then
+                target_step_rotation = 10/180
+            elseif (step_counter >= 180) then
+                target_step_rotation = 0
+            end
         else
             --Generate next random target step rotation (std = 5?)
             if (step_counter >= 50) and (step_counter % 50 == 0) then

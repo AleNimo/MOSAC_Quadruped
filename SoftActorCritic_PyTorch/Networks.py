@@ -36,7 +36,11 @@ class Q_Network(nn.Module):
         self.to(self.device)
     
     def forward(self, state, action, pref):
-        Q_value = self.hidden1(torch.cat([state, action, pref], dim=1))
+        if self.pref_dim > 0:
+            Q_value = self.hidden1(torch.cat([state, action, pref], dim=1))
+        else:
+            Q_value = self.hidden1(torch.cat([state, action], dim=1))
+
         Q_value = F.relu(Q_value)
         
         Q_value = self.hidden2(Q_value)
@@ -49,11 +53,11 @@ class Q_Network(nn.Module):
 
         return Q_value
     
-    def save_checkpoint(self):
-        torch.save(self.state_dict(), self.checkpoint_file)
+    def save_checkpoint(self, episode):
+        torch.save(self.state_dict(), self.checkpoint_file + '_episode_{0:07d}'.format(episode))
 
-    def load_checkpoint(self):
-        self.load_state_dict(torch.load(self.checkpoint_file))
+    def load_checkpoint(self, episode):
+        self.load_state_dict(torch.load(self.checkpoint_file + '_episode_{0:07d}'.format(episode)))
 
 
 class P_Network(nn.Module):
@@ -85,7 +89,10 @@ class P_Network(nn.Module):
         self.to(self.device)
     
     def forward(self, state, pref):
-        aux = self.hidden1(torch.cat([state, pref], dim=1))
+        if self.pref_dim > 0:
+            aux = self.hidden1(torch.cat([state, pref], dim=1))
+        else:
+            aux = self.hidden1(state)
         aux = F.relu(aux)
         
         aux = self.hidden2(aux)
@@ -116,8 +123,8 @@ class P_Network(nn.Module):
 
         return actions_restricted, log_probs, sigma
 
-    def save_checkpoint(self):
-        torch.save(self.state_dict(), self.checkpoint_file)
+    def save_checkpoint(self, episode):
+        torch.save(self.state_dict(), self.checkpoint_file + '_episode_{0:07d}'.format(episode))
 
-    def load_checkpoint(self):
-        self.load_state_dict(torch.load(self.checkpoint_file))
+    def load_checkpoint(self, episode):
+        self.load_state_dict(torch.load(self.checkpoint_file + '_episode_{0:07d}'.format(episode)))

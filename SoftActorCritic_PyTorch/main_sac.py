@@ -24,7 +24,7 @@ data_type = np.float64
 #              -If intentionally interrupted, the script takes time to save the training history, so don't close the console window right away
 def exit_handler(agent, train_history):
     train_history.episode -= 1
-    agent.save_models()
+    agent.save_models(train_history.episode)
     agent.replay_buffer.save(train_history.episode)
 
     train_history.save()
@@ -95,7 +95,7 @@ def SAC_Agent_Training(q):
         # Testing
         if test_agent:
             #Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back]
-            pref = np.array([[1,1,1,1,1]])
+            pref = np.array([[2, 1, 1, 2, 1]])
             print("Preference vector: ", pref)
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
@@ -130,27 +130,44 @@ def SAC_Agent_Training(q):
 
         # Compute total reward from partial rewards and preference of the episode
         tot_rwd = np.sum(pref * ep_rwd[:,:-1], axis=1) + ep_rwd[:,-1]
+
+        # Real return:
+        # Auxiliary array for computing return without overwriting tot_rwd
+        aux_ret = np.copy(tot_rwd)
+        pref_tensor = torch.tensor(pref, dtype=torch.float64).to(agent.P_net.device)
+
+        # If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
+        # Using the last state, and last action that the policy would have chosen in that state
+        if not done_flag:
+            last_state = torch.tensor(np.expand_dims(ep_obs[step+1][env.sim_measurement:], axis=0), dtype=torch.float64).to(agent.P_net.device)
+            last_action = agent.choose_action(ep_obs[step+1][env.sim_measurement:], pref, random=not(test_agent), tensor=True)
+            aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+
+        for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
+        train_history.ep_ret[train_history.episode, 0] = aux_ret[0]
         
         if test_agent:
+            print("Episode's real return: ", aux_ret[0])
+
             # Send the information for plotting in the other process through a Queue
             q.put(( test_agent, ep_obs[0:ep_len+1], tot_rwd[0:ep_len+1], ep_rwd[0:ep_len+1],  ep_act[0:ep_len+1] ))
 
         else:
-            ######## Compute the real and expected returns and the root mean square error ##########
-            # Real return:
-            # Auxiliary array for computing return without overwriting tot_rwd
-            aux_ret = np.copy(tot_rwd)
-            pref_tensor = torch.tensor(pref, dtype=torch.float64).to(agent.P_net.device)
+            # ######## Compute the real and expected returns and the root mean square error ##########
+            # # Real return:
+            # # Auxiliary array for computing return without overwriting tot_rwd
+            # aux_ret = np.copy(tot_rwd)
+            # pref_tensor = torch.tensor(pref, dtype=torch.float64).to(agent.P_net.device)
 
-            # If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
-            # Using the last state, and last action that the policy would have chosen in that state
-            if not done_flag:
-                last_state = torch.tensor(np.expand_dims(ep_obs[step+1][env.sim_measurement:], axis=0), dtype=torch.float64).to(agent.P_net.device)
-                last_action = agent.choose_action(ep_obs[step+1][env.sim_measurement:], pref, random=not(test_agent), tensor=True)
-                aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+            # # If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
+            # # Using the last state, and last action that the policy would have chosen in that state
+            # if not done_flag:
+            #     last_state = torch.tensor(np.expand_dims(ep_obs[step+1][env.sim_measurement:], axis=0), dtype=torch.float64).to(agent.P_net.device)
+            #     last_action = agent.choose_action(ep_obs[step+1][env.sim_measurement:], pref, random=not(test_agent), tensor=True)
+            #     aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
-            for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
-            train_history.ep_ret[train_history.episode, 0] = aux_ret[0]
+            # for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
+            # train_history.ep_ret[train_history.episode, 0] = aux_ret[0]
 
             # Expected return at the start of the episode:
             initial_state = torch.tensor(np.expand_dims(ep_obs[0][env.sim_measurement:], axis=0), dtype=torch.float64).to(agent.P_net.device)
@@ -183,10 +200,9 @@ def SAC_Agent_Training(q):
                     train_history.ep_alpha[0:train_history.episode+1], train_history.ep_entropy[0:train_history.episode+1], train_history.ep_std[0:train_history.episode+1]))            
         
             # Save the progress every save_period episodes, unless its being tested
-            if train_history.episode % save_period == 0 and train_history.episode != 0:
-                agent.save_models()
+            if train_history.episode % save_period == 0 or train_history.episode == 50:
+                agent.save_models(train_history.episode)
                 agent.replay_buffer.save(train_history.episode)
-                
                 train_history.save()
         print("------------------------------------------")
         train_history.episode += 1
