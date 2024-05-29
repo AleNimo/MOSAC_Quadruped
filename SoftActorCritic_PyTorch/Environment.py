@@ -99,9 +99,6 @@ class Environment:
             else:
                 self.forward_velocity_reward = self.__vmax / self.__target_velocity * forward_velocity[i]
 
-            # print("forward_velocity = ", forward_velocity[i])
-            # print("forward_velocity_penalty = ", forward_velocity_penalty)
-
             reward[i,0] = self.forward_velocity_reward
 
             '''Penalization for peak abs forward acceleration'''
@@ -114,9 +111,6 @@ class Environment:
 
             '''Penalization for Lateral velocity'''
             self.lateral_velocity_penalty = -self.__vmin_lat/(self.__curvature_lateral * np.abs(lateral_velocity[i]) + 1) + self.__vmin_lat
-
-            # print("lateral_velocity = ", lateral_velocity[i])
-            # print("lateral_velocity_penalty = ", lateral_velocity_penalty)
 
             reward[i,2] = self.lateral_velocity_penalty
 
@@ -144,11 +138,6 @@ class Environment:
                 self.flat_back_penalty[j-8] = (-self.__vmin_back/(self.__curvature_back * back_angle + 1) + self.__vmin_back)
                 
                 reward[i,4] += self.flat_back_penalty[j-8]
-
-                # print("back_angle ({0}) = {1:.2f}".format(j, back_angle))
-                # print("Flat_back_reward ({0}) = {1:.2f}".format(j, flat_back_reward))
-            
-            # print("Total_reward = ", reward[i])
                 
             '''Reward for avoiding critical failure (flipping over)'''
             reward[i,5] = self.__not_flipping_reward
@@ -160,11 +149,7 @@ class Environment:
 
             elif dist_fin[i] >= self.__end_cond:
                 end[i] = True
-                # print("finaliza")
             else:
                 end[i] = False
-
-            # print("reward = ", reward[i])
-            # print("end = ", end[i])
 
         return reward, end

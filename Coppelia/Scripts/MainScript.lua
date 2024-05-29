@@ -66,7 +66,7 @@ function sysCall_init() -- Executed when the scene is loaded
     sim = require('sim')
     simIK = require('simIK')
     
-    if testing then
+    if slider then
         --Slider for selecting target step rotation when testing
         simUI=require('simUI')
 
@@ -321,7 +321,7 @@ function sysCall_actuation()
         --Target Rotation for the step
         client:send(string.format(Tx_float_length, target_step_rotation))
         
-        if testing then
+        if slider then
             --Use value from slider (converting to radians normalized by pi)
             simUI.setLabelText(ui,1,string.format('Target Step Rotation = %d %s',targetRotSlider, utf8.char(176)))
             target_step_rotation = targetRotSlider / 180
@@ -529,7 +529,7 @@ end
 function sysCall_cleanup() -- Executed when the scene is closed
     -- Close the communication socket
     client:close()
-    if testing then simUI.destroy(ui) end
+    if slider then simUI.destroy(ui) end
 end
 
 function sysCall_nonSimulation() -- Executed when the simulation is not running

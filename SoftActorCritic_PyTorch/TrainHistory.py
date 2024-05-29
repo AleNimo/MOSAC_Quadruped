@@ -6,11 +6,11 @@ data_type = np.float64
 class TrainHistory():
     def __init__(self, max_episodes):
         self.episode = 0
-        self.ep_ret = np.zeros((max_episodes, 3), dtype=data_type)                           # Returns for each episode (real, expected and RMSE)
-        self.ep_loss = np.zeros((max_episodes, 2), dtype=data_type)                          # Training loss for each episode (Q and P)
-        self.ep_alpha = np.zeros((max_episodes,), dtype=data_type)                           # Alpha for each episode
-        self.ep_entropy = np.zeros((max_episodes,), dtype=data_type)                         # Entropy of the policy for each episode
-        self.ep_std = np.zeros((max_episodes,), dtype=data_type)                             # Mean standard deviation of the policy for each episode
+        self.ep_ret = np.zeros((max_episodes, 3), dtype=data_type)   # Returns for each episode (real, expected and RMSE)
+        self.ep_loss = np.zeros((max_episodes, 2), dtype=data_type)  # Training loss for each episode (Q and P)
+        self.ep_alpha = np.zeros((max_episodes,), dtype=data_type)   # Alpha for each episode
+        self.ep_entropy = np.zeros((max_episodes,), dtype=data_type) # Entropy of the policy for each episode
+        self.ep_std = np.zeros((max_episodes,), dtype=data_type)     # Mean standard deviation of the policy for each episode
 
     def save(self):
         filename = './Train/Train_History_episode_{0:07d}'.format(self.episode)
