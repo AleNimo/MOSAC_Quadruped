@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import torch
 from SAC import SAC_Agent
@@ -53,11 +52,14 @@ def SAC_Agent_Training(q):
     
     episodes = 20000
     episode_steps = 200 #Maximum steps allowed per episode
-    save_period = 500
+    save_period = 100
 
     #Preference vector maximum and minimum values - [vel_forward, acceleration, vel_lateral, orientation, flat_back]
+    #If pref_min_vector == pref_max_vector then the multi-objective approach is disabled, and constant reward weights 
+    #equal to pref_max_vector are defined
     pref_max_vector = np.array([2, 1, 1, 2, 1])
     pref_min_vector = np.array([0.5, 0, 0, 0, 0])
+    
     pref_dim = pref_max_vector.size
 
     agent = SAC_Agent('Cuadruped', env, pref_max_vector, pref_min_vector, replay_buffer_size=1000000)
@@ -99,7 +101,8 @@ def SAC_Agent_Training(q):
             print("Preference vector: ", pref)
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
-                ep_act[step] = agent.choose_action(ep_obs[step][env.sim_measurement:], pref, random=False)  #The agent doesn't receive the position and target direction although it is on the ep_obs vector for plotting reasons
+                ep_act[step] = agent.choose_action(ep_obs[step][env.sim_measurement:], pref, random=False)
+                #The agent doesn't receive the position and target direction although it is on the ep_obs vector for plotting reasons
 
                 # Act in the environment
                 ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
@@ -131,7 +134,8 @@ def SAC_Agent_Training(q):
         # Compute total reward from partial rewards and preference of the episode
         tot_rwd = np.sum(pref * ep_rwd[:,:-1], axis=1) + ep_rwd[:,-1]
 
-        # Real return:
+        ######## Compute the real and expected returns, and the root mean square error ##########
+        ### Real return (undiscounted for testing, discounted for training):
         # Auxiliary array for computing return without overwriting tot_rwd
         aux_ret = np.copy(tot_rwd)
         pref_tensor = torch.tensor(pref, dtype=torch.float64).to(agent.P_net.device)
@@ -141,40 +145,30 @@ def SAC_Agent_Training(q):
         if not done_flag:
             last_state = torch.tensor(np.expand_dims(ep_obs[step+1][env.sim_measurement:], axis=0), dtype=torch.float64).to(agent.P_net.device)
             last_action = agent.choose_action(ep_obs[step+1][env.sim_measurement:], pref, random=not(test_agent), tensor=True)
-            aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+            if test_agent:
+                aux_ret[step] += agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+            else:
+                aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
-        for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
+        if test_agent:
+            for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + aux_ret[i+1]
+        else:
+            for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
         train_history.ep_ret[train_history.episode, 0] = aux_ret[0]
         
-        if test_agent:
-            print("Episode's real return: ", aux_ret[0])
+        if test_agent:  #when testing only compute the real return
+            print("Episode's undiscounted return: ", aux_ret[0])
 
             # Send the information for plotting in the other process through a Queue
             q.put(( test_agent, ep_obs[0:ep_len+1], tot_rwd[0:ep_len+1], ep_rwd[0:ep_len+1],  ep_act[0:ep_len+1] ))
 
         else:
-            # ######## Compute the real and expected returns and the root mean square error ##########
-            # # Real return:
-            # # Auxiliary array for computing return without overwriting tot_rwd
-            # aux_ret = np.copy(tot_rwd)
-            # pref_tensor = torch.tensor(pref, dtype=torch.float64).to(agent.P_net.device)
-
-            # # If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
-            # # Using the last state, and last action that the policy would have chosen in that state
-            # if not done_flag:
-            #     last_state = torch.tensor(np.expand_dims(ep_obs[step+1][env.sim_measurement:], axis=0), dtype=torch.float64).to(agent.P_net.device)
-            #     last_action = agent.choose_action(ep_obs[step+1][env.sim_measurement:], pref, random=not(test_agent), tensor=True)
-            #     aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
-
-            # for i in range(ep_len-2, -1, -1): aux_ret[i] = aux_ret[i] + agent.discount_factor * aux_ret[i+1]
-            # train_history.ep_ret[train_history.episode, 0] = aux_ret[0]
-
-            # Expected return at the start of the episode:
+            #### Expected return at the start of the episode:
             initial_state = torch.tensor(np.expand_dims(ep_obs[0][env.sim_measurement:], axis=0), dtype=torch.float64).to(agent.P_net.device)
             initial_action = torch.tensor(np.expand_dims(ep_act[0], axis=0), dtype=torch.float64).to(agent.P_net.device)
             train_history.ep_ret[train_history.episode, 1] = agent.minimal_Q(initial_state, initial_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
-            # Root mean square error
+            #### Root mean square error
             train_history.ep_ret[train_history.episode, 2] = np.sqrt(np.square(train_history.ep_ret[train_history.episode,0] - train_history.ep_ret[train_history.episode, 1]))
 
             ######### Train the agent with batch_size samples for every step made in the episode ##########
