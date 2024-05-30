@@ -3,7 +3,7 @@
  * Auto generated Run-Time-Environment Configuration File
  *      *** Do not modify ! ***
  *
- * Project: 'Tetrapod_Control_uVision' 
+ * Project: 'Quadruped_Control_Nucleo' 
  * Target:  'Quadruped_Control_Nucleo' 
  */
 
