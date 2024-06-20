@@ -39,7 +39,7 @@
 #define M_PI 3.14159265358979323846
 
 //Number of joints
-#define JOINTS 4
+#define JOINTS 12
 
 //Number of ADC measurements for average
 #define N_SAMPLES 10
@@ -258,7 +258,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-		HAL_Init();
+  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -366,7 +366,7 @@ int main(void)
       for(uint8_t joint = 0; joint < JOINTS;joint++) joint_angle[joint] += joint_angle_dma[joint];
       samples++;
     }*/
-		// Convert ADC data to UART transmission buffer
+
 
 		
 		memcpy(dummy1,&joint_angle_dma[buffer_to_copy][0],sizeof(dummy1));
@@ -490,7 +490,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Channel = ADC_CHANNEL_14;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
@@ -1051,19 +1051,26 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : USER_Btn_Pin */
   GPIO_InitStruct.Pin = USER_Btn_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USER_Btn_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SPI_Ready_Pin */
+  GPIO_InitStruct.Pin = SPI_Ready_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(SPI_Ready_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LD1_Pin LD3_Pin LD2_Pin */
   GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin|LD2_Pin;
@@ -1084,13 +1091,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USB_OverCurrent_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : SPI_Ready_Pin */
-  GPIO_InitStruct.Pin = SPI_Ready_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(SPI_Ready_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
@@ -1213,10 +1213,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 				else if(angulo_salida <= 0)
 					angulo_salida = 0;
 				
-				target_joint[0] = angulo_salida;
-				target_joint[1] = angulo_salida;
-				target_joint[2] = angulo_salida;
-        target_joint[3] = angulo_salida;
+				//target_joint[0] = angulo_salida;
+				//target_joint[1] = angulo_salida;
+				//target_joint[2] = angulo_salida;
+        //target_joint[3] = angulo_salida;
 				
 				angulo_ready = 1;
 				
@@ -1398,7 +1398,7 @@ void State_Machine_Control(void)
     case TX_RASPBERRY:
       
       //Request master to transmit target step rotation and joint angles
-      //HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)f_joint_angle, 12*2);
+      HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)f_joint_angle, 12*2);
       HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
       HAL_Delay(1);
       HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET);	//POSIBLE PROBLEMA ACA (tiempo que tarda el master en iniciar desde que lee el 1 en el GPIO)
@@ -1408,7 +1408,7 @@ void State_Machine_Control(void)
       break;
     case RX_RASPBERRY:
       //Request master to receive the next action
-      //while(HAL_SPI_Receive_DMA(&hspi3, (uint8_t*)target_joint, 12*2) == HAL_BUSY);
+      while(HAL_SPI_Receive_DMA(&hspi3, (uint8_t*)target_joint, 12*2) == HAL_BUSY);
       if(angulo_ready)
       {
         angulo_ready = 0;

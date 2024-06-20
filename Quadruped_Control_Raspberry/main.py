@@ -2,7 +2,7 @@
 #SPI1 (supports 16 bit words):  MOSI (GPIO20, pin 38); MISO (GPIO19, pin 35); SCLK (GPIO21, pin 40)
 #                               CE0 (GPIO18, pin 12), CE1 (GPIO17, pin 11), CE2 (GPIO16, pin 36)
 #I2C1 (I2C0 is for the SD): SDA (GPIO2, pin 3); SCL (GPIO3, pin 5)
-spi_slave_ready = 26 #GPIO26, pin 37
+spi_slave_ready = 25 #GPIO25, pin 22
 
 import pigpio #For GPIO, SPI and I2C
 from Policy import P_Network
@@ -110,8 +110,9 @@ if __name__ == '__main__':
 
                 #Read 4*4 bytes (4 floats)
                 (count, data) = pi.i2c_read_device(hi2c, 4*4)
-                # if count == 4*4: print("Se leyó todo")
-                # else: print("no se leyeron la cantidad de bytes correcta")
+                if count == 4*4: print("Se leyó todo")
+                else: print("no se leyeron la cantidad de bytes correcta")
+                print("bytes IMU",data)
 
                 #IMU_data[4] = [roll, pitch, wx, wy]
                 IMU_data = np.frombuffer(bytes(data), dtype='<f4')
@@ -129,10 +130,10 @@ if __name__ == '__main__':
                 vel_roll = IMU_data[3]
                 
                 state = np.array([target_rot, pitch, roll, vel_pitch, vel_roll])
-                state = np.concatenate((state, measured_joints), axis=0)
+                state = np.concatenate((state, measured_joints), axis=0) #HAY QUE NORMALIZAR LOS ANGULOS!!!!!!!
                 # print("state", state)
                 state = np.expand_dims(state, axis=0)
-                # print("state", state)
+                print("state", state)
 
                 state = torch.tensor(state).to(P_net.device)
 
@@ -147,7 +148,7 @@ if __name__ == '__main__':
                     action[1+i*3] = action[1+i*3] * leg_range + leg_mean
                     action[2+i*3] = action[2+i*3] * paw_range + paw_mean
                 
-                # print("Action = ", action)
+                print("Action = ", action)
                 # print("action.dtype", action.dtype)
 
                 #Convert float numpy array in byte list
@@ -169,7 +170,7 @@ if __name__ == '__main__':
 
                     state = "RX_SPI"
                             
-        
+    
         
         #joints_byte_list = spi.readbytes(12*4)
         

@@ -128,8 +128,8 @@ double Time_prev  = 0;
 
 void setup() {
     // put your setup code here, to run once:
-    Serial.begin(9600);
-    while (!Serial);
+    //Serial.begin(9600);
+    //while (!Serial);
     //Call .begin() to configure the IMUs
     if (myIMU.begin() != 0) {
         //Serial.println("Device error");
@@ -257,12 +257,12 @@ void setup() {
 void loop() {
 
      
-  ax_noisy = myIMU.readFloatAccelY()*G;
-  ay_noisy = myIMU.readFloatAccelX()*G;
+  ax_noisy = -myIMU.readFloatAccelX()*G;
+  ay_noisy = myIMU.readFloatAccelY()*G;
   az_noisy = -myIMU.readFloatAccelZ()*G;
 
-  wx_noisy = (myIMU.readFloatGyroY()-gx_cal)*PI/180;
-  wy_noisy = (myIMU.readFloatGyroX()-gy_cal)*PI/180;
+  wx_noisy = -(myIMU.readFloatGyroX()-gx_cal)*PI/180;
+  wy_noisy = (myIMU.readFloatGyroY()-gy_cal)*PI/180;
   wz_noisy = -(myIMU.readFloatGyroZ()-gz_cal)*PI/180;
 
   Time = micros()/1000000.0f;
@@ -457,6 +457,7 @@ void Send_IMU(void)
   imu_data[2] = wy;
   imu_data[3] = wx;
 
+/*
   Serial.print(imu_data[0],10);
   Serial.print(",");
   Serial.print(imu_data[1],10);
@@ -465,7 +466,7 @@ void Send_IMU(void)
   Serial.print(",");
   Serial.print(imu_data[3],10);
   Serial.print("\n");
- 
+ */
 
 /*
   byte imu_data[16] = {0};
