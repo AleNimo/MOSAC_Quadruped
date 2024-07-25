@@ -40,9 +40,28 @@
 
 //Number of joints
 #define JOINTS 12
+#define PWM_BFR 65
+#define PWM_BBR 65
+#define PWM_BFL 65
+#define PWM_BBL 65
+#define PWM_LFR 65
+#define PWM_LBR 65
+#define PWM_LFL 65
+#define PWM_LBL 65
+#define PWM_PFR 65
+#define PWM_PBR 65
+#define PWM_PFL 65
+#define PWM_PBL 65
 
-//Number of ADC measurements for average
+//Number of ADC measurements for average for calibration
 #define N_SAMPLES 10
+////For calibration
+#define PWM_STEP 50
+#define PWM_MIN 800 
+#define PWM_MAX 2200 
+#define MED_CALIB (int)__round(((float)(PWM_MAX-PWM_MIN)/PWM_STEP)+1)
+#define UPDATE_PWM 0
+#define MEASURE 1
 
 //States for Main State Machine
 #define RESET 						0
@@ -57,39 +76,25 @@
 #define TIMEOUT_STATE     3
 
 //Parameters to transform Degrees(�) values to PWM (Ton in microseconds)
-#define K_TON_1 (float)(100.0/9.0)
-#define BIAS_TON_1	(float)500
-	
-#define K_TON_2 (float)(38.0/3.0)
-#define BIAS_TON_2	(float)(350.0)
+#define K_TON (float)(140.0/13.0)
+#define BIAS_TON	(float)800
 
 //Parameters of the time-out algorithm
 //(150 microseconds is the delay between 2 average measurements)
 
-#define DEAD_BANDWIDTH_SERVO 3  //Degrees
-#define MAX_DELTA_ANGLE	2	//Degrees		(960 micro radians is the quantum of the ADC in angle. 680 micro radians is the minimum change detectable measuring with 150us of delay and the speed of the servo)
-#define MAX_DELTA_SAMPLE	0.5	
+#define DEAD_BANDWIDTH_SERVO 1  //Degrees
+#define MAX_DELTA_ANGLE	4	//Degrees		(960 micro radians is the quantum of the ADC in angle. 680 micro radians is the minimum change detectable measuring with 150us of delay and the speed of the servo)
+#define MAX_DELTA_SAMPLE	2	
 
 #define SAMPLE_TIME 50	//miliseconds
-#define TIMEOUT 1000 //miliseconds
+#define TIMEOUT 500 //miliseconds
 
 #define UMBRAL_DONE 100
 
-#define ALL_FINISHED pow(2,JOINTS)-1
+#define ALL_FINISHED 0xFFF
 
-//For calibration
-#define PWM_STEP 95
-#define PWM_MIN 350  //FOR PRO Servo
-#define PWM_MAX 2630 //FOR PRO Servo
-#define MED_CALIB (int)__round(((float)(PWM_MAX-PWM_MIN)/PWM_STEP)+1)
-#define UPDATE_PWM 0
-#define MEASURE 1
 
-#define LENGTH_TABLE_1 21
-#define LENGTH_TABLE_2 25
-
-#define NUM_TAPS 200
-
+//For IIR Filter EWMA
 #define NUM_STAGE_IIR 1
 #define NUM_ORDER_IIR (NUM_STAGE_IIR*2)
 #define NUM_STD_COEFS 5 // b0, b1, b2, a1, a2
@@ -105,6 +110,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
@@ -124,11 +130,13 @@ DMA_HandleTypeDef hdma_usart3_tx;
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
-//FIR FILTER Variables
-arm_fir_instance_f32 fir_instance[12];
-float32_t fir_in_arm[12], fir_state[12][NUM_TAPS];
 
-float32_t fir_coeff[NUM_TAPS] = {0};
+//For tx floats under UART (Serial plot)
+typedef union float2byte
+{
+	float angle;
+	uint8_t angle_bytes [4];
+}float2byte;
 
 //IIR FILTER Variables
 static float32_t iirState[12][NUM_ORDER_IIR];
@@ -139,7 +147,10 @@ static float32_t iirCoeffs[NUM_STAGE_IIR * NUM_STD_COEFS] =
 };
 
 arm_biquad_cascade_df2T_instance_f32 S [12];
-	
+
+//Test Vector Standing Quadruped
+float test_quadruped_coppelia[12] = {0};
+float test_quadruped_nucleo[12] = {PWM_PFR,PWM_PBR,PWM_PBL,PWM_LFR,PWM_BFR,PWM_PFL,PWM_BFL,PWM_LFL,PWM_BBL,PWM_LBL,PWM_LBR,PWM_BBR};
 
 //Global Flags
 uint8_t conv_cplt = 1;
@@ -157,23 +168,15 @@ uint32_t channel[4] = {TIM_CHANNEL_1,TIM_CHANNEL_2, TIM_CHANNEL_3, TIM_CHANNEL_4
 
 //	ADC-DMA
 uint16_t joint_angle_dma[2][12] = {0};	//ADC measurement with DMA
-float32_t joint_angle[12] = {0};				//Accumulator for average
+float32_t joint_angle[12] = {0};				//Filtered angles
 uint8_t current_buffer = 0;
 //Ticks of timer
 uint16_t sample_time = 0;
 uint16_t timeout = 0;
 uint16_t time = 0; // for calibrating Servo
 
-//VARIABLES PARA DEBUG///////
-#define ANGULO_INICIAL 0
-HAL_StatusTypeDef status_spi;
 uint16_t delay_button = 0;
-//uint32_t counter = 0;
-//uint32_t last_counter = 0;
-//uint32_t delay_counter = 0;
-float resultado;
-
-uint16_t ton[JOINTS] = {0};
+float resultado; //state machine Actuation result
 
 uint8_t joint = 0;
 
@@ -181,10 +184,7 @@ uint8_t joint = 0;
 uint16_t calibrated_joints_up[MED_CALIB][12] = {0};  //For storing the results of calibration up
 uint16_t calibrated_joints_down[MED_CALIB][12] = {0};  //For storing the results of calibration down
 
-uint8_t joint_adc = 0;
-
-const float32_t *calibration_table[12] = {&ADC_VALUES_SERVO_9[0][0],&ADC_VALUES_SERVO_10[0][0],&ADC_VALUES_SERVO_11[0][0],&ADC_VALUES_SERVO_12[0][0],&ADC_VALUES_SERVO_1[0][0],&ADC_VALUES_SERVO_2[0][0],&ADC_VALUES_SERVO_3[0][0],&ADC_VALUES_SERVO_4[0][0],&ADC_VALUES_SERVO_5[0][0],&ADC_VALUES_SERVO_6[0][0],&ADC_VALUES_SERVO_7[0][0],&ADC_VALUES_SERVO_8[0][0]};
-uint8_t col_sel[12] = {LENGTH_TABLE_1, LENGTH_TABLE_2, LENGTH_TABLE_2, LENGTH_TABLE_1, LENGTH_TABLE_1, LENGTH_TABLE_1, LENGTH_TABLE_1, LENGTH_TABLE_1, LENGTH_TABLE_1, LENGTH_TABLE_1, LENGTH_TABLE_1, LENGTH_TABLE_1};
+const float32_t *calibration_table[12] = {&ADC_VALUES_SERVO_0[0][0],&ADC_VALUES_SERVO_1[0][0],&ADC_VALUES_SERVO_2[0][0],&ADC_VALUES_SERVO_3[0][0],&ADC_VALUES_SERVO_4[0][0],&ADC_VALUES_SERVO_5[0][0],&ADC_VALUES_SERVO_6[0][0],&ADC_VALUES_SERVO_7[0][0],&ADC_VALUES_SERVO_8[0][0],&ADC_VALUES_SERVO_9[0][0],&ADC_VALUES_SERVO_10[0][0],&ADC_VALUES_SERVO_11[0][0]};
 
 /////////////////////////////
 
@@ -198,7 +198,7 @@ float f_joint_angle[JOINTS] = {ANGULO_INICIAL, ANGULO_INICIAL, ANGULO_INICIAL, A
 //float f_joint_angle[JOINTS] = {1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9, 9.1, 10.11, 11.12, 12.13};
 float f_last_joint[JOINTS] = {0};
 float f_joint_angle_aux[JOINTS] = {0};
-uint8_t uart_tx_buffer[12*2+12*2+2];
+uint8_t uart_tx_buffer[12*4+12*4+2];
 
 uint8_t state_actuation = RESET_ACTUATION;
 
@@ -227,8 +227,8 @@ static void MX_SPI3_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_TIM9_Init(void);
 /* USER CODE BEGIN PFP */
-float adc2angle(uint16_t adc_value, uint8_t up_down,const float32_t* table_ptr,uint8_t col_sel);
-uint16_t angle2ton_us(float,uint8_t);
+float adc2angle(uint16_t adc_value, uint8_t up_down,const float32_t* table_ptr);
+uint16_t angle2ton_us(float);
 
 int8_t State_Machine_Actuation(void);
 void State_Machine_Calibration(void);
@@ -240,8 +240,11 @@ void State_Machine_Control(void);
 
 uint16_t dummy1[12];
 uint16_t dummy2[12];
+float2byte u_dummy1;
+float2byte u_dummy2;
+
 uint8_t buffer_ready = 0;
-uint16_t ton_dummy = PWM_MIN;
+float angle_dummy = 65;
 /* USER CODE END 0 */
 
 /**
@@ -328,11 +331,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 	
 	//Main state
-	for(joint = 0; joint < JOINTS; joint++)
-		__HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], PWM_MIN);
 	
-	HAL_Delay(2000);	
-
 	// ton = angle2ton_us(ANGULO_INICIAL);
 	
 	 //First measure of joints before transmition
@@ -347,28 +346,47 @@ int main(void)
 	uart_tx_buffer[0] = 0xFF;
 	uart_tx_buffer[1] = 0xFF;
 	
+	for(joint = 0; joint < JOINTS; joint++)
+		__HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(test_quadruped_nucleo[joint]));
+	HAL_Delay(2000);	
+
   while(1)
   {
+
+    //State_Machine_Calibration();
+
+		//Body  Front   Right
+		test_quadruped_nucleo[4] = 65 - test_quadruped_coppelia[0];
+		//Leg   Front   Right
+		test_quadruped_nucleo[3] = 65 - test_quadruped_coppelia[1];
+		//Paw   Front   Right
+		test_quadruped_nucleo[0] = 65 + test_quadruped_coppelia[2];
+		//Body  Front   Left
+		test_quadruped_nucleo[6] = 65 + test_quadruped_coppelia[3];
+		//Leg   Front   Left
+		test_quadruped_nucleo[7] = 65 + test_quadruped_coppelia[4];
+		//Paw   Front   Left
+		test_quadruped_nucleo[5] = 65 - test_quadruped_coppelia[5];
+		//Body  Back    Right
+		test_quadruped_nucleo[11] = 65 - test_quadruped_coppelia[6];
+		//Leg   Back    Right
+		test_quadruped_nucleo[10] = 65 - test_quadruped_coppelia[7];
+		//Paw   Back    Right
+		test_quadruped_nucleo[1] = 65 + test_quadruped_coppelia[8];
+		//Body  Back    Left
+		test_quadruped_nucleo[8] = 65 + test_quadruped_coppelia[9];
+		//Leg   Back    Left
+		test_quadruped_nucleo[9] = 65 + test_quadruped_coppelia[10];
+		//Paw   Back    Left
+		test_quadruped_nucleo[2] = 65 - test_quadruped_coppelia[11];
+		
 		/*
 		for(joint = 0; joint < JOINTS; joint++)
-		__HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], ton_dummy);
+				__HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(test_quadruped_nucleo[joint]));
 		*/
-		//__HAL_TIM_SET_COMPARE(htim[1 / 4], channel[1 % 4], ton_dummy);
-    //State_Machine_Calibration();
-		/*
-    if(samples == N_SAMPLES)
-    {
-      samples = 0;
-      conv_cplt = 1;
-    }
-    else if(conv_cplt == 0)
-    {
-      for(uint8_t joint = 0; joint < JOINTS;joint++) joint_angle[joint] += joint_angle_dma[joint];
-      samples++;
-    }*/
-
-
 		
+		//Serial Plot
+		/*
 		memcpy(dummy1,&joint_angle_dma[buffer_to_copy][0],sizeof(dummy1));
 		//memcpy(dummy2,(uint16_t*)joint_angle,sizeof(dummy2));
 		for(uint8_t joint = 0; joint<12;joint++) 
@@ -381,19 +399,28 @@ int main(void)
 		
 		if(sample_time == 0)
 		{
-			for (int i = 0; i < 4; i++) 
+			for (int i = 0; i < JOINTS; i++) 
 			{
-					uart_tx_buffer[4*i+2] = (dummy1[i] >> 8) & 0xFF;
-					uart_tx_buffer[4*i + 3] = dummy1[i] & 0xFF;
-					uart_tx_buffer[4*i + 4] = (dummy2[i] >> 8) & 0xFF;
-					uart_tx_buffer[4*i + 5] = dummy2[i] & 0xFF;
+					u_dummy1.angle = adc2angle(dummy1[i], up_down_ADC[i],calibration_table[i]);	//there is no way to define the up_down vector, initial values are used
+					u_dummy2.angle = adc2angle(dummy2[i], up_down_ADC[i],calibration_table[i]);
+
+					uart_tx_buffer[8*i+2] = u_dummy1.angle_bytes[3];
+					uart_tx_buffer[8*i+3] = u_dummy1.angle_bytes[2];
+					uart_tx_buffer[8*i+4] = u_dummy1.angle_bytes[1];
+					uart_tx_buffer[8*i + 5] = u_dummy1.angle_bytes[0];
+				
+					uart_tx_buffer[8*i + 6] = u_dummy2.angle_bytes[3];
+					uart_tx_buffer[8*i + 7] = u_dummy2.angle_bytes[2];
+					uart_tx_buffer[8*i + 8] = u_dummy2.angle_bytes[1];
+					uart_tx_buffer[8*i + 9] = u_dummy2.angle_bytes[0];
 					
 			}
 			
-			HAL_UART_Transmit(&huart3,uart_tx_buffer,4*4+2,HAL_MAX_DELAY);
+			HAL_UART_Transmit(&huart3,uart_tx_buffer,8*JOINTS+2,HAL_MAX_DELAY);
 		}
 		//HAL_Delay(1); // Adjust delay as necessary
-    State_Machine_Control();
+		*/
+   //State_Machine_Control();
 
   }
 		
@@ -490,7 +517,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_14;
+  sConfig.Channel = ADC_CHANNEL_5;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
@@ -500,7 +527,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Channel = ADC_CHANNEL_4;
   sConfig.Rank = 2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -509,7 +536,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Channel = ADC_CHANNEL_9;
   sConfig.Rank = 3;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -518,7 +545,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_4;
+  sConfig.Channel = ADC_CHANNEL_6;
   sConfig.Rank = 4;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -527,7 +554,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_5;
+  sConfig.Channel = ADC_CHANNEL_7;
   sConfig.Rank = 5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -536,7 +563,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_6;
+  sConfig.Channel = ADC_CHANNEL_2;
   sConfig.Rank = 6;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -545,7 +572,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_7;
+  sConfig.Channel = ADC_CHANNEL_10;
   sConfig.Rank = 7;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -554,7 +581,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_9;
+  sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = 8;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -563,7 +590,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_10;
+  sConfig.Channel = ADC_CHANNEL_13;
   sConfig.Rank = 9;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -572,7 +599,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_11;
+  sConfig.Channel = ADC_CHANNEL_12;
   sConfig.Rank = 10;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -581,7 +608,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_12;
+  sConfig.Channel = ADC_CHANNEL_11;
   sConfig.Rank = 11;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -590,7 +617,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_13;
+  sConfig.Channel = ADC_CHANNEL_14;
   sConfig.Rank = 12;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -1220,7 +1247,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 				
 				angulo_ready = 1;
 				
-				delay_button = 500;
+				delay_button = 1000;
 			}
     }
 }
@@ -1261,56 +1288,41 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 }
 
 //Convert ADC_value of ACCUMULATED measurement to angle in degrees using linear interpolation
-float adc2angle(uint16_t adc_value, uint8_t up_down,const float32_t* table_ptr,uint8_t col_sel)
+float adc2angle(uint16_t adc_value, uint8_t up_down,const float32_t* table_ptr)
 {
 	uint16_t index = 0;
 	
 	const float32_t *ADC_VALUES = table_ptr;
 
-  if(col_sel == LENGTH_TABLE_2) // Servo Pro decreases adc values as angle increases
-    while(adc_value < ADC_VALUES[up_down*col_sel + index]/10)	//Busco el c�digo en la tabla obtenida en la calibracion
-    {
-      index++;
-      if(index > col_sel-1)
-        return 180;	//adc_value greater than maximum value of table
-    }
-  else
-    while(adc_value > ADC_VALUES[up_down*col_sel + index]/10)	//Busco el c�digo en la tabla obtenida en la calibracion
-    {
-      index++;
-      if(index > col_sel-1)
-        return 180;	//adc_value greater than maximum value of table
-    }
+  
+  while(adc_value > ADC_VALUES[up_down*TABLE_LENGTH + index]/10)	//Busco el c�digo en la tabla obtenida en la calibracion
+  {
+    index++;
+    if(index > TABLE_LENGTH-1)
+      return 180;	//adc_value greater than maximum value of table
+  }
 
 
-	if(adc_value == ADC_VALUES[up_down*col_sel + index]/10)	//Si el c�digo est� en la tabla, devuelvo el angulo correspondiente
-		if(col_sel==LENGTH_TABLE_1)
-			return ANGLES_1[index];
-		else
-			return ANGLES_2[index];
+	if(adc_value == ADC_VALUES[up_down*TABLE_LENGTH + index]/10)	//Si el c�digo est� en la tabla, devuelvo el angulo correspondiente
+			return ANGLES[index];
 
-	else if(index == 0) return 0;	//adc_value lesser than minimum value of table
+	else if(index == 0) 
+      return 0;	//adc_value lesser than minimum value of table
 	
 	else	//Si es menor al codigo de la tabla, realizo una interpolacion lineal
-		if(col_sel == LENGTH_TABLE_1)
-			return (ANGLES_1[index-1] * (ADC_VALUES[up_down*col_sel + index]/10-adc_value) + ANGLES_1[index] * (adc_value-ADC_VALUES[up_down*col_sel + index-1]/10)) / (ADC_VALUES[up_down*col_sel + index]/10 - ADC_VALUES[up_down*col_sel + index-1]/10);
-		else
-			return (ANGLES_2[index-1] * (ADC_VALUES[up_down*col_sel + index]/10-adc_value) + ANGLES_2[index] * (adc_value-ADC_VALUES[up_down*col_sel + index-1]/10)) / (ADC_VALUES[up_down*col_sel + index]/10 - ADC_VALUES[up_down*col_sel + index-1]/10);
-
+			return (ANGLES[index-1] * (ADC_VALUES[up_down*TABLE_LENGTH + index]/10-adc_value) + ANGLES[index] * (adc_value-ADC_VALUES[up_down*TABLE_LENGTH + index-1]/10)) / (ADC_VALUES[up_down*TABLE_LENGTH + index]/10 - ADC_VALUES[up_down*TABLE_LENGTH + index-1]/10);
+		
 }
 
-uint16_t angle2ton_us(float angle_value,uint8_t col_sel)
+uint16_t angle2ton_us(float angle_value)
 {
 	uint16_t  ton_us = 0;
 	
-	if(col_sel == LENGTH_TABLE_1)
-		ton_us = __round(angle_value * K_TON_1 + BIAS_TON_1);
-	else if(col_sel == LENGTH_TABLE_2)
-		ton_us = __round(angle_value * K_TON_2 + BIAS_TON_2);
+	ton_us = __round(angle_value * K_TON + BIAS_TON);
 	
 	return ton_us;
 }
-/*
+
 void State_Machine_Calibration(void)
 {
 
@@ -1324,6 +1336,8 @@ void State_Machine_Calibration(void)
   static uint8_t calibration_direction = 1;
 	
 	static uint8_t cant_med = 0;
+	
+	static uint16_t joint_angle_acum[JOINTS] = {0,0,0,0,0,0,0,0,0,0,0,0};
 	
   //static uint8_t cant_med = 0;
 
@@ -1353,45 +1367,47 @@ void State_Machine_Calibration(void)
 			time = 1000;
 			
 			state = MEASURE;
+			break;
 		case MEASURE:
       if(cant_med == N_SAMPLES)
 			{
 				cant_med = 0;
 				if(calibration_direction == 1)
 				{						
-					memcpy(calibrated_joints_up[pwm_value], joint_angle, sizeof(joint_angle));
+					memcpy(calibrated_joints_up[pwm_value], joint_angle_acum, sizeof(joint_angle_acum));
 				}
 				
 				else
 				{
-					memcpy(calibrated_joints_down[pwm_value], joint_angle, sizeof(joint_angle));
+					memcpy(calibrated_joints_down[pwm_value], joint_angle_acum, sizeof(joint_angle_acum));
 				}
 				
-				memset(joint_angle, 0, sizeof(joint_angle));
+				memset(joint_angle_acum, 0, sizeof(joint_angle_acum));
 				state = UPDATE_PWM;
 			}
 			else if(time == 0)
 			{
-				for(uint8_t joint = 0; joint < JOINTS;joint++) joint_angle[joint] += joint_angle_dma[joint];
+				for(uint8_t joint = 0; joint < JOINTS;joint++) joint_angle_acum[joint] += joint_angle[joint];
 				time = 1000;
 				cant_med++;
 			}
+			break;
   } 
 
-}*/
+}
 
 void State_Machine_Control(void)
 {
 	static uint8_t state = RESET;
 	
-	int8_t result = 0;
+	static int8_t result = 0;
 	
   switch(state)
   {
     case RESET:
 								
 			for(joint = 0; joint < JOINTS; joint++)
-				f_joint_angle[joint] = adc2angle(joint_angle[joint], up_down_ADC[joint],calibration_table[joint],col_sel[joint]);	//there is no way to define the up_down vector, initial values are used
+				f_joint_angle[joint] = adc2angle(joint_angle[joint], up_down_ADC[joint],calibration_table[joint]);	//there is no way to define the up_down vector, initial values are used
 			state = TX_RASPBERRY;
 
       break;
@@ -1408,9 +1424,10 @@ void State_Machine_Control(void)
       break;
     case RX_RASPBERRY:
       //Request master to receive the next action
-      while(HAL_SPI_Receive_DMA(&hspi3, (uint8_t*)target_joint, 12*2) == HAL_BUSY);
-      if(angulo_ready)
+      
+      //if(angulo_ready)
       {
+				while(HAL_SPI_Receive_DMA(&hspi3, (uint8_t*)target_joint, 12*2) == HAL_BUSY);
         angulo_ready = 0;
         HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
         HAL_Delay(1);
@@ -1420,25 +1437,32 @@ void State_Machine_Control(void)
         //Therefore consider the joint already finished
 				HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 0);
 				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0);
+				//memcpy(target_joint,test_quadruped_nucleo,sizeof(target_joint));
         for(joint=0;joint<JOINTS;joint++)
-        {
+        {	
+					
           delta_target = fabs(f_joint_angle[joint] - target_joint[joint]);
           if(delta_target < DEAD_BANDWIDTH_SERVO)
             joints_finished |= 1<<joint;	//Set respective bit in 1
           else
-						ton[joint] = angle2ton_us(target_joint[joint],col_sel[joint]);
-            __HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], ton[joint]);  //Move the servomotor
+            __HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(target_joint[joint]));  //Move the servomotor
         }
         
         //Start first measure of joints before ACTUATION
         //memset(joint_angle, 0, sizeof(joint_angle));
         //HAL_ADC_Start_DMA(&hadc1,(uint32_t*)joint_angle_dma,12);
       
-        //Evaluate if servo has to go up or down to get a better measurement
-        for(joint=0;joint<JOINTS;joint++)
-          up_down_ADC[joint] = (f_joint_angle[joint] < target_joint[joint]);
+				if(joints_finished == (uint16_t)ALL_FINISHED)	//Si ninguna articulacion se tiene que mover, salteo la actuacion
+					state = TX_RASPBERRY;
+				
+				else
+				{
+					//Evaluate if servo has to go up or down to get a better measurement
+					for(joint=0;joint<JOINTS;joint++)
+						up_down_ADC[joint] = (f_joint_angle[joint] < target_joint[joint]);
 
-        state = ACTUATION;
+					state = ACTUATION;
+				}
       }
       break;
     case ACTUATION:
@@ -1460,7 +1484,7 @@ int8_t State_Machine_Actuation(void)
 
 			
 			for(joint = 0; joint < JOINTS; joint++)
-				f_last_joint[joint] = adc2angle(joint_angle[joint], up_down_ADC[joint],calibration_table[joint],col_sel[joint]);
+				f_last_joint[joint] = adc2angle(joint_angle[joint], up_down_ADC[joint],calibration_table[joint]);
 							
 			sample_time = SAMPLE_TIME;
 			state_actuation = DELAY_STATE;
@@ -1489,7 +1513,7 @@ int8_t State_Machine_Actuation(void)
 				{
 					if((joints_finished & (1<<joint)) == 0)	//Ignore joints that finished
 					{
-						f_joint_angle[joint] = adc2angle(joint_angle[joint], up_down_ADC[joint],calibration_table[joint],col_sel[joint]);
+						f_joint_angle[joint] = adc2angle(joint_angle[joint], up_down_ADC[joint],calibration_table[joint]);
 						
 						delta_sample = fabs(f_joint_angle[joint] - f_last_joint[joint]);
 						
@@ -1501,7 +1525,7 @@ int8_t State_Machine_Actuation(void)
 							{
 								joints_finished |= 1<<joint;	//Set respective bit in 1
 								
-								if(joints_finished == ALL_FINISHED)
+								if(joints_finished == (uint16_t)ALL_FINISHED)
 								{
 									state_actuation = RESET_ACTUATION;
 									HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0);
@@ -1510,8 +1534,7 @@ int8_t State_Machine_Actuation(void)
 								}
 							}
 						}
-						else
-							
+						else							
 							timeout = TIMEOUT;
 
 					}
@@ -1534,8 +1557,8 @@ int8_t State_Machine_Actuation(void)
       //Turn off joints that got stuck
       for(joint=0; joint<JOINTS; joint++)
       {
-        if((joints_finished & (1<<joint)) == 0)
-          __HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], 0);
+        //if((joints_finished & (1<<joint)) == 0)
+          //__HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], 0);
       }
       return -1;
 	}
@@ -1684,7 +1707,7 @@ void State_Machine_Control(void)
           if(delta_target < DEAD_BANDWIDTH_SERVO)
             joints_finished |= 1<<joint;	//Set respective bit in 1
           else
-            __HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(target_joint[joint],col_sel[joint]));  //Move the servomotor
+            __HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(target_joint[joint]));  //Move the servomotor
         }
         
         //Start first measure of joints before ACTUATION

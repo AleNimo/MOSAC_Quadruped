@@ -99,8 +99,41 @@ if __name__ == '__main__':
                     # if bytes_read == 12*4: print("Se leyó todo")
                     # else: print("no se leyeron la cantidad de bytes correcta")
 
-                    measured_joints = np.frombuffer(bytes(joints_byte_list), dtype='<f4')   #< little endian, > big endian
-                    # print("measured_joints = ", measured_joints)
+                    measured_joints_nucleo = np.frombuffer(bytes(joints_byte_list), dtype='<f4')   #< little endian, > big endian
+                    print("measured_joints_nucleo = ", measured_joints_nucleo)
+                    #Change the order from coppelia to the order the NUCLEO needs based on servo conections to the timers:
+                    measured_joints = np.zeros(12,dtype = np.float32)
+                    # Body  Front   Right
+                    measured_joints[0] = 65 - measured_joints_nucleo[4]
+                    # Leg   Front   Right
+                    measured_joints[1] = 65 - measured_joints_nucleo[3]
+                    # Paw   Front   Right
+                    measured_joints[2] = measured_joints_nucleo[0] - 65 
+                    # Body  Front   Left
+                    measured_joints[3] = measured_joints_nucleo[6] - 65 
+                    # Leg   Front   Left
+                    measured_joints[4] = measured_joints_nucleo[7] - 65 
+                    # Paw   Front   Left
+                    measured_joints[5] = 65 - measured_joints_nucleo[5]
+                    # Body  Back    Right
+                    measured_joints[6] = 65 - measured_joints_nucleo[11]
+                    # Leg   Back    Right
+                    measured_joints[7] = 65 - measured_joints_nucleo[10]
+                    # Paw   Back    Right
+                    measured_joints[8] = measured_joints_nucleo[1] - 65 
+                    # Body  Back    Left
+                    measured_joints[9] = measured_joints_nucleo[8] - 65 
+                    # Leg   Back    Left
+                    measured_joints[10] = measured_joints_nucleo[9] - 65 
+                    # Paw   Back    Left
+                    measured_joints[11] = 65 - measured_joints_nucleo[2]
+
+                    for i in range(4):
+                        measured_joints[i*3] =      (measured_joints[i*3]    - body_mean)   /   body_range
+                        measured_joints[1+i*3] =    (measured_joints[1+i*3]  - leg_mean)    /   leg_range
+                        measured_joints[2+i*3] =    (measured_joints[2+i*3]  - paw_mean)    /   paw_range
+                    
+                    print("measured_joints = ", measured_joints)
                     # print("measured_joints.dtype", measured_joints.dtype)
 
                     state = "RX_I2C"
@@ -112,11 +145,11 @@ if __name__ == '__main__':
                 (count, data) = pi.i2c_read_device(hi2c, 4*4)
                 if count == 4*4: print("Se leyó todo")
                 else: print("no se leyeron la cantidad de bytes correcta")
-                print("bytes IMU",data)
+                #print("bytes IMU",data)
 
                 #IMU_data[4] = [roll, pitch, wx, wy]
                 IMU_data = np.frombuffer(bytes(data), dtype='<f4')
-                # print("IMU_data = ", IMU_data)
+                print("IMU_data = ", IMU_data)
 
                 state = "POLICY"
 
@@ -148,11 +181,44 @@ if __name__ == '__main__':
                     action[1+i*3] = action[1+i*3] * leg_range + leg_mean
                     action[2+i*3] = action[2+i*3] * paw_range + paw_mean
                 
-                print("Action = ", action)
+                
+
+                #Change the order from coppelia to the order the NUCLEO needs based on servo conections to the timers:
+                action_nucleo = np.zeros(12, dtype=np.float32)
+                # Body  Front   Right
+                action_nucleo[4] = 65 - action[0]
+                # Leg   Front   Right
+                action_nucleo[3] = 65 - action[1]
+                # Paw   Front   Right
+                action_nucleo[0] = 65 + action[2]
+                # Body  Front   Left
+                action_nucleo[6] = 65 + action[3]
+                # Leg   Front   Left
+                action_nucleo[7] = 65 + action[4]
+                # Paw   Front   Left
+                action_nucleo[5] = 65 - action[5]
+                # Body  Back    Right
+                action_nucleo[11] = 65 - action[6]
+                # Leg   Back    Right
+                action_nucleo[10] = 65 - action[7]
+                # Paw   Back    Right
+                action_nucleo[1] = 65 + action[8]
+                # Body  Back    Left
+                action_nucleo[8] = 65 + action[9]
+                # Leg   Back    Left
+                action_nucleo[9] = 65 + action[10]
+                # Paw   Back    Left
+                action_nucleo[2] = 65 - action[11]
+
+                #Order of nucleo servos:
+                #0PWM_PFR,1PWM_PBR,2PWM_PBL,3PWM_LFR,4PWM_BFR,5PWM_PFL,6PWM_BFL,7PWM_LFL,8PWM_BBL,9PWM_LBL,10PWM_LBR,11PWM_BBR
+
+                print("Action = ",          action)
+                print("Action Nucleo = ", action_nucleo)
                 # print("action.dtype", action.dtype)
 
                 #Convert float numpy array in byte list
-                action_byte_list = list(action.tobytes())
+                action_byte_list = list(action_nucleo.tobytes())
 
                 state = "TX_SPI"
 
