@@ -43,17 +43,17 @@ class ReplayBuffer():
 
         return states, actions, rewards, pref, next_states, done_flags
     
-    def save(self, episode):
-        filename = 'Train/Replay_Buffer_episode_{0:07d}'.format(episode)
+    def save(self, step):
+        filename = 'Train/Replay_Buffer_step_{0:07d}'.format(step)
 
         np.savez_compressed(filename, size = self.mem_size, counter = self.mem_counter, state = self.state_memory, action = self.action_memory,
                     reward = self.reward_memory, next_state = self.next_state_memory, done = self.done_flag_memory)
         
         # Update progress file
-        with open('./Train/Progress.txt', 'w') as file: np.savetxt(file, np.array((episode,)), fmt='%d')
+        with open('./Train/Progress.txt', 'w') as file: np.savetxt(file, np.array((step,)), fmt='%d')
     
-    def load(self, episode):
-        filename = './Train/Replay_Buffer_episode_{0:07d}.npz'.format(episode)
+    def load(self, step):
+        filename = './Train/Replay_Buffer_step_{0:07d}.npz'.format(step)
         loaded_arrays = np.load(filename)
 
         self.mem_size = loaded_arrays['size']

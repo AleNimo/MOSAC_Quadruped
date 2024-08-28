@@ -42,21 +42,21 @@ def MORL_Agent_Test(q):
     ep_rwd = np.zeros((episode_steps, rwd_dim), dtype=data_type)            # Episode's rewards
 
     #Load Agent
-    # agent = SAC_Agent('MOSAC_HalfCheetah', obs_dim, act_dim, rwd_dim, pref_max_vector, pref_min_vector, replay_buffer_size=1000000)
-    # agent.load_models()
+    agent = SAC_Agent('MOSAC_HalfCheetah_learn_each_step', obs_dim, act_dim, rwd_dim, pref_max_vector, pref_min_vector, replay_buffer_size=1000000)
+    agent.load_models()
 
     # agent = CAPQL(env, device = "cuda")
     # agent.load(path="weights/CAPQL steps=1000000.tar", load_replay_buffer=False)
 
-    agent = GPIPDContinuousAction(env, device = "cuda")
-    agent.load(path="weights/GPI-PD gpi-ls iter=10.tar", load_replay_buffer=False)
+    # agent = GPIPDContinuousAction(env, device = "cuda")
+    # agent.load(path="weights/GPI-PD gpi-ls iter=10.tar", load_replay_buffer=False)
     
     # Measure discounted return in tests
     for x_index, x_pref in enumerate(x_axis_pref):
         for y_index, y_pref in enumerate(y_axis_pref):
             print(f"Testing with preferences [{x_pref}, {y_pref}]: ")
-            pref = np.array([x_pref, y_pref]) #MORL_baselines
-            # pref = np.array([[x_pref, y_pref]]) #MOSAC
+            # pref = np.array([x_pref, y_pref]) #MORL_baselines
+            pref = np.array([[x_pref, y_pref]]) #MOSAC
             acum_ret = 0
             for run in range(1,6):
 
@@ -66,11 +66,11 @@ def MORL_Agent_Test(q):
 
                 while not done_flag:
                     # Decide action based on present observed state (taking only the mean)
-                    action = agent.eval(obs, pref) #MORL_baselines
-                    # action = agent.choose_action(obs, pref, random=False) #MOSAC
+                    # action = agent.eval(obs, pref) #MORL_baselines
+                    action = agent.choose_action(obs, pref, random=False) #MOSAC
                     # Act in the environment
-                    obs, ep_rwd[step], terminated, truncated, info = env.step(action) #MORL_baselines
-                    # obs, ep_rwd[step], terminated, truncated, info = env.step(action[0]) #MOSAC
+                    # obs, ep_rwd[step], terminated, truncated, info = env.step(action) #MORL_baselines
+                    obs, ep_rwd[step], terminated, truncated, info = env.step(action[0]) #MOSAC
 
                     done_flag = terminated or truncated
                     
@@ -101,7 +101,7 @@ def MORL_Agent_Test(q):
             print("Average return to plot: ", ret[x_index, y_index])
     
     #Save the testing data (for 3D plot)
-    filename = f"./Return_Surface_GPI-PD"
+    filename = f"./Return_Surface_MOSAC_2"
     np.savez_compressed(filename, return_3D = ret)
 
 def updatePlot():   

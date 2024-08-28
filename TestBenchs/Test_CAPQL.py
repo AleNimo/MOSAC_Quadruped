@@ -6,11 +6,11 @@ from morl_baselines.multi_policy.capql.capql import CAPQL
 
 GAMMA = 0.99
 
-env = mo_gym.make("mo-halfcheetah-v4", render_mode="human")
+env = mo_gym.make("mo-walker2d-v4", render_mode="human")
 
 env = MORecordEpisodeStatistics(env, gamma=GAMMA)  # wrapper for recording statistics
 
-eval_env = mo_gym.make("mo-halfcheetah-v4", render_mode="human")
+eval_env = mo_gym.make("mo-walker2d-v4", render_mode="human")
 
 agent = CAPQL(env, gamma = GAMMA, batch_size = 1000, device = "cuda", seed=1)
 
