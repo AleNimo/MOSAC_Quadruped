@@ -6,12 +6,13 @@ class CoppeliaSocket:
         ''' Creates an object that controls the communications with the CoppeliaSim simulator '''
         self.__obs_sp_size = obs_sp_size     # Observation space size
 
+        print("Waiting socket connection", flush=True)
         # Establish socket connection
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(('127.0.0.1', port))
             s.listen()
             self.__coppelia_socket, addr = s.accept()
-            print('Connected by', addr)
+            print('Connected by', addr, flush=True)
 
         # Discard first observed state
         _ = [float(self.__coppelia_socket.recv(10).decode()) for idx in range(obs_sp_size)]
