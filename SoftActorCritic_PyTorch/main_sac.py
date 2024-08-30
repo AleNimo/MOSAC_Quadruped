@@ -96,7 +96,7 @@ def SAC_Agent_Training(q):
 
     while train_history.episode <= episodes:
 
-        print("Episode: ", train_history.episode)
+        print("Episode: ", train_history.episode, flush=True)
 
         ep_obs[0], done_flag = env.reset(), False
 
@@ -104,7 +104,7 @@ def SAC_Agent_Training(q):
         if test_agent:
             # Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back]
             pref = np.array([[2, 1, 1, 2, 1,1]])
-            print("Preference vector: ", pref)
+            print("Preference vector: ", pref, flush=True)
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
                 ep_act[step] = agent.choose_action(ep_obs[step][:env.obs_dim], pref, random=False)
@@ -122,7 +122,7 @@ def SAC_Agent_Training(q):
         else:
             # Generate random preference for the episode
             pref = np.random.random_sample((1, pref_dim)) * (pref_max_vector-pref_min_vector) + pref_min_vector
-            print("Preference vector: ", pref)
+            print("Preference vector: ", pref, flush=True)
             for step in range(episode_steps):
                 # Decide action based on present observed state (random action with mean and std)
                 ep_act[step] = agent.choose_action(ep_obs[step][:env.obs_dim], pref)
@@ -150,13 +150,13 @@ def SAC_Agent_Training(q):
 
         # If the episode ended because the agent reached the maximum steps allowed, the rest of the return is estimated with the Q function
         # Using the last state, and last action that the policy would have chosen in that state
-        if not done_flag:
-            last_state = torch.tensor(np.expand_dims(ep_obs[step+1][:env.obs_dim], axis=0), dtype=torch.float64).to(agent.P_net.device)
-            last_action = agent.choose_action(ep_obs[step+1][:env.obs_dim], pref, random=not (test_agent), tensor=True)
-            if test_agent:
-                aux_ret[step] += agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
-            else:
-                aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+        # if not done_flag:
+        #     last_state = torch.tensor(np.expand_dims(ep_obs[step+1][env.sim_measurement:], axis=0), dtype=torch.float64).to(agent.P_net.device)
+        #     last_action = agent.choose_action(ep_obs[step+1][env.sim_measurement:], pref, random=not(test_agent), tensor=True)
+        #     if test_agent:
+        #         aux_ret[step] += agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
+        #     else:
+        #         aux_ret[step] += agent.discount_factor * agent.minimal_Q(last_state, last_action, pref_tensor).detach().cpu().numpy().reshape(-1)
 
         if test_agent:
             for i in range(ep_len-2, -1, -1):
@@ -167,7 +167,7 @@ def SAC_Agent_Training(q):
         train_history.ep_ret[train_history.episode, 0] = aux_ret[0]
 
         if test_agent:  # when testing only compute the real return
-            print("Episode's undiscounted return: ", aux_ret[0])
+            print("Episode's undiscounted return: ", aux_ret[0], flush=True)
 
             # Send the information for plotting in the other process through a Queue
             q.put((test_agent, ep_obs[0:ep_len+1], tot_rwd[0:ep_len+1],ep_rwd[0:ep_len+1],  ep_act[0:ep_len+1]))
@@ -192,12 +192,12 @@ def SAC_Agent_Training(q):
             train_history.ep_entropy[train_history.episode] = agent.entropy.item()
             train_history.ep_std[train_history.episode] = agent.std.item()
 
-            print("Replay_Buffer_counter: ", agent.replay_buffer.mem_counter)
-            print("Q_loss: ", train_history.ep_loss[train_history.episode, 0])
-            print("P_loss: ", train_history.ep_loss[train_history.episode, 1])
-            print("Alpha: ", train_history.ep_alpha[train_history.episode])
+            print("Replay_Buffer_counter: ", agent.replay_buffer.mem_counter, flush=True)
+            print("Q_loss: ", train_history.ep_loss[train_history.episode, 0], flush=True)
+            print("P_loss: ", train_history.ep_loss[train_history.episode, 1], flush=True)
+            print("Alpha: ", train_history.ep_alpha[train_history.episode], flush=True)
             print("Policy's Entropy: ",
-                  train_history.ep_entropy[train_history.episode])
+                  train_history.ep_entropy[train_history.episode], flush=True)
 
             # Send the information for plotting in the other process through a Queue
             q.put((test_agent, ep_obs[0:ep_len+1], tot_rwd[0:ep_len+1], ep_rwd[0:ep_len+1],  ep_act[0:ep_len+1],train_history.episode, train_history.ep_ret[0:train_history.episode +
@@ -237,7 +237,7 @@ def updatePlot():
         curve_FrontPaw_right_state, curve_FrontPaw_left_state, curve_FrontPaw_right_action, curve_FrontPaw_left_action, \
         curve_BackPaw_right_state, curve_BackPaw_left_state, curve_BackPaw_right_action, curve_BackPaw_left_action, \
         body_joints_state, body_joints_action, leg_joints_state, leg_joints_action, paw_joints_state, paw_joints_action
-    # print('Thread ={}          Function = updatePlot()'.format(threading.currentThread().getName()))
+    # print('Thread ={}          Function = updatePlot()'.format(threading.currentThread().getName()), flush=True)
     try:
         results = q.get_nowait()
 
@@ -410,12 +410,12 @@ def updatePlot():
             curve_Std.setData(episode_linspace, Std_data)
 
     except queue.Empty:
-        # print("Empty Queue")
+        # print("Empty Queue", flush=True)
         pass
 
 
 if __name__ == '__main__':
-    # print('Thread ={}          Function = main()'.format(threading.currentThread().getName()))
+    # print('Thread ={}          Function = main()'.format(threading.currentThread().getName()), flush=True)
     app = QApplication(sys.argv)
 
     # Create a queue to share data between processes

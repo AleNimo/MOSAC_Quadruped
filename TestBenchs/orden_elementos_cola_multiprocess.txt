@@ -1,0 +1,11 @@
+0-test_agent
+1-ep_hidden_obs[0:ep_len+1]
+2-ep_obs[0:ep_len+1]
+3-tot_rwd[0:ep_len+1]
+4-ep_rwd[0:ep_len+1]
+5-ep_act[0:ep_len+1]
+6-train_history.episode
+7-train_history.ep_ret[0:train_history.episode+1]
+8-train_history.ep_loss[0:train_history.episode+1]
+9-train_history.ep_alpha[0:train_history.episode+1]
+10-train_history.ep_entropy[0:train_history.episode+1]
