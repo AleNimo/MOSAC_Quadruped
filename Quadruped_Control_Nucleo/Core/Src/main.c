@@ -77,7 +77,8 @@
 #define TIMEOUT_STATE 3
 
 // Parameters to transform Degrees(�) values to PWM (Ton in microseconds)
-#define K_TON (float32_t)0.135
+// ton = 500us --> 0°, ton = 1785.71 ---> 180°
+#define K_TON (float32_t)(1000.0 / 140.0)
 #define BIAS_TON (float)500
 
 // Parameters of the actuation and time-out algorithm
