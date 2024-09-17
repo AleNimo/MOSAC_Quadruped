@@ -1,0 +1,1414 @@
+#VRML_SIM R2023b utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/floors/protos/RectangleArena.proto"
+
+WorldInfo {
+  basicTimeStep 10
+  contactProperties [
+    ContactProperties {
+      maxContactJoints 10000
+    }
+  ]
+}
+Viewpoint {
+  orientation -0.2624283526989839 -0.13773937480479143 0.9550702719319049 4.03690999672862
+  position 0.4992521329167264 0.6480945510555329 0.5777504654913562
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  floorSize 50 50
+}
+DEF MOSAC Robot {
+  translation 0 0 0.14
+  children [
+    Gyro {
+      translation 0 -0.005 0.036
+      rotation 0 0 1 3.14159
+      translationStep 0.001
+    }
+    Accelerometer {
+      translation 0 -0.005 0.036
+      rotation 0 0 1 3.14159
+    }
+    Shape {
+      appearance DEF chasis_base_link_material PBRAppearance {
+        baseColor 0.298039 0.298039 0.298039
+        roughness 1
+        metalness 0
+      }
+      geometry DEF chasis_base_link Mesh {
+        url [
+          "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/chasis_base_link.STL"
+        ]
+      }
+    }
+    HingeJoint {
+      jointParameters HingeJointParameters {
+        anchor 0.095 -0.05275 0.0032
+      }
+      device [
+        RotationalMotor {
+          name "BFR_joint"
+          maxTorque 3.43
+        }
+        PositionSensor {
+          name "BFR_joint_sensor"
+        }
+      ]
+      endPoint Solid {
+        translation 0.095 -0.05275 0.0032
+        rotation 0.5773502691896257 -0.5773502691896257 -0.5773502691896257 2.094395
+        children [
+          Shape {
+            appearance DEF BFR_link_material PBRAppearance {
+              baseColor 0.79216 0.81961 0.93333
+              roughness 1
+              metalness 0
+            }
+            geometry DEF BFR_link Mesh {
+              url [
+                "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BFR_link.STL"
+              ]
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              anchor 0.035125 0.010265 -0.02005
+            }
+            device [
+              RotationalMotor {
+                name "FR_servo_femur_joint"
+                maxTorque 3.43
+              }
+              PositionSensor {
+                name "FR_servo_femur_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.035125 0.010265 -0.02005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF FR_servo_femur_link_material PBRAppearance {
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF FR_servo_femur_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_servo_femur_link.STL"
+                    ]
+                  }
+                }
+                HingeJoint {
+                  jointParameters HingeJointParameters {
+                    axis 0 0 -1
+                    anchor -0.07355 -0.067752 0.004875
+                  }
+                  device [
+                    PositionSensor {
+                      name "FR_tibia_joint_sensor"
+                    }
+                  ]
+                  endPoint Solid {
+                    translation -0.07355 -0.067752 0.004875
+                    rotation 0 0 -1 0
+                    children [
+                      Shape {
+                        appearance DEF FR_tibia_link_material PBRAppearance {
+                          roughness 1
+                          metalness 0
+                        }
+                        geometry DEF FR_tibia_link Mesh {
+                          url [
+                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_tibia_link.STL"
+                          ]
+                        }
+                      }
+                      HingeJoint {
+                        jointParameters HingeJointParameters {
+                          axis 0 0 -1
+                          anchor -0.019092 0.019092 -0.00425
+                        }
+                        device [
+                          PositionSensor {
+                            name "FR_rotula_grande_tibia_joint_sensor"
+                          }
+                        ]
+                        endPoint Solid {
+                          translation -0.019092 0.019092 -0.00425
+                          rotation 0 0 -1 0
+                          children [
+                            Shape {
+                              appearance DEF FR_rotula_grande_tibia_link_material PBRAppearance {
+                                baseColor 0.298039 0.298039 0.298039
+                                roughness 1
+                                metalness 0
+                              }
+                              geometry DEF FR_rotula_grande_tibia_link Mesh {
+                                url [
+                                  "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_rotula_grande_tibia_link.STL"
+                                ]
+                              }
+                            }
+                            HingeJoint {
+                              jointParameters HingeJointParameters {
+                                axis 0 0 1
+                                anchor 0.07355 0.067752 0
+                              }
+                              device [
+                                PositionSensor {
+                                  name "FR_rotula_grande_shoulder_joint_sensor"
+                                }
+                              ]
+                              endPoint SolidReference {
+                                solidName "FR_shoulder_link"
+                              }
+                            }
+                          ]
+                          name "FR_rotula_grande_tibia_link"
+                          boundingObject USE FR_rotula_grande_tibia_link
+                          physics Physics {
+                            density -1
+                            mass 0.0064
+                            centerOfMass [
+                              0.036775 0.033876 0
+                            ]
+                            inertiaMatrix [
+                              3.347027e-06 3.926502e-06 7.222441e-06
+                              -3.524465e-06 -4.032518e-20 -3.730798e-20
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                    name "FR_tibia_link"
+                    boundingObject Pose {
+                      translation 0.074 -0.065 0
+                      children [
+                        Cylinder {
+                          height 0.02
+                          radius 0.02
+                        }
+                      ]
+                    }
+                    physics Physics {
+                      density -1
+                      mass 0.025039
+                      centerOfMass [
+                        0.040552 -0.040701 -0.000529
+                      ]
+                      inertiaMatrix [
+                        1.136341e-05 1.805429e-05 2.862278e-05
+                        1.319702e-05 -2.026665e-07 2.003045e-07
+                      ]
+                    }
+                  }
+                }
+              ]
+              name "FR_servo_femur_link"
+              boundingObject USE FR_servo_femur_link
+              physics Physics {
+                density -1
+                mass 0.024784
+                centerOfMass [
+                  -0.035696 -0.032879 0.003397
+                ]
+                inertiaMatrix [
+                  9.0612e-06 1.0494e-05 1.8687e-05
+                  -8.7198e-06 2.0748e-07 1.9069e-07
+                ]
+              }
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              anchor 0.02375 -0.010265 -0.04005
+            }
+            device [
+              RotationalMotor {
+                name "FR_servo_tibia_joint"
+                maxTorque 3.43
+              }
+              PositionSensor {
+                name "FR_servo_tibia_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.02375 -0.010265 -0.04005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF FR_servo_tibia_link_material PBRAppearance {
+                    baseColor 0.898039 0.917647 0.929412
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF FR_servo_tibia_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_servo_tibia_link.STL"
+                    ]
+                  }
+                }
+                HingeJoint {
+                  jointParameters HingeJointParameters {
+                    axis 0 0 1
+                    anchor 0.016698 0.017238 0.0106
+                  }
+                  device [
+                    PositionSensor {
+                      name "FR_rotula_chica_servo_joint_sensor"
+                    }
+                  ]
+                  endPoint Solid {
+                    translation 0.016698 0.017238 0.0106
+                    children [
+                      Shape {
+                        appearance DEF FR_rotula_chica_servo_link_material PBRAppearance {
+                          baseColor 0.298039 0.298039 0.298039
+                          roughness 1
+                          metalness 0
+                        }
+                        geometry DEF FR_rotula_chica_servo_link Mesh {
+                          url [
+                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_rotula_chica_servo_link.STL"
+                          ]
+                        }
+                      }
+                      HingeJoint {
+                        jointParameters HingeJointParameters {
+                          axis 0 0 1
+                          anchor -0.019728 0.020263 0
+                        }
+                        device [
+                          PositionSensor {
+                            name "FR_rotula_chica_shoulder_joint_sensor"
+                          }
+                        ]
+                        endPoint SolidReference {
+                          solidName "FR_shoulder_link"
+                        }
+                      }
+                    ]
+                    name "FR_rotula_chica_servo_link"
+                    boundingObject USE FR_rotula_chica_servo_link
+                    physics Physics {
+                      density -1
+                      mass 0.00307
+                      centerOfMass [
+                        -0.009864 0.010131 0
+                      ]
+                      inertiaMatrix [
+                        2.884972e-07 2.768914e-07 5.409709e-07
+                        2.169723e-07 5.800905e-22 -1.073308e-21
+                      ]
+                    }
+                  }
+                }
+              ]
+              name "FR_servo_tibia_link"
+              boundingObject USE FR_servo_tibia_link
+              physics Physics {
+                density -1
+                mass 0.004851
+                centerOfMass [
+                  0.008491 0.008777 0.00541
+                ]
+                inertiaMatrix [
+                  2.415336e-07 2.247202e-07 4.159661e-07
+                  -1.637305e-07 -4.590641e-09 -4.713469e-09
+                ]
+              }
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              anchor 0.035125 0.010265 -0.02005
+            }
+            device [
+              PositionSensor {
+                name "FR_shoulder_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.035125 0.010265 -0.02005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF FR_shoulder_link_material PBRAppearance {
+                    baseColor 0.752941 0 0
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF FR_shoulder_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_shoulder_link.STL"
+                    ]
+                  }
+                }
+              ]
+              name "FR_shoulder_link"
+              boundingObject USE FR_shoulder_link
+              physics Physics {
+                density -1
+                mass 0.006585
+                centerOfMass [
+                  -0.001056 0.012507 -0.006044
+                ]
+                inertiaMatrix [
+                  5.780505e-07 5.887966e-07 1.082291e-06
+                  5.767561e-08 1.846366e-09 -9.291943e-09
+                ]
+              }
+            }
+          }
+        ]
+        name "BFR_link"
+        boundingObject USE BFR_link
+        physics Physics {
+          density -1
+          mass 0.14189
+          centerOfMass [
+            0.005418 -2e-06 -0.030952
+          ]
+          inertiaMatrix [
+            2.2913e-05 2.018e-05 8.4922e-06
+            -2.9145e-09 -1.1575e-09 8.907e-10
+          ]
+        }
+      }
+    }
+    HingeJoint {
+      jointParameters HingeJointParameters {
+        axis 1 -4e-06 4e-06
+        anchor -0.095 -0.05275 0.0032
+      }
+      device [
+        RotationalMotor {
+          name "BBR_joint"
+          maxTorque 3.43
+        }
+        PositionSensor {
+          name "BBR_joint_sensor"
+        }
+      ]
+      endPoint Solid {
+        translation -0.095 -0.05275 0.0032
+        rotation 0.5773496025226482 -0.5773516025212713 -0.5773496025226482 2.094399
+        children [
+          Shape {
+            appearance DEF BBR_link_material PBRAppearance {
+              baseColor 0.792157 0.819608 0.933333
+              roughness 1
+              metalness 0
+            }
+            geometry DEF BBR_link Mesh {
+              url [
+                "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BBR_link.STL"
+              ]
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              anchor 0.035125 0.010265 0.04005
+            }
+            device [
+              RotationalMotor {
+                name "BR_servo_femur_joint"
+                maxTorque 3.43
+              }
+              PositionSensor {
+                name "BR_servo_femur_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.035125 0.010265 0.04005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF BR_servo_femur_link_material PBRAppearance {
+                    baseColor 0.298039 0.298039 0.298039
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF BR_servo_femur_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_servo_femur_link.STL"
+                    ]
+                  }
+                }
+                HingeJoint {
+                  jointParameters HingeJointParameters {
+                    axis 0 0 -1
+                    anchor -0.07355 -0.067752 0.004875
+                  }
+                  device [
+                    PositionSensor {
+                      name "BR_tibia_joint_sensor"
+                    }
+                  ]
+                  endPoint Solid {
+                    translation -0.07355 -0.067752 0.004875
+                    rotation 0 0 -1 0
+                    children [
+                      Shape {
+                        appearance DEF BR_tibia_link_material PBRAppearance {
+                          roughness 1
+                          metalness 0
+                        }
+                        geometry DEF BR_tibia_link Mesh {
+                          url [
+                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_tibia_link.STL"
+                          ]
+                        }
+                      }
+                      HingeJoint {
+                        jointParameters HingeJointParameters {
+                          axis 0 0 1
+                          anchor -0.019092 0.019092 -0.00425
+                        }
+                        device [
+                          PositionSensor {
+                            name "BR_rotula_grande_tibia_joint_sensor"
+                          }
+                        ]
+                        endPoint Solid {
+                          translation -0.019092 0.019092 -0.00425
+                          children [
+                            Shape {
+                              appearance DEF BR_rotula_grande_tibia_link_material PBRAppearance {
+                                baseColor 0.298039 0.298039 0.298039
+                                roughness 1
+                                metalness 0
+                              }
+                              geometry DEF BR_rotula_grande_tibia_link Mesh {
+                                url [
+                                  "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_rotula_grande_tibia_link.STL"
+                                ]
+                              }
+                            }
+                            HingeJoint {
+                              jointParameters HingeJointParameters {
+                                axis 0 0 1
+                                anchor 0.07355 0.067752 0
+                              }
+                              device [
+                                PositionSensor {
+                                  name "BR_rotula_grande_shoulder_joint_sensor"
+                                }
+                              ]
+                              endPoint SolidReference {
+                                solidName "BR_shoulder_link"
+                              }
+                            }
+                          ]
+                          name "BR_rotula_grande_tibia_link"
+                          boundingObject USE BR_rotula_grande_tibia_link
+                          physics Physics {
+                            density -1
+                            mass 0.0064
+                            centerOfMass [
+                              0.036775 0.033876 0
+                            ]
+                            inertiaMatrix [
+                              3.347027e-06 3.926502e-06 7.222441e-06
+                              -3.524465e-06 -8.733662e-21 -8.853791e-21
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                    name "BR_tibia_link"
+                    boundingObject Pose {
+                      translation 0.074 -0.065 0
+                      children [
+                        Cylinder {
+                          height 0.02
+                          radius 0.02
+                        }
+                      ]
+                    }
+                    physics Physics {
+                      density -1
+                      mass 0.025039
+                      centerOfMass [
+                        0.040552 -0.040701 -0.000529
+                      ]
+                      inertiaMatrix [
+                        1.136341e-05 1.805429e-05 2.862278e-05
+                        1.319702e-05 -2.026665e-07 2.003045e-07
+                      ]
+                    }
+                  }
+                }
+              ]
+              name "BR_servo_femur_link"
+              boundingObject USE BR_servo_femur_link
+              physics Physics {
+                density -1
+                mass 0.024784
+                centerOfMass [
+                  -0.035696 -0.032879 0.003398
+                ]
+                inertiaMatrix [
+                  9.061205e-06 1.049426e-05 1.868678e-05
+                  -8.719828e-06 2.074839e-07 1.906913e-07
+                ]
+              }
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              anchor 0.02375 -0.010265 0.02005
+            }
+            device [
+              RotationalMotor {
+                name "BR_servo_tibia_joint"
+                maxTorque 3.43
+              }
+              PositionSensor {
+                name "BR_servo_tibia_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.02375 -0.010265 0.02005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF BR_servo_tibia_link_material PBRAppearance {
+                    baseColor 0.898039 0.917647 0.929412
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF BR_servo_tibia_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_servo_tibia_link.STL"
+                    ]
+                  }
+                }
+                HingeJoint {
+                  jointParameters HingeJointParameters {
+                    axis 0 0 1
+                    anchor 0.016698 0.017238 0.0106
+                  }
+                  device [
+                    PositionSensor {
+                      name "BR_rotula_chica_servo_joint_sensor"
+                    }
+                  ]
+                  endPoint Solid {
+                    translation 0.016698 0.017238 0.0106
+                    children [
+                      Shape {
+                        appearance DEF BR_rotula_chica_servo_link_material PBRAppearance {
+                          baseColor 0.298039 0.298039 0.298039
+                          roughness 1
+                          metalness 0
+                        }
+                        geometry DEF BR_rotula_chica_servo_link Mesh {
+                          url [
+                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_rotula_chica_servo_link.STL"
+                          ]
+                        }
+                      }
+                      HingeJoint {
+                        jointParameters HingeJointParameters {
+                          axis 0 0 1
+                          anchor -0.019728 0.020263 0
+                        }
+                        device [
+                          PositionSensor {
+                            name "BR_rotula_chica_shoulder_joint_sensor"
+                          }
+                        ]
+                        endPoint SolidReference {
+                          solidName "BR_shoulder_link"
+                        }
+                      }
+                    ]
+                    name "BR_rotula_chica_servo_link"
+                    boundingObject USE BR_rotula_chica_servo_link
+                    physics Physics {
+                      density -1
+                      mass 0.00307
+                      centerOfMass [
+                        -0.009864 0.010131 0
+                      ]
+                      inertiaMatrix [
+                        2.884972e-07 2.768914e-07 5.409709e-07
+                        2.169723e-07 2.220379e-21 -2.375491e-21
+                      ]
+                    }
+                  }
+                }
+              ]
+              name "BR_servo_tibia_link"
+              boundingObject USE BR_servo_tibia_link
+              physics Physics {
+                density -1
+                mass 0.004851
+                centerOfMass [
+                  0.008491 0.008777 0.00541
+                ]
+                inertiaMatrix [
+                  2.415336e-07 2.247202e-07 4.159661e-07
+                  -1.637305e-07 -4.590641e-09 -4.713469e-09
+                ]
+              }
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              anchor 0.035125 0.010265 0.04005
+            }
+            device [
+              PositionSensor {
+                name "BR_shoulder_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.035125 0.010265 0.04005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF BR_shoulder_link_material PBRAppearance {
+                    baseColor 0.752941 0 0
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF BR_shoulder_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_shoulder_link.STL"
+                    ]
+                  }
+                }
+              ]
+              name "BR_shoulder_link"
+              boundingObject USE BR_shoulder_link
+              physics Physics {
+                density -1
+                mass 0.006585
+                centerOfMass [
+                  -0.001056 0.012507 -0.006044
+                ]
+                inertiaMatrix [
+                  5.780505e-07 5.887966e-07 1.082291e-06
+                  5.767561e-08 1.846366e-09 -9.291943e-09
+                ]
+              }
+            }
+          }
+        ]
+        name "BBR_link"
+        boundingObject USE BBR_link
+        physics Physics {
+          density -1
+          mass 0.141888
+          centerOfMass [
+            0.005419 2e-06 0.030952
+          ]
+          inertiaMatrix [
+            2.291278e-05 2.018036e-05 8.492226e-06
+            2.914524e-09 1.157504e-09 8.907022e-10
+          ]
+        }
+      }
+    }
+    HingeJoint {
+      jointParameters HingeJointParameters {
+        axis 1 4e-06 -4e-06
+        anchor 0.095 0.05275 0.0032
+      }
+      device [
+        RotationalMotor {
+          name "BFL_joint"
+          maxTorque 3.43
+        }
+        PositionSensor {
+          name "BFL_joint_sensor"
+        }
+      ]
+      endPoint Solid {
+        translation 0.095 0.05275 0.0032
+        rotation 0.5773496025226482 0.5773516025212713 0.5773496025226482 2.094399
+        children [
+          Shape {
+            appearance DEF BFL_link_material PBRAppearance {
+              baseColor 0.792157 0.819608 0.933333
+              roughness 1
+              metalness 0
+            }
+            geometry DEF BFL_link Mesh {
+              url [
+                "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BFL_link.STL"
+              ]
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              axis -1 0 0
+              anchor 0.035125 0.010265 0.02005
+            }
+            device [
+              RotationalMotor {
+                name "FL_servo_femur_joint"
+                maxTorque 3.43
+              }
+              PositionSensor {
+                name "FL_servo_femur_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.035125 0.010265 0.02005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF FL_servo_femur_link_material PBRAppearance {
+                    baseColor 0.529412 0.54902 0.54902
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF FL_servo_femur_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_servo_femur_link.STL"
+                    ]
+                  }
+                }
+                HingeJoint {
+                  jointParameters HingeJointParameters {
+                    axis 0 0 1
+                    anchor 0.07355 -0.067752 0.004875
+                  }
+                  device [
+                    PositionSensor {
+                      name "FL_tibia_joint_sensor"
+                    }
+                  ]
+                  endPoint Solid {
+                    translation 0.07355 -0.067752 0.004875
+                    children [
+                      Shape {
+                        appearance DEF FL_tibia_link_material PBRAppearance {
+                          baseColor 0.243137 0.243137 0.243137
+                          roughness 1
+                          metalness 0
+                        }
+                        geometry DEF FL_tibia_link Mesh {
+                          url [
+                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_tibia_link.STL"
+                          ]
+                        }
+                      }
+                      HingeJoint {
+                        jointParameters HingeJointParameters {
+                          axis 0 0 1
+                          anchor 0.019092 0.019092 -0.00425
+                        }
+                        device [
+                          PositionSensor {
+                            name "FL_rotula_grande_tibia_joint_sensor"
+                          }
+                        ]
+                        endPoint Solid {
+                          translation 0.019092 0.019092 -0.00425
+                          children [
+                            Shape {
+                              appearance DEF FL_rotula_grande_tibia_link_material PBRAppearance {
+                                baseColor 0.298039 0.298039 0.298039
+                                roughness 1
+                                metalness 0
+                              }
+                              geometry DEF FL_rotula_grande_tibia_link Mesh {
+                                url [
+                                  "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_rotula_grande_tibia_link.STL"
+                                ]
+                              }
+                            }
+                            HingeJoint {
+                              jointParameters HingeJointParameters {
+                                axis 0 0 -1
+                                anchor -0.07355 0.067752 0
+                              }
+                              device [
+                                PositionSensor {
+                                  name "FL_rotula_grande_shoulder_joint_sensor"
+                                }
+                              ]
+                              endPoint SolidReference {
+                                solidName "FL_shoulder_link"
+                              }
+                            }
+                          ]
+                          name "FL_rotula_grande_tibia_link"
+                          boundingObject USE FL_rotula_grande_tibia_link
+                          physics Physics {
+                            density -1
+                            mass 0.0064
+                            centerOfMass [
+                              -0.036775 0.033876 0
+                            ]
+                            inertiaMatrix [
+                              3.347027e-06 3.926502e-06 7.222441e-06
+                              3.524465e-06 4.520198e-21 -4.105416e-21
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                    name "FL_tibia_link"
+                    boundingObject Pose {
+                      translation -0.074 -0.065 0
+                      children [
+                        Cylinder {
+                          height 0.02
+                          radius 0.02
+                        }
+                      ]
+                    }
+                    physics Physics {
+                      density -1
+                      mass 0.025039
+                      centerOfMass [
+                        -0.040552 -0.040701 -0.000529
+                      ]
+                      inertiaMatrix [
+                        1.136344e-05 1.805425e-05 2.862277e-05
+                        -1.319704e-05 2.026317e-07 2.003751e-07
+                      ]
+                    }
+                  }
+                }
+              ]
+              name "FL_servo_femur_link"
+              boundingObject USE FL_servo_femur_link
+              physics Physics {
+                density -1
+                mass 0.024784
+                centerOfMass [
+                  0.035718 -0.0329 0.003398
+                ]
+                inertiaMatrix [
+                  9.056714e-06 1.048907e-05 1.86771e-05
+                  8.714998e-06 -2.115238e-07 1.944147e-07
+                ]
+              }
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              axis -1 0 0
+              anchor 0.02375 -0.010265 0.04005
+            }
+            device [
+              RotationalMotor {
+                name "FL_servo_tibia_joint"
+                maxTorque 3.43
+              }
+              PositionSensor {
+                name "FL_servo_tibia_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.02375 -0.010265 0.04005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF FL_servo_tibia_link_material PBRAppearance {
+                    baseColor 0.898039 0.917647 0.929412
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF FL_servo_tibia_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_servo_tibia_link.STL"
+                    ]
+                  }
+                }
+                HingeJoint {
+                  jointParameters HingeJointParameters {
+                    axis 0 0 -1
+                    anchor -0.016698 0.017238 0.0106
+                  }
+                  device [
+                    PositionSensor {
+                      name "FL_rotula_chica_servo_joint_sensor"
+                    }
+                  ]
+                  endPoint Solid {
+                    translation -0.016698 0.017238 0.0106
+                    rotation 0 0 -1 0
+                    children [
+                      Shape {
+                        appearance DEF FL_rotula_chica_servo_link_material PBRAppearance {
+                          baseColor 0.298039 0.298039 0.298039
+                          roughness 1
+                          metalness 0
+                        }
+                        geometry DEF FL_rotula_chica_servo_link Mesh {
+                          url [
+                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_rotula_chica_servo_link.STL"
+                          ]
+                        }
+                      }
+                      HingeJoint {
+                        jointParameters HingeJointParameters {
+                          axis 0 0 -1
+                          anchor 0.019728 0.020263 0
+                        }
+                        device [
+                          PositionSensor {
+                            name "FL_rotula_chica_shoulder_joint_sensor"
+                          }
+                        ]
+                        endPoint SolidReference {
+                          solidName "FL_shoulder_link"
+                        }
+                      }
+                    ]
+                    name "FL_rotula_chica_servo_link"
+                    boundingObject USE FL_rotula_chica_servo_link
+                    physics Physics {
+                      density -1
+                      mass 0.00307
+                      centerOfMass [
+                        0.009864 0.010131 0
+                      ]
+                      inertiaMatrix [
+                        2.884972e-07 2.768914e-07 5.409709e-07
+                        -2.169723e-07 2.041499e-22 2.172831e-22
+                      ]
+                    }
+                  }
+                }
+              ]
+              name "FL_servo_tibia_link"
+              boundingObject USE FL_servo_tibia_link
+              physics Physics {
+                density -1
+                mass 0.004851
+                centerOfMass [
+                  -0.008502 0.008766 0.00541
+                ]
+                inertiaMatrix [
+                  2.351502e-07 2.311035e-07 4.15966e-07
+                  1.639338e-07 4.565025e-09 -4.738273e-09
+                ]
+              }
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              axis -1 0 0
+              anchor 0.035125 0.010265 0.02005
+            }
+            device [
+              PositionSensor {
+                name "FL_shoulder_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.035125 0.010265 0.02005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF FL_shoulder_link_material PBRAppearance {
+                    baseColor 0.752941 0 0
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF FL_shoulder_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_shoulder_link.STL"
+                    ]
+                  }
+                }
+              ]
+              name "FL_shoulder_link"
+              boundingObject USE FL_shoulder_link
+              physics Physics {
+                density -1
+                mass 0.006585
+                centerOfMass [
+                  0.001056 0.012507 -0.006044
+                ]
+                inertiaMatrix [
+                  5.780505e-07 5.887966e-07 1.082291e-06
+                  -5.767561e-08 -1.846366e-09 -9.291943e-09
+                ]
+              }
+            }
+          }
+        ]
+        name "BFL_link"
+        boundingObject USE BFL_link
+        physics Physics {
+          density -1
+          mass 0.141888
+          centerOfMass [
+            0.005419 -2e-06 0.030952
+          ]
+          inertiaMatrix [
+            2.291279e-05 2.018036e-05 8.49223e-06
+            -2.913992e-09 1.157505e-09 -3.998982e-10
+          ]
+        }
+      }
+    }
+    HingeJoint {
+      jointParameters HingeJointParameters {
+        anchor -0.095 0.05275 0.0032
+      }
+      device [
+        RotationalMotor {
+          name "BBL_joint"
+          maxTorque 3.43
+        }
+        PositionSensor {
+          name "BBL_joint_sensor"
+        }
+      ]
+      endPoint Solid {
+        translation -0.095 0.05275 0.0032
+        rotation 0.5773502691896257 0.5773502691896257 0.5773502691896257 2.094395
+        children [
+          Shape {
+            appearance DEF BBL_link_material PBRAppearance {
+              roughness 1
+              metalness 0
+            }
+            geometry DEF BBL_link Mesh {
+              url [
+                "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BBL_link.STL"
+              ]
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              axis -1 0 0
+              anchor 0.035125 0.010265 -0.04005
+            }
+            device [
+              RotationalMotor {
+                name "BL_servo_femur_joint"
+                maxTorque 3.43
+              }
+              PositionSensor {
+                name "BL_servo_femur_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.035125 0.010265 -0.04005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF BL_servo_femur_link_material PBRAppearance {
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF BL_servo_femur_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_servo_femur_link.STL"
+                    ]
+                  }
+                }
+                HingeJoint {
+                  jointParameters HingeJointParameters {
+                    axis 0 0 1
+                    anchor 0.07355 -0.067752 0.004875
+                  }
+                  device [
+                    PositionSensor {
+                      name "BL_tibia_joint_sensor"
+                    }
+                  ]
+                  endPoint Solid {
+                    translation 0.07355 -0.067752 0.004875
+                    children [
+                      Shape {
+                        appearance DEF BL_tibia_link_material PBRAppearance {
+                          roughness 1
+                          metalness 0
+                        }
+                        geometry DEF BL_tibia_link Mesh {
+                          url [
+                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_tibia_link.STL"
+                          ]
+                        }
+                      }
+                      HingeJoint {
+                        jointParameters HingeJointParameters {
+                          axis 0 0 -1
+                          anchor 0.019092 0.019092 -0.00425
+                        }
+                        device [
+                          PositionSensor {
+                            name "BL_rotula_grande_tibia_joint_sensor"
+                          }
+                        ]
+                        endPoint Solid {
+                          translation 0.019092 0.019092 -0.00425
+                          rotation 0 0 -1 0
+                          children [
+                            Shape {
+                              appearance DEF BL_rotula_grande_tibia_link_material PBRAppearance {
+                                baseColor 0.298039 0.298039 0.298039
+                                roughness 1
+                                metalness 0
+                              }
+                              geometry DEF BL_rotula_grande_tibia_link Mesh {
+                                url [
+                                  "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_rotula_grande_tibia_link.STL"
+                                ]
+                              }
+                            }
+                            HingeJoint {
+                              jointParameters HingeJointParameters {
+                                axis 0 0 -1
+                                anchor -0.07355 0.067752 0
+                              }
+                              device [
+                                PositionSensor {
+                                  name "BL_rotula_grande_shoulder_joint_sensor"
+                                }
+                              ]
+                              endPoint SolidReference {
+                                solidName "BL_shoulder_link"
+                              }
+                            }
+                          ]
+                          name "BL_rotula_grande_tibia_link"
+                          boundingObject USE BL_rotula_grande_tibia_link
+                          physics Physics {
+                            density -1
+                            mass 0.0064
+                            centerOfMass [
+                              -0.036775 0.033876 0
+                            ]
+                            inertiaMatrix [
+                              3.347027e-06 3.926502e-06 7.222441e-06
+                              3.524465e-06 -8.310582e-22 8.203567e-22
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                    name "BL_tibia_link"
+                    boundingObject Pose {
+                      translation -0.074 -0.065 0
+                      children [
+                        Cylinder {
+                          height 0.02
+                          radius 0.02
+                        }
+                      ]
+                    }
+                    physics Physics {
+                      density -1
+                      mass 0.025039
+                      centerOfMass [
+                        -0.040552 -0.040701 -0.000529
+                      ]
+                      inertiaMatrix [
+                        1.136344e-05 1.805425e-05 2.862277e-05
+                        -1.319704e-05 2.026317e-07 2.003751e-07
+                      ]
+                    }
+                  }
+                }
+              ]
+              name "BL_servo_femur_link"
+              boundingObject USE BL_servo_femur_link
+              physics Physics {
+                density -1
+                mass 0.024784
+                centerOfMass [
+                  0.035718 -0.0329 0.003398
+                ]
+                inertiaMatrix [
+                  9.056714e-06 1.048907e-05 1.86771e-05
+                  8.714998e-06 -2.115238e-07 1.944147e-07
+                ]
+              }
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              axis -1 0 0
+              anchor 0.02375 -0.010265 -0.02005
+            }
+            device [
+              RotationalMotor {
+                name "BL_servo_tibia_joint"
+                maxTorque 3.43
+              }
+              PositionSensor {
+                name "BL_servo_tibia_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.02375 -0.010265 -0.02005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF BL_servo_tibia_link_material PBRAppearance {
+                    baseColor 0.898039 0.917647 0.929412
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF BL_servo_tibia_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_servo_tibia_link.STL"
+                    ]
+                  }
+                }
+                HingeJoint {
+                  jointParameters HingeJointParameters {
+                    axis 0 0 -1
+                    anchor -0.016698 0.017238 0.0106
+                  }
+                  device [
+                    PositionSensor {
+                      name "BL_rotula_chica_servo_joint_sensor"
+                    }
+                  ]
+                  endPoint Solid {
+                    translation -0.016698 0.017238 0.0106
+                    rotation 0 0 -1 0
+                    children [
+                      Shape {
+                        appearance DEF BL_rotula_chica_servo_link_material PBRAppearance {
+                          baseColor 0.298039 0.298039 0.298039
+                          roughness 1
+                          metalness 0
+                        }
+                        geometry DEF BL_rotula_chica_servo_link Mesh {
+                          url [
+                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_rotula_chica_servo_link.STL"
+                          ]
+                        }
+                      }
+                      HingeJoint {
+                        jointParameters HingeJointParameters {
+                          axis 0 0 -1
+                          anchor 0.019728 0.020263 0
+                        }
+                        device [
+                          PositionSensor {
+                            name "BL_rotula_chica_shoulder_joint_sensor"
+                          }
+                        ]
+                        endPoint SolidReference {
+                          solidName "BL_shoulder_link"
+                        }
+                      }
+                    ]
+                    name "BL_rotula_chica_servo_link"
+                    boundingObject USE BL_rotula_chica_servo_link
+                    physics Physics {
+                      density -1
+                      mass 0.00307
+                      centerOfMass [
+                        0.009864 0.010131 0
+                      ]
+                      inertiaMatrix [
+                        2.884972e-07 2.768914e-07 5.409709e-07
+                        -2.169723e-07 3.794766e-23 4.862199e-23
+                      ]
+                    }
+                  }
+                }
+              ]
+              name "BL_servo_tibia_link"
+              boundingObject USE BL_servo_tibia_link
+              physics Physics {
+                density -1
+                mass 0.004851
+                centerOfMass [
+                  -0.008502 0.008766 0.00541
+                ]
+                inertiaMatrix [
+                  2.351502e-07 2.311035e-07 4.15966e-07
+                  1.639338e-07 4.565025e-09 -4.738273e-09
+                ]
+              }
+            }
+          }
+          HingeJoint {
+            jointParameters HingeJointParameters {
+              axis -1 0 0
+              anchor 0.035125 0.010265 -0.04005
+            }
+            device [
+              PositionSensor {
+                name "BL_shoulder_joint_sensor"
+              }
+            ]
+            endPoint Solid {
+              translation 0.035125 0.010265 -0.04005
+              rotation 0 1 0 1.570796
+              children [
+                Shape {
+                  appearance DEF BL_shoulder_link_material PBRAppearance {
+                    baseColor 0.752941 0 0
+                    roughness 1
+                    metalness 0
+                  }
+                  geometry DEF BL_shoulder_link Mesh {
+                    url [
+                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_shoulder_link.STL"
+                    ]
+                  }
+                }
+              ]
+              name "BL_shoulder_link"
+              boundingObject USE BL_shoulder_link
+              physics Physics {
+                density -1
+                mass 0.006585
+                centerOfMass [
+                  0.001056 0.012507 -0.006044
+                ]
+                inertiaMatrix [
+                  5.780505e-07 5.887966e-07 1.082291e-06
+                  -5.767561e-08 -1.846366e-09 -9.291943e-09
+                ]
+              }
+            }
+          }
+        ]
+        name "BBL_link"
+        boundingObject USE BBL_link
+        physics Physics {
+          density -1
+          mass 0.141888
+          centerOfMass [
+            0.005419 2e-06 -0.030952
+          ]
+          inertiaMatrix [
+            2.291279e-05 2.018036e-05 8.49223e-06
+            2.913992e-09 -1.157505e-09 -3.998982e-10
+          ]
+        }
+      }
+    }
+  ]
+  name "URDFMOSACReal"
+  boundingObject USE chasis_base_link
+  physics Physics {
+    density -1
+    mass 1.285177
+    centerOfMass [
+      0.00029 0.000892 -0.002484
+    ]
+    inertiaMatrix [
+      0.0008361186 0.001689253 0.001907959
+      2.50543e-06 2.473525e-06 -5.869037e-07
+    ]
+  }
+  controller "MOSAC_Controller"
+  supervisor TRUE
+}
