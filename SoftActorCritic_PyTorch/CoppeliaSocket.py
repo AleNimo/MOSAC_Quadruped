@@ -15,10 +15,11 @@ class CoppeliaSocket:
             print('Connected by', addr, flush=True)
 
         # Discard first observed state
-        _ = [float(self.__coppelia_socket.recv(10).decode()) for idx in range(obs_sp_size)]
+        # _ = [float(self.__coppelia_socket.recv(10).decode()) for idx in range(obs_sp_size)]
+        _ = np.frombuffer(self.__coppelia_socket.recv(4*self.__obs_sp_size), dtype='<f4')   #< little endian, > big endian
 
 
-    def reset(self, obs):
+    def reset(self, pos_ang):
         ''' Reset the simulation environment to the requested position and return the new state '''
         # Get the socket
         coppelia_socket = self.__coppelia_socket
@@ -26,15 +27,20 @@ class CoppeliaSocket:
         # Send the reset command and the requested position
         coppelia_socket.sendall("RESET".encode())
         #print(coppelia_socket.recv(5).decode())
-        for data in obs:
-            data = "{0:010.6f}".format(data)
-            #print("Reset:",data)
-            coppelia_socket.sendall(data.encode())
+
+        coppelia_socket.sendall(pos_ang.tobytes())
+
+        # for data in obs:
+        #     data = "{0:010.6f}".format(data)
+        #     #print("Reset:",data)
+        #     coppelia_socket.sendall(data.encode())
 
         # Receive and return the new observed state
-        next_obs = np.array([float(coppelia_socket.recv(10).decode()) for idx in range(self.__obs_sp_size)])
+        # next_obs = np.array([float(coppelia_socket.recv(10).decode()) for idx in range(self.__obs_sp_size)])
+        next_obs = np.frombuffer(coppelia_socket.recv(4*self.__obs_sp_size), dtype='<f4')   #< little endian, > big endian
+
         #print("Reset:",next_obs)
-        return next_obs
+        return np.copy(next_obs)
 
     def act(self, act):
         ''' Take the requested action in the simulation and obtain the new state '''
@@ -45,15 +51,20 @@ class CoppeliaSocket:
         # Send the act command and the requested action
         coppelia_socket.sendall("ACT__".encode())
         #print(coppelia_socket.recv(5).decode())
-        for data in np.clip(act, -1.0, 1.0):
-            data = "{0:010.6f}".format(data)
-            #print("Act:", data)
-            coppelia_socket.sendall(data.encode())
+
+        coppelia_socket.sendall(act.tobytes())
+
+        # for data in np.clip(act, -1.0, 1.0):
+        #     data = "{0:010.6f}".format(data)
+        #     #print("Act:", data)
+            
+        #     coppelia_socket.sendall(data.encode())
 
         # Receive and return the next observed state
-        next_obs = np.array([float(coppelia_socket.recv(10).decode()) for idx in range(self.__obs_sp_size)])
-        #print("Act:", next_obs)
-        return next_obs
+        # next_obs = np.array([float(coppelia_socket.recv(10).decode()) for idx in range(self.__obs_sp_size)])
+        next_obs = np.frombuffer(coppelia_socket.recv(4*self.__obs_sp_size), dtype='<f4')   #< little endian, > big endian
+
+        return np.copy(next_obs)
 
     def change_mode(self, mode):
         ''' Toggle between joint control and direction control modes '''
@@ -66,4 +77,5 @@ class CoppeliaSocket:
         coppelia_socket.sendall(data.encode())
 
         # Discard first observed state
-        _ = [float(self.__coppelia_socket.recv(10).decode()) for idx in range(self.__obs_sp_size)]
+        # _ = [float(self.__coppelia_socket.recv(10).decode()) for idx in range(self.__obs_sp_size)]
+        _ = np.frombuffer(coppelia_socket.recv(4*self.__obs_sp_size), dtype='<f4')   #< little endian, > big endian

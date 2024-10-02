@@ -27,8 +27,7 @@ class Environment:
 
         # Parameters for forward velocity reward
         self.forward_velocity_reward = 0
-        # m/s (In the future it could be a changing velocity)
-        self.__target_velocity = 0.3
+        self.__target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
         self.__vmax = 2
         self.__delta_vel = 2 * self.__target_velocity
         self.__vmin = -6
@@ -38,8 +37,7 @@ class Environment:
 
         # Parameters for forward acceleration penalization
         self.forward_acc_penalty = 0
-        # m/s^2  (Acceleration at which the penalization is -1)
-        self.__max_acc = 4.5
+        self.__max_acc = 6 #m/s^2  (Acceleration at which the penalization is -1)
 
         # Parameters for lateral velocity penalization
         self.lateral_velocity_penalty = 0
@@ -56,7 +54,9 @@ class Environment:
         self.__vmin_back = -2
         self.__curvature_back = 3
 
-        self.energy_penlaty = 0.0
+        # Parameters for energy penalization
+        self.energy_penalty = 0.0
+        
         # Reward for not flipping over
         self.__not_flipping_reward = 0.5
 
@@ -163,15 +163,15 @@ class Environment:
 
                 
             '''Reward for energy consumption'''
-            self.energy_penlaty = -50e-3 * np.abs(total_mech_power) * 100
-            reward[i,5] =  self.energy_penlaty
+            self.energy_penalty = -50e-3 * np.abs(total_mech_power) * 100
+            reward[i,5] =  self.energy_penalty
 
             '''Reward for avoiding critical failure (flipping over)'''
             reward[i, 6] = self.__not_flipping_reward
 
             # If the absolute value of X or Y angle is greater than 50° there is a penalization and the episode ends
             if abs(next_obs[i, 1])*180 >= 50 or abs(next_obs[i, 2])*180 >= 50:
-                reward[i] -= self.__not_flipping_reward
+                reward[i, 6] -= self.__not_flipping_reward
                 end[i] = True
 
             elif dist_fin[i] >= self.__end_cond:

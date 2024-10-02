@@ -13,15 +13,12 @@ from scipy.spatial.transform import Rotation
 
 import random
 
-
-# slider = False
-# programmed_target_rotation = False
-
-critical_failure_angle = 50 #Must match angle in environment.py
+slider = False
+programmed_target_rotation = False
 
 robot = Supervisor()
 root = robot.getSelf()
-robot_node = robot.getFromDef('MOSAC')
+robot_node = robot.getFromDef('MOSACV1Sim')
 bola = robot.getFromDef('bola')
 
 # Create Socket
@@ -43,7 +40,7 @@ Tx_Rx_command_length = 5
 
 reset_pos = np.array([0.0, 0.0, 0.134728])  # Quadruped short leg (original)
 
-reset_orientation = np.array([0.0, 0.0, 0.0])
+reset_or = np.array([0.0, 0.0, 0.0])
 
 def ypr_to_axis_angle(yaw, pitch, roll):
     # Create a rotation object from yaw, pitch, roll (in degrees)
@@ -58,7 +55,7 @@ def ypr_to_axis_angle(yaw, pitch, roll):
 
 
 robot_node.getField("translation").setSFVec3f([reset_pos[0],reset_pos[1],reset_pos[2]])
-robot_node.getField("rotation").setSFRotation(ypr_to_axis_angle(reset_orientation[2],reset_orientation[1],reset_orientation[0]))
+robot_node.getField("rotation").setSFRotation(ypr_to_axis_angle(reset_or[2],reset_or[1],reset_or[0]))
 
 # get the time step of the current world.
 timestep = 10
@@ -258,7 +255,7 @@ joint_sensor = [
 
 state = 0  # state 0 = idle / 1 = moving to intermediate position / 2 = moving to target position / 3 = reset
 # Random Target step rotation for the step:
-target_step_rotation = np.float32(0.0)
+target_step_rotation = 0.0
 
 JOINT_MAX_NOISE = 3*np.pi/180.0  # degrees
 
@@ -273,10 +270,10 @@ step_counter = 0
 prev_time = 0.0
 prev_forward_velocity = 0.0
 prev_lateral_velocity = 0.0
-current_position =        np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32)
-prev_angular_position =   np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32)
-joint_angular_velocity =  np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
-joint_torque=             np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+current_position =        np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0])
+prev_angular_position =   np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0])
+joint_angular_velocity =  np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]) 
+joint_torque=             np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]) 
 
 velocity = 0.0
 forward_velocity = 0.0
@@ -293,11 +290,8 @@ max_forward_acc = 0.0
 
 attitude = np.array([0.0,0.0])
 ang_vel = np.array([0.0,0.0])
-reset_orientation = np.array([0.0,0.0,0.0])
+reset_or = np.array([0.0,0.0,0.0])
 
-sim_measure_dim = 31
-obs_dim = 17
-environment_state = np.zeros(sim_measure_dim+obs_dim, dtype=np.float32)
 
 ## Servo_tibia_joint.setPosition(1.57)
 #FL_servo_tibia_joint.setPosition(+20 * 3.14 / 180)
@@ -348,9 +342,9 @@ def Kalman_filter():
     dt = timestep * 1e-3
 
     A = np.array([  [ 0,   -wx,    -wy,    -wz],
-                    [wx,     0,     wz,    -wy],
-                    [wy,   -wz,      0,     wx],
-                    [wz,    wy,    -wx,      0]])
+                         [wx,     0,     wz,    -wy],
+                         [wy,   -wz,      0,     wx],
+                         [wz,    wy,    -wx,      0]])
     
     A = I + A * dt * 0.5
 
@@ -460,8 +454,7 @@ def resetKalman():
   roll = 0
 
   vel_pitch = 0
-  vel_roll = 0
-
+  vel_roll = 0 
 #States for Main State Machine
 RESET =	0
 TX_RASPBERRY = 1
@@ -480,7 +473,7 @@ MAX_DELTA_ANGLE = 1.0*np.pi/180.0  # Degrees
 MAX_DELTA_SAMPLE = 1.0 *np.pi/180.0 # Degrees
 
 SAMPLE_TIME  = 10	  #miliseconds
-TIMEOUT = 500      #miliseconds
+TIMEOUT  = 500      #miliseconds
 
 ALL_FINISHED  = 4095  #(12 ones)
 
@@ -504,60 +497,28 @@ timeout = 0
 
 # Function to reset robot position and orientation
 def reset_robot_position_orientation():
-    global robot_node,robot,reset_orientation,reset_pos
+    global robot_node,robot,reset_or,reset_pos
     
-    print("RESET: MOSAC reset")
     # Apply the reset position and orientation
     robot_node.getField("translation").setSFVec3f([reset_pos[0],reset_pos[1],reset_pos[2]])
-    robot_node.getField("rotation").setSFRotation(ypr_to_axis_angle(reset_orientation[2],reset_orientation[1],reset_orientation[0]))
+    robot_node.getField("rotation").setSFRotation(ypr_to_axis_angle(reset_or[2],reset_or[1],reset_or[0]))
 
-    # robot.simulationSetMode(Supervisor.SIMULATION_MODE_FAST)
     # Reset other robot states if needed (e.g., velocity, sensor data)
     robot.simulationReset()  # Reset physics without resetting the simulation
 
     for i in range(len(joint)):
       #! EN RADIANES HAY QUE PONERLO!!!!//Move the servomotor
-      joint[i].setPosition(0)
+      joint[i].setPosition(0)   
 
 
 def SendState():
-  global environment_state, robot_node,Tx_float_length,reset_pos,reset_orientation,mean_forward_velocity,mean_lateral_velocity,max_forward_acc,target_step_rotation,slider,step_counter,attitude,ang_vel,joint_sensor,f_joint_angle,jointUpperLimit,jointLowerLimit,step_completed,joint_angular_velocity
+  global robot_node,Tx_float_length,reset_pos,reset_or,mean_forward_velocity,mean_lateral_velocity,max_forward_acc,target_step_rotation,slider,step_counter,attitude,ang_vel,joint_sensor,f_joint_angle,jointUpperLimit,jointLowerLimit,step_completed,joint_angular_velocity
   
-  for i in range(len(joint)):
-    #without noise in joints for now
-    #added_noise = (math.random() * 2 - 1) * JOINT_MAX_NOISE * math.pi/180   - - [-JOINT_MAX_NOISE;JOINT_MAX_NOISE] in radians
-    #jointPos[i] = (sim.getJointPosition(joint[i]) + added_noise - (jointUpperLimit[i]+jointLowerLimit[i])/2) / ((jointUpperLimit[i]-jointLowerLimit[i])/2)
-    f_joint_angle[i] = (joint_sensor[i].getValue() - (jointUpperLimit[i] + jointLowerLimit[i])/2.0) / ((jointUpperLimit[i]-jointLowerLimit[i])/2.0)
+  ###########Finally the measurements used for the observation state of the agent
+  #Target Rotation for the step
+  client.send(Tx_float_length.format(target_step_rotation).encode('utf-8'))
 
-  current_translation = robot_node.getField("translation").getSFVec3f()
-  current_rotation = robot_node.getField("rotation").getSFRotation()
-  # Convert axis-angle to a rotation object
-  rotation = Rotation.from_rotvec(np.array(current_rotation[:3]) * current_rotation[3])
-  # Extract yaw, pitch, and roll (in radians)
-  current_rotation = rotation.as_euler('zyx', degrees=False)
-
-  #Fill the state array with the observed state and additional measurements:
-    #Measurements used for the observation state of the agent
-  environment_state[0] = target_step_rotation
-  environment_state[1:3] = attitude/np.pi
-  environment_state[3:5] = ang_vel/np.pi
-  environment_state[5:17] = f_joint_angle
-
-    #Additional Measurements used to compute the rewards and/ or plots:
-  environment_state[17:20] = current_translation
-  environment_state[20] = mean_forward_velocity
-  environment_state[21] = mean_lateral_velocity
-  environment_state[22] = max_forward_acc
-  environment_state[23] = current_rotation[0]
-  environment_state[24:36] = joint_torque
-  environment_state[36:48] = joint_angular_velocity
-
-  client.sendall(environment_state.tobytes())
-
-  step_completed = True
-
-
-  # if slider:
+  if slider:
   #   --Use value from slider(converting to radians normalized by pi)
   #     simUI.setLabelText(ui, 1, string.format(
   #         'Target Step Rotation = %d %s', targetRotSlider, utf8.char(176)))
@@ -577,82 +538,72 @@ def SendState():
   #     elseif(step_counter >= 180) then
   #       target_step_rotation = 0
   #     end
-
-  # else:
-  #Generate next random target step rotation (std = 5?)
-  if (step_counter >= 50) and (step_counter % 50 == 0):
-    mean = 0.0
-    std_dev = 1/36
-    clip_range = 1/18
-    target_step_rotation = random.gauss(mean, std_dev) #? Cambiar a Uniforme
-    #-Clip the target step rotation to + /- 10?
-    target_step_rotation = max(-clip_range, min(clip_range, target_step_rotation))
-
-  #Target Rotation for the step
-  #print("target_step_rotation",target_step_rotation)
-  # client.send(Tx_float_length.format(target_step_rotation).encode('utf-8'))
-
-  
+    True
+  else:
+    #Generate next random target step rotation (std = 5?)
+    if (step_counter >= 50) and (step_counter % 50 == 0):
+      mean = 0.0
+      std_dev = 1/36
+      clip_range = 1/18
+      target_step_rotation = random.gauss(mean, std_dev) #? Cambiar a Uniforme
+      #-Clip the target step rotation to + /- 10?
+      target_step_rotation = max(-clip_range, min(clip_range, target_step_rotation))
     
   
   #Pitch and roll angles of the back(world reference)
-  
-  # client.send(Tx_float_length.format(attitude[0]/np.pi).encode('utf-8')) #pitch angle
-  # client.send(Tx_float_length.format(attitude[1]/np.pi).encode('utf-8'))#roll angle
-  #print("pitch angular_vel",ang_vel[0])
-  #print("roll angular_vel",ang_vel[1])
+  #print("pitch",attitude[0])
+  #print("roll",attitude[1])
+  client.send(Tx_float_length.format(attitude[0]/np.pi).encode('utf-8')) #pitch angle
+  client.send(Tx_float_length.format(attitude[1]/np.pi).encode('utf-8'))#roll angle
+
   #Pitch and roll angular velocities of the back(world reference)
-  # client.send(Tx_float_length.format(ang_vel[0]/np.pi).encode('utf-8')) #pitch angular_vel
-  # client.send(Tx_float_length.format(ang_vel[1]/np.pi).encode('utf-8')) #roll angular_vel
+  client.send(Tx_float_length.format(ang_vel[0]/np.pi).encode('utf-8')) #pitch angular_vel
+  client.send(Tx_float_length.format(ang_vel[1]/np.pi).encode('utf-8')) #roll angular_vel
 
   #Joints angular positions
-  # for i in range(len(joint)):
+  for i in range(len(joint)):
     #without noise in joints for now
     #added_noise = (math.random() * 2 - 1) * JOINT_MAX_NOISE * math.pi/180   - - [-JOINT_MAX_NOISE;JOINT_MAX_NOISE] in radians
     #jointPos[i] = (sim.getJointPosition(joint[i]) + added_noise - (jointUpperLimit[i]+jointLowerLimit[i])/2) / ((jointUpperLimit[i]-jointLowerLimit[i])/2)
-    # f_joint_angle[i] = (joint_sensor[i].getValue() - (jointUpperLimit[i] + jointLowerLimit[i])/2.0) / ((jointUpperLimit[i]-jointLowerLimit[i])/2.0)
-    
-    # client.send(Tx_float_length.format(f_joint_angle[i]).encode('utf-8'))    
-  #print("Joints angular positions",f_joint_angle)
+    f_joint_angle[i] = (joint_sensor[i].getValue() - (jointUpperLimit[i] + jointLowerLimit[i])/2.0) / ((jointUpperLimit[i]-jointLowerLimit[i])/2.0)
+    client.send(Tx_float_length.format(f_joint_angle[i]).encode('utf-8'))    
+
 
   #World position(change the second parameter from -1 to another handle to get a relative position)
-  # current_translation = robot_node.getField("translation").getSFVec3f()
-  #print("World position",current_translation)
-  # client.send(Tx_float_length.format(current_translation[0]).encode('utf-8')) #x
-  # client.send(Tx_float_length.format(current_translation[1]).encode('utf-8')) #y
-  # client.send(Tx_float_length.format(current_translation[2]).encode('utf-8')) #z
+  current_translation = robot_node.getField("translation").getSFVec3f()
+  client.send(Tx_float_length.format(current_translation[0]).encode('utf-8')) #x
+  client.send(Tx_float_length.format(current_translation[1]).encode('utf-8')) #y
+  client.send(Tx_float_length.format(current_translation[2]).encode('utf-8')) #z
 
   #Mean forward and lateral velocities and peak absolute forward acceleration with reference of the agent
   #Measured and computed in sysCall_sensing
-  #print("mean_forward_velocity",mean_forward_velocity)
-  #print("mean_lateral_velocity",mean_lateral_velocity)
-  #print("max_forward_acc",max_forward_acc)
-  # client.send(Tx_float_length.format(mean_forward_velocity).encode('utf-8'))
-  # client.send(Tx_float_length.format(mean_lateral_velocity).encode('utf-8'))
-  # client.send(Tx_float_length.format(max_forward_acc).encode('utf-8'))
+  
+  client.send(Tx_float_length.format(mean_forward_velocity).encode('utf-8'))
+  client.send(Tx_float_length.format(mean_lateral_velocity).encode('utf-8'))
+  client.send(Tx_float_length.format(max_forward_acc).encode('utf-8'))
 
-  # step_completed = True
+  step_completed = True
 
 
   #Object world orientation(change the second parameter from -1 to another handle to get a relative position)
   #data = sim.getObjectOrientation(agent, -1)
-  # current_rotation = robot_node.getField("rotation").getSFRotation()
+  current_rotation = robot_node.getField("rotation").getSFRotation()
   # Convert axis-angle to a rotation object
-  # rotation = Rotation.from_rotvec(np.array(current_rotation[:3]) * current_rotation[3])
+  rotation = Rotation.from_rotvec(np.array(current_rotation[:3]) * current_rotation[3])
   # Extract yaw, pitch, and roll (in radians)
-  # current_rotation = rotation.as_euler('zyx', degrees=False)
-  # client.send(Tx_float_length.format(current_rotation[0]).encode('utf-8')) #Yaw angle for the reward
+  current_rotation = rotation.as_euler('zyx', degrees=False) - np.pi/2 #!Esto es porque creo que esta invertido el eje ('zyx' corresponds to Yaw (Z), Pitch (Y), Roll (X))
+  client.send(Tx_float_length.format(current_rotation[0]).encode('utf-8')) #Yaw angle for the reward
   
   #Send torque
-  # print("joint_torque",joint_torque)
-  # for i in range(len(joint)):
-  #   client.send(Tx_float_length.format(joint_torque[i]).encode('utf-8'))
+  for i in range(len(joint)):
+    client.send(Tx_float_length.format(joint_torque[i]).encode('utf-8'))
 
   #Send Angular Velocity
-  #print("joint_angular_velocity",joint_angular_velocity)
-  # for i in range(len(joint)):
-  #   client.send(Tx_float_length.format(joint_angular_velocity[i]).encode('utf-8'))      
+  for i in range(len(joint)):
+    client.send(Tx_float_length.format(joint_angular_velocity[i]).encode('utf-8'))      
   
+  #print("Torque",joint_torque)
+  #print("angular_velocity",joint_angular_velocity)
 def State_Machine_Control():
 
   global state,state_actuation, joint_sensor, f_joint_angle,f_last_joint, joints_finished, target_joint, delta_target, joint,stuck_servo,prev_forward_velocity,target_step_rotation,prev_lateral_velocity,max_forward_acc,step_completed,step_counter,mean_forward_velocity,mean_lateral_velocity,max_forward_acc,vel_samples,prev_angular_position
@@ -679,16 +630,12 @@ def State_Machine_Control():
       print("RESET: Environment reset")
 
       # Receive new position
-      # reset_pos[0] = float(client.recv(Rx_float_length).decode('utf-8'))
-      # reset_pos[1] = float(client.recv(Rx_float_length).decode('utf-8'))
+      reset_pos[0] = float(client.recv(Rx_float_length).decode('utf-8'))
+      reset_pos[1] = float(client.recv(Rx_float_length).decode('utf-8'))
 
       # Receive new orientation and convert it to radians
-      # reset_orientation[2] = float(client.recv(Rx_float_length).decode('utf-8'))
-
-      pos_ang = np.copy(np.frombuffer(client.recv(8*3), dtype='<f8'))   #< little endian, > big endian
-
-      reset_pos = pos_ang[0:2]
-      reset_orientation[2] = np.pi * pos_ang[2]
+      reset_or[2] = float(client.recv(Rx_float_length).decode('utf-8'))
+      reset_or[2] = np.pi * reset_or[2]
 
       reset_robot_position_orientation()
       resetKalman()
@@ -714,16 +661,18 @@ def State_Machine_Control():
 
       f_joint_angle = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
       target_joint = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
       f_last_joint = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
+
 
       state = RESET
       state_actuation = RESET_ACTUATION
 
     elif data == "ACT__":
-      normalized_action = np.copy(np.frombuffer(client.recv(8*len(joint)), dtype='<f8'))   #< little endian, > big endian      
       for i in range(len(joint)):
-        # data = float(client.recv(Rx_float_length).decode('utf-8'))
-        target_joint[i] = ((jointUpperLimit[i]-jointLowerLimit[i])/2.0) * normalized_action[i] + (jointUpperLimit[i]+jointLowerLimit[i])/2.0
+        data = float(client.recv(Rx_float_length).decode('utf-8'))
+        target_joint[i] = ((jointUpperLimit[i]-jointLowerLimit[i])/2.0) * data + (jointUpperLimit[i]+jointLowerLimit[i])/2.0
 
       joints_finished = 0
       # Check if the new target is too close to the actual position, in which case the servo wouldn't move because of the dead bandwidth
@@ -746,10 +695,6 @@ def State_Machine_Control():
   elif state == ACTUATION:
     stuck_servo = State_Machine_Actuation()
 
-    # if (pitch*180/np.pi >= critical_failure_angle or roll*180/np.pi >= critical_failure_angle):
-    #     robot.simulationSetMode(Supervisor.SIMULATION_MODE_PAUSE)
-    #     state = TX_RASPBERRY
-
     if stuck_servo == 1:
       state = TX_RASPBERRY
 
@@ -769,8 +714,8 @@ def State_Machine_Actuation():
       #! EN RADIANES HAY QUE PONERLO!!!!//Move the servomotor
       joint[i].setPosition(target_joint[i])      
 							
-    sample_time = SAMPLE_TIME
-    state_actuation = DELAY_STATE
+    sample_time = SAMPLE_TIME;
+    state_actuation = DELAY_STATE;
     timeout = TIMEOUT
 
 		
@@ -920,14 +865,39 @@ def computeVelocityMaxAccelerationAngularVelocityTorque():
 
       step_completed = False
       #print("HOLASS")
+
 if __name__ == "__main__":
-     # Main loop:
-   
+    # Main loop:
+    # - perform simulation steps until Webots is stopping the controller7
+    
+    #root.getField("rotation").enableSFTracking(timestep)
+    #root.getField("translation").enableSFTracking(timestep)
+    #root.enablePoseTracking(timestep)
     while robot.step(timestep) != -1:
-      
+      #velocity = root.getVelocity()
+      #print(velocity)
+      #if robot.stepBegin(timestep) == -1: break
+      # t = t + timestep
+      # # Read the sensors:
+      # # Enter here functions to read sensor data, like:
+      # #  val = ds.getValue()
+      # angle_tibia = 10 * np.sin(2 * np.pi * 10 * t * 1e-3)
+      # angle_femur = -10 * np.sin(2 * np.pi * 10 * t * 1e-3)
+      # FL_servo_tibia_joint.setPosition(angle_tibia * np.pi / 180)
+      # FL_servo_femur_joint.setPosition(angle_femur * np.pi / 180)
+
+      # BR_servo_tibia_joint.setPosition(-angle_tibia * np.pi / 180)
+      # BR_servo_femur_joint.setPosition(-angle_femur * np.pi / 180)
+
+      # BL_servo_tibia_joint.setPosition(angle_tibia * np.pi / 180)
+      # BL_servo_femur_joint.setPosition(angle_femur * np.pi / 180)
+
+      # FR_servo_tibia_joint.setPosition(-angle_tibia * np.pi / 180)
+      # FR_servo_femur_joint.setPosition(-angle_femur * np.pi / 180)
+      #bola.setVelocity([0,-0.1,0,0,0,0])
       if sample_time >0: sample_time-=timestep
       if timeout >0: timeout-=timestep
-
+      #print(robot.getTime())
       measure-=timestep
       if(measure<=0):          
         computeVelocityMaxAccelerationAngularVelocityTorque() 
@@ -938,5 +908,7 @@ if __name__ == "__main__":
       ang_vel[0],ang_vel[1] = vel_pitch,vel_roll   
 
       State_Machine_Control()               
-
-    # Optionally add code here clean when simulation is finished (robot.step(timestep) == -1)
+      #print("State", state)
+      #if robot.stepEnd() == -1: break             
+        
+      pass

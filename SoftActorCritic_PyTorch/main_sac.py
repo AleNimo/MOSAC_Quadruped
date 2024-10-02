@@ -59,17 +59,17 @@ def SAC_Agent_Training(q):
     episode_steps = 200  # Maximum steps allowed per episode
     save_period = 100
 
-    # Preference vector maximum and minimum values - [vel_forward, acceleration, vel_lateral, orientation, flat_back]
+    # Preference vector maximum and minimum values - [vel_forward, acceleration, vel_lateral, orientation, flat_back, energy]
     # If pref_min_vector == pref_max_vector then the multi-objective approach is disabled, and constant reward weights
     # equal to pref_max_vector are defined
-    pref_max_vector = np.array([2, 1, 1, 2, 1,0])
-    pref_min_vector = np.array([0.5, 0, 0, 0, 0,0])
+    pref_max_vector = np.array([2, 1, 1, 2, 1, 0])
+    pref_min_vector = np.array([0.5, 0, 0, 0, 0, 0])
 
     pref_dim = pref_max_vector.size
 
     agent = SAC_Agent('Cuadruped', env, pref_max_vector,pref_min_vector, replay_buffer_size=1000000)
 
-    agent.replay_batch_size = 1000
+    agent.replay_batch_size = 10000
 
     agent.update_Q = 1  # The Q function is updated every episode
     agent.update_P = 1  # The policy is updated every 1 episode
@@ -129,6 +129,7 @@ def SAC_Agent_Training(q):
 
                 # Act in the environment
                 ep_obs[step+1], ep_rwd[step], done_flag = env.act(ep_act[step])
+
 
                 # Store in replay buffer
                 agent.remember(ep_obs[step][:env.obs_dim], ep_act[step],ep_rwd[step], ep_obs[step+1][:env.obs_dim], done_flag)

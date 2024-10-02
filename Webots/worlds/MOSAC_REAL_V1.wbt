@@ -13,8 +13,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation -0.2624283526989839 -0.13773937480479143 0.9550702719319049 4.03690999672862
-  position 0.4992521329167264 0.6480945510555329 0.5777504654913562
+  orientation 0.23787157008857576 -0.16908140691965207 -0.9564667239259644 4.374127074946839
+  position 0.4554847878713555 -0.8916200104306089 0.5982445349106241
 }
 TexturedBackground {
 }
@@ -171,7 +171,6 @@ DEF MOSAC Robot {
                             }
                           ]
                           name "FR_rotula_grande_tibia_link"
-                          boundingObject USE FR_rotula_grande_tibia_link
                           physics Physics {
                             density -1
                             mass 0.0064
@@ -211,7 +210,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "FR_servo_femur_link"
-              boundingObject USE FR_servo_femur_link
               physics Physics {
                 density -1
                 mass 0.024784
@@ -295,7 +293,6 @@ DEF MOSAC Robot {
                       }
                     ]
                     name "FR_rotula_chica_servo_link"
-                    boundingObject USE FR_rotula_chica_servo_link
                     physics Physics {
                       density -1
                       mass 0.00307
@@ -311,7 +308,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "FR_servo_tibia_link"
-              boundingObject USE FR_servo_tibia_link
               physics Physics {
                 density -1
                 mass 0.004851
@@ -352,7 +348,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "FR_shoulder_link"
-              boundingObject USE FR_shoulder_link
               physics Physics {
                 density -1
                 mass 0.006585
@@ -368,7 +363,6 @@ DEF MOSAC Robot {
           }
         ]
         name "BFR_link"
-        boundingObject USE BFR_link
         physics Physics {
           density -1
           mass 0.14189
@@ -507,7 +501,6 @@ DEF MOSAC Robot {
                             }
                           ]
                           name "BR_rotula_grande_tibia_link"
-                          boundingObject USE BR_rotula_grande_tibia_link
                           physics Physics {
                             density -1
                             mass 0.0064
@@ -547,7 +540,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "BR_servo_femur_link"
-              boundingObject USE BR_servo_femur_link
               physics Physics {
                 density -1
                 mass 0.024784
@@ -631,7 +623,6 @@ DEF MOSAC Robot {
                       }
                     ]
                     name "BR_rotula_chica_servo_link"
-                    boundingObject USE BR_rotula_chica_servo_link
                     physics Physics {
                       density -1
                       mass 0.00307
@@ -647,7 +638,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "BR_servo_tibia_link"
-              boundingObject USE BR_servo_tibia_link
               physics Physics {
                 density -1
                 mass 0.004851
@@ -688,7 +678,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "BR_shoulder_link"
-              boundingObject USE BR_shoulder_link
               physics Physics {
                 density -1
                 mass 0.006585
@@ -704,7 +693,6 @@ DEF MOSAC Robot {
           }
         ]
         name "BBR_link"
-        boundingObject USE BBR_link
         physics Physics {
           density -1
           mass 0.141888
@@ -844,7 +832,6 @@ DEF MOSAC Robot {
                             }
                           ]
                           name "FL_rotula_grande_tibia_link"
-                          boundingObject USE FL_rotula_grande_tibia_link
                           physics Physics {
                             density -1
                             mass 0.0064
@@ -884,7 +871,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "FL_servo_femur_link"
-              boundingObject USE FL_servo_femur_link
               physics Physics {
                 density -1
                 mass 0.024784
@@ -970,7 +956,6 @@ DEF MOSAC Robot {
                       }
                     ]
                     name "FL_rotula_chica_servo_link"
-                    boundingObject USE FL_rotula_chica_servo_link
                     physics Physics {
                       density -1
                       mass 0.00307
@@ -986,7 +971,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "FL_servo_tibia_link"
-              boundingObject USE FL_servo_tibia_link
               physics Physics {
                 density -1
                 mass 0.004851
@@ -1028,7 +1012,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "FL_shoulder_link"
-              boundingObject USE FL_shoulder_link
               physics Physics {
                 density -1
                 mass 0.006585
@@ -1044,7 +1027,6 @@ DEF MOSAC Robot {
           }
         ]
         name "BFL_link"
-        boundingObject USE BFL_link
         physics Physics {
           density -1
           mass 0.141888
@@ -1181,7 +1163,6 @@ DEF MOSAC Robot {
                             }
                           ]
                           name "BL_rotula_grande_tibia_link"
-                          boundingObject USE BL_rotula_grande_tibia_link
                           physics Physics {
                             density -1
                             mass 0.0064
@@ -1221,7 +1202,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "BL_servo_femur_link"
-              boundingObject USE BL_servo_femur_link
               physics Physics {
                 density -1
                 mass 0.024784
@@ -1307,7 +1287,6 @@ DEF MOSAC Robot {
                       }
                     ]
                     name "BL_rotula_chica_servo_link"
-                    boundingObject USE BL_rotula_chica_servo_link
                     physics Physics {
                       density -1
                       mass 0.00307
@@ -1323,7 +1302,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "BL_servo_tibia_link"
-              boundingObject USE BL_servo_tibia_link
               physics Physics {
                 density -1
                 mass 0.004851
@@ -1365,7 +1343,6 @@ DEF MOSAC Robot {
                 }
               ]
               name "BL_shoulder_link"
-              boundingObject USE BL_shoulder_link
               physics Physics {
                 density -1
                 mass 0.006585
@@ -1381,7 +1358,6 @@ DEF MOSAC Robot {
           }
         ]
         name "BBL_link"
-        boundingObject USE BBL_link
         physics Physics {
           density -1
           mass 0.141888
@@ -1397,7 +1373,13 @@ DEF MOSAC Robot {
     }
   ]
   name "URDFMOSACReal"
-  boundingObject USE chasis_base_link
+  boundingObject Pose {
+    children [
+      Box {
+        size 0.36 0.135 0.085
+      }
+    ]
+  }
   physics Physics {
     density -1
     mass 1.285177
