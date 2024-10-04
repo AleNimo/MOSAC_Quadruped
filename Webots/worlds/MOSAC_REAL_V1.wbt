@@ -43,7 +43,7 @@ DEF MOSAC Robot {
       }
       geometry DEF chasis_base_link Mesh {
         url [
-          "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/chasis_base_link.STL"
+          "../protos/URDF_MOSAC_Real/meshes/chasis_base_link.STL"
         ]
       }
     }
@@ -72,7 +72,7 @@ DEF MOSAC Robot {
             }
             geometry DEF BFR_link Mesh {
               url [
-                "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BFR_link.STL"
+                "../protos/URDF_MOSAC_Real/meshes/BFR_link.STL"
               ]
             }
           }
@@ -100,7 +100,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF FR_servo_femur_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_servo_femur_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/FR_servo_femur_link.STL"
                     ]
                   }
                 }
@@ -125,7 +125,7 @@ DEF MOSAC Robot {
                         }
                         geometry DEF FR_tibia_link Mesh {
                           url [
-                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_tibia_link.STL"
+                            "../protos/URDF_MOSAC_Real/meshes/FR_tibia_link.STL"
                           ]
                         }
                       }
@@ -151,7 +151,7 @@ DEF MOSAC Robot {
                               }
                               geometry DEF FR_rotula_grande_tibia_link Mesh {
                                 url [
-                                  "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_rotula_grande_tibia_link.STL"
+                                  "../protos/URDF_MOSAC_Real/meshes/FR_rotula_grande_tibia_link.STL"
                                 ]
                               }
                             }
@@ -248,7 +248,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF FR_servo_tibia_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_servo_tibia_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/FR_servo_tibia_link.STL"
                     ]
                   }
                 }
@@ -273,7 +273,7 @@ DEF MOSAC Robot {
                         }
                         geometry DEF FR_rotula_chica_servo_link Mesh {
                           url [
-                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_rotula_chica_servo_link.STL"
+                            "../protos/URDF_MOSAC_Real/meshes/FR_rotula_chica_servo_link.STL"
                           ]
                         }
                       }
@@ -342,7 +342,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF FR_shoulder_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FR_shoulder_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/FR_shoulder_link.STL"
                     ]
                   }
                 }
@@ -402,7 +402,7 @@ DEF MOSAC Robot {
             }
             geometry DEF BBR_link Mesh {
               url [
-                "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BBR_link.STL"
+                "../protos/URDF_MOSAC_Real/meshes/BBR_link.STL"
               ]
             }
           }
@@ -431,7 +431,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF BR_servo_femur_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_servo_femur_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/BR_servo_femur_link.STL"
                     ]
                   }
                 }
@@ -456,7 +456,7 @@ DEF MOSAC Robot {
                         }
                         geometry DEF BR_tibia_link Mesh {
                           url [
-                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_tibia_link.STL"
+                            "../protos/URDF_MOSAC_Real/meshes/BR_tibia_link.STL"
                           ]
                         }
                       }
@@ -481,7 +481,7 @@ DEF MOSAC Robot {
                               }
                               geometry DEF BR_rotula_grande_tibia_link Mesh {
                                 url [
-                                  "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_rotula_grande_tibia_link.STL"
+                                  "../protos/URDF_MOSAC_Real/meshes/BR_rotula_grande_tibia_link.STL"
                                 ]
                               }
                             }
@@ -578,7 +578,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF BR_servo_tibia_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_servo_tibia_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/BR_servo_tibia_link.STL"
                     ]
                   }
                 }
@@ -603,7 +603,7 @@ DEF MOSAC Robot {
                         }
                         geometry DEF BR_rotula_chica_servo_link Mesh {
                           url [
-                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_rotula_chica_servo_link.STL"
+                            "../protos/URDF_MOSAC_Real/meshes/BR_rotula_chica_servo_link.STL"
                           ]
                         }
                       }
@@ -672,7 +672,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF BR_shoulder_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BR_shoulder_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/BR_shoulder_link.STL"
                     ]
                   }
                 }
@@ -732,7 +732,7 @@ DEF MOSAC Robot {
             }
             geometry DEF BFL_link Mesh {
               url [
-                "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BFL_link.STL"
+                "../protos/URDF_MOSAC_Real/meshes/BFL_link.STL"
               ]
             }
           }
@@ -762,7 +762,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF FL_servo_femur_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_servo_femur_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/FL_servo_femur_link.STL"
                     ]
                   }
                 }
@@ -787,7 +787,7 @@ DEF MOSAC Robot {
                         }
                         geometry DEF FL_tibia_link Mesh {
                           url [
-                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_tibia_link.STL"
+                            "../protos/URDF_MOSAC_Real/meshes/FL_tibia_link.STL"
                           ]
                         }
                       }
@@ -812,7 +812,7 @@ DEF MOSAC Robot {
                               }
                               geometry DEF FL_rotula_grande_tibia_link Mesh {
                                 url [
-                                  "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_rotula_grande_tibia_link.STL"
+                                  "../protos/URDF_MOSAC_Real/meshes/FL_rotula_grande_tibia_link.STL"
                                 ]
                               }
                             }
@@ -910,7 +910,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF FL_servo_tibia_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_servo_tibia_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/FL_servo_tibia_link.STL"
                     ]
                   }
                 }
@@ -936,7 +936,7 @@ DEF MOSAC Robot {
                         }
                         geometry DEF FL_rotula_chica_servo_link Mesh {
                           url [
-                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_rotula_chica_servo_link.STL"
+                            "../protos/URDF_MOSAC_Real/meshes/FL_rotula_chica_servo_link.STL"
                           ]
                         }
                       }
@@ -1006,7 +1006,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF FL_shoulder_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/FL_shoulder_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/FL_shoulder_link.STL"
                     ]
                   }
                 }
@@ -1064,7 +1064,7 @@ DEF MOSAC Robot {
             }
             geometry DEF BBL_link Mesh {
               url [
-                "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BBL_link.STL"
+                "../protos/URDF_MOSAC_Real/meshes/BBL_link.STL"
               ]
             }
           }
@@ -1093,7 +1093,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF BL_servo_femur_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_servo_femur_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/BL_servo_femur_link.STL"
                     ]
                   }
                 }
@@ -1117,7 +1117,7 @@ DEF MOSAC Robot {
                         }
                         geometry DEF BL_tibia_link Mesh {
                           url [
-                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_tibia_link.STL"
+                            "../protos/URDF_MOSAC_Real/meshes/BL_tibia_link.STL"
                           ]
                         }
                       }
@@ -1143,7 +1143,7 @@ DEF MOSAC Robot {
                               }
                               geometry DEF BL_rotula_grande_tibia_link Mesh {
                                 url [
-                                  "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_rotula_grande_tibia_link.STL"
+                                  "../protos/URDF_MOSAC_Real/meshes/BL_rotula_grande_tibia_link.STL"
                                 ]
                               }
                             }
@@ -1241,7 +1241,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF BL_servo_tibia_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_servo_tibia_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/BL_servo_tibia_link.STL"
                     ]
                   }
                 }
@@ -1267,7 +1267,7 @@ DEF MOSAC Robot {
                         }
                         geometry DEF BL_rotula_chica_servo_link Mesh {
                           url [
-                            "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_rotula_chica_servo_link.STL"
+                            "../protos/URDF_MOSAC_Real/meshes/BL_rotula_chica_servo_link.STL"
                           ]
                         }
                       }
@@ -1337,7 +1337,7 @@ DEF MOSAC Robot {
                   }
                   geometry DEF BL_shoulder_link Mesh {
                     url [
-                      "E:/UTN/GIAR/MOSAC_Quadruped/Webots/protos/URDF_MOSAC_Real/meshes/BL_shoulder_link.STL"
+                      "../protos/URDF_MOSAC_Real/meshes/BL_shoulder_link.STL"
                     ]
                   }
                 }
