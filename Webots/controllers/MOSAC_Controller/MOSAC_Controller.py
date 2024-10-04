@@ -838,7 +838,7 @@ def computeVelocityMaxAccelerationAngularVelocityTorque():
   rotation = Rotation.from_rotvec(np.array(current_rotation[:3]) * current_rotation[3])
   #bola_rotation = Rotation.from_rotvec(np.array(bola_current_rotation[:3]) * bola_current_rotation[3])
   # Extract yaw, pitch, and roll (in radians)
-  current_rotation = rotation.as_euler('zyx', degrees=False) - np.pi/2 #!Esto es porque creo que esta invertido el eje   # 'zyx' corresponds to Yaw (Z), Pitch (Y), Roll (X)
+  current_rotation = rotation.as_euler('zyx', degrees=False)
   #bola_current_rotation = bola_rotation.as_euler('zyx', degrees=False) - np.pi/2
   #print("Yaw", current_rotation[0]*180/np.pi)
 

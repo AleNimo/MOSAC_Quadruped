@@ -97,10 +97,6 @@
 #define NUM_STD_COEFS 5 // b0, b1, b2, a1, a2
 #define ALPHA (float32_t)0.01
 
-// PID Constants
-#define KP (float32_t)0.5
-#define KI (float32_t)0.001
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -150,10 +146,18 @@ float32_t iir_in_arm[12];
 
 // PID Variables
 float32_t error = 0;
+float32_t previous_error[JOINTS] = {0};
 float32_t control_signal = 0;
 float32_t error_acum[JOINTS] = {0};
+float32_t error_dif = 0;
+
 uint16_t ton_pwm[JOINTS] = {0};
 uint8_t pid_enable = 0;
+
+// PID Constants
+float32_t kp = 0.2;
+float32_t ki = 0.0;//0.005
+float32_t kd = 0.0;
 
 // Vectors to control joints manually
 float test_quadruped_coppelia[12] = {0};
@@ -195,10 +199,10 @@ const float32_t *calibration_table[12] = {&ADC_VALUES_SERVO_0[0][0], &ADC_VALUES
 // VARIABLES QUE NO DEBEN SER GLOBALES, pero es mas cómodo para debuggear
 
 // podrían ser locales
-float delta_sample = 0;
-float delta_target = 0;
-float f_joint_angle[JOINTS] = {0};
-uint8_t uart_tx_buffer[12 * 4 + 12 * 4 + 2];
+float32_t delta_sample = 0;
+float32_t delta_target = 0;
+float32_t f_joint_angle[JOINTS] = {0};
+uint8_t uart_tx_buffer[2 + 12 * 4 + 12 * 4 + 12 * 4 + 12 * 4];
 
 // podrían ser estaticas locales
 float f_last_joint[JOINTS] = {0};
@@ -236,10 +240,15 @@ void State_Machine_Control(void);
 /* USER CODE BEGIN 0 */
 
 // CAMBIAR NOMBRES PARA QUE SEA MAS DESCRIPTIVO
-uint16_t dummy1[12];
+//uint16_t dummy1[12];
 uint16_t dummy2[12];
+
 float2byte u_dummy1;
 float2byte u_dummy2;
+float2byte u_dummy3;
+float2byte u_dummy4;
+
+float32_t last_joint[JOINTS] = {0};
 
 uint8_t buffer_ready = 0;
 float angle_dummy = 90;
@@ -353,67 +362,57 @@ int main(void)
 
     // State_Machine_Calibration();
 
-    /// Manual control of joints
-    // Body  Front   Right
-    //		test_quadruped_nucleo[4] = 65 - test_quadruped_coppelia[0];
-    //		//Leg   Front   Right
-    //		test_quadruped_nucleo[3] = 65 - test_quadruped_coppelia[1];
-    //		//Paw   Front   Right
-    //		test_quadruped_nucleo[0] = 65 + test_quadruped_coppelia[2];
-    //		//Body  Front   Left
-    //		test_quadruped_nucleo[6] = 65 + test_quadruped_coppelia[3];
-    //		//Leg   Front   Left
-    //		test_quadruped_nucleo[7] = 65 + test_quadruped_coppelia[4];
-    //		//Paw   Front   Left
-    //		test_quadruped_nucleo[5] = 65 - test_quadruped_coppelia[5];
-    //		//Body  Back    Right
-    //		test_quadruped_nucleo[11] = 65 - test_quadruped_coppelia[6];
-    //		//Leg   Back    Right
-    //		test_quadruped_nucleo[10] = 65 - test_quadruped_coppelia[7];
-    //		//Paw   Back    Right
-    //		test_quadruped_nucleo[1] = 65 + test_quadruped_coppelia[8];
-    //		//Body  Back    Left
-    //    test_quadruped_nucleo[8] = 65 + test_quadruped_coppelia[9];
-    //		//Leg   Back    Left
-    //		test_quadruped_nucleo[9] = 65 + test_quadruped_coppelia[10];
-    //		//Paw   Back    Left
-    //		test_quadruped_nucleo[2] = 65 - test_quadruped_coppelia[11];
-
+    
 //    for (joint = 0; joint < JOINTS; joint++)
 //      __HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(test_quadruped_nucleo[joint]));
 
     // // Serial Plot
 
-    // memcpy(dummy1, &raw_angle_ADC[buffer_to_copy][0], sizeof(dummy1));
-    // // memcpy(dummy2,(uint16_t*)filt_angle_ADC,sizeof(dummy2));
-    // for (uint8_t joint = 0; joint < 12; joint++)
-    // {
-    //   // f_joint_angle_aux[joint] = adc2angle(filt_angle_ADC[joint], up_down_ADC[joint],calibration_table[joint],col_sel[joint]);
+    //memcpy(dummy1, &raw_angle_ADC[buffer_to_copy][0], sizeof(dummy1));
+    
+    for (uint8_t joint = 0; joint < 12; joint++)
+    {
+      // f_joint_angle_aux[joint] = adc2angle(filt_angle_ADC[joint], up_down_ADC[joint],calibration_table[joint],col_sel[joint]);
 
-    //   dummy2[joint] = (uint16_t)filt_angle_ADC[joint];
-    //   // dummy1[i] = raw_angle_ADC[buffer_to_copy][i];
-    // }
+      dummy2[joint] = (uint16_t)filt_angle_ADC[joint];
+      // dummy1[i] = raw_angle_ADC[buffer_to_copy][i];
+    }
 
-    // if (sample_time == 0)
-    // {
-    //   for (int i = 0; i < JOINTS; i++)
-    //   {
-    //     u_dummy1.angle = adc2angle(dummy1[i], up_down_ADC[i], calibration_table[i]); // there is no way to define the up_down vector, initial values are used
-    //     u_dummy2.angle = adc2angle(dummy2[i], up_down_ADC[i], calibration_table[i]);
+    if (sample_time == 0)
+    {
+      for (int i = 0; i < JOINTS; i++)
+      {
+				u_dummy1.angle = target_joint[i];
+        //u_dummy1.angle = adc2angle(dummy1[i], up_down_ADC[i], calibration_table[i]); // there is no way to define the up_down vector, initial values are used
+        u_dummy2.angle = adc2angle(dummy2[i], up_down_ADC[i], calibration_table[i]);
+				u_dummy3.angle = fabs(u_dummy1.angle - u_dummy2.angle);
+				u_dummy4.angle = fabs(u_dummy2.angle - last_joint[i]);
+				
+				last_joint[i] = u_dummy2.angle;
 
-    //     uart_tx_buffer[8 * i + 2] = u_dummy1.angle_bytes[3];
-    //     uart_tx_buffer[8 * i + 3] = u_dummy1.angle_bytes[2];
-    //     uart_tx_buffer[8 * i + 4] = u_dummy1.angle_bytes[1];
-    //     uart_tx_buffer[8 * i + 5] = u_dummy1.angle_bytes[0];
+        uart_tx_buffer[16 * i + 2] = u_dummy1.angle_bytes[3];
+        uart_tx_buffer[16 * i + 3] = u_dummy1.angle_bytes[2];
+        uart_tx_buffer[16 * i + 4] = u_dummy1.angle_bytes[1];
+        uart_tx_buffer[16 * i + 5] = u_dummy1.angle_bytes[0];
 
-    //     uart_tx_buffer[8 * i + 6] = u_dummy2.angle_bytes[3];
-    //     uart_tx_buffer[8 * i + 7] = u_dummy2.angle_bytes[2];
-    //     uart_tx_buffer[8 * i + 8] = u_dummy2.angle_bytes[1];
-    //     uart_tx_buffer[8 * i + 9] = u_dummy2.angle_bytes[0];
-    //   }
+        uart_tx_buffer[16 * i + 6] = u_dummy2.angle_bytes[3];
+        uart_tx_buffer[16 * i + 7] = u_dummy2.angle_bytes[2];
+        uart_tx_buffer[16 * i + 8] = u_dummy2.angle_bytes[1];
+        uart_tx_buffer[16 * i + 9] = u_dummy2.angle_bytes[0];
+				
+				uart_tx_buffer[16 * i + 10] = u_dummy3.angle_bytes[3];
+        uart_tx_buffer[16 * i + 11] = u_dummy3.angle_bytes[2];
+        uart_tx_buffer[16 * i + 12] = u_dummy3.angle_bytes[1];
+        uart_tx_buffer[16 * i + 13] = u_dummy3.angle_bytes[0];
+				
+				uart_tx_buffer[16 * i + 14] = u_dummy4.angle_bytes[3];
+        uart_tx_buffer[16 * i + 15] = u_dummy4.angle_bytes[2];
+        uart_tx_buffer[16 * i + 16] = u_dummy4.angle_bytes[1];
+        uart_tx_buffer[16 * i + 17] = u_dummy4.angle_bytes[0];
+      }
 
-    //   HAL_UART_Transmit(&huart3, uart_tx_buffer, 8 * JOINTS + 2, HAL_MAX_DELAY);
-    // }
+      HAL_UART_Transmit(&huart3, uart_tx_buffer, 16 * JOINTS + 2, HAL_MAX_DELAY);
+    }
     // HAL_Delay(1); // Adjust delay as necessary
 
     State_Machine_Control();
@@ -1205,27 +1204,27 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
     // angle_femur = -5*sin(2*M_PI*0.5*t_step) +65.0;
 
     // Leg   Back    Left
-    test_quadruped_nucleo[10] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
-    // Paw   Back    Left
-    test_quadruped_nucleo[11] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+//    test_quadruped_nucleo[10] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+//    // Paw   Back    Left
+//    test_quadruped_nucleo[11] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
 
-    test_quadruped_nucleo[3] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
-    // Paw   Back    Left
-    test_quadruped_nucleo[4] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+//    test_quadruped_nucleo[3] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+//    // Paw   Back    Left
+//    test_quadruped_nucleo[4] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
 
-    test_quadruped_nucleo[9] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
-    // Paw   Back    Left
-    test_quadruped_nucleo[8] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+//    test_quadruped_nucleo[9] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+//    // Paw   Back    Left
+//    test_quadruped_nucleo[8] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
 
-    test_quadruped_nucleo[7] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
-    // Paw   Back    Left
-    test_quadruped_nucleo[6] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+//    test_quadruped_nucleo[7] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+//    // Paw   Back    Left
+//    test_quadruped_nucleo[6] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
   }
 
   if (timer == &htim9)
   {
     // PID
-    if (pid_enable == 1 && stuck_servo == 0)
+    if (stuck_servo == 0)
     {
       for (uint8_t joint = 0; joint < 12; joint++)
       {
@@ -1235,8 +1234,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 
           error = target_joint[joint] - f_joint_angle[joint];
           error_acum[joint] += error;
+					error_dif = (error - previous_error[joint])*100; //(divido por 10ms, tick de tim9)
+					
+					previous_error[joint] = error;
 
-          control_signal = KP * error + KI * error_acum[joint];
+          control_signal = kp * error + ki * error_acum[joint] + kd * error_dif;
           ton_pwm[joint] = ton_pwm[joint] + __round_int(control_signal);
 
           __HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], ton_pwm[joint]); // Move the servomotor
@@ -1414,6 +1416,7 @@ void State_Machine_Control(void)
           up_down_ADC[joint] = (f_joint_angle[joint] < target_joint[joint]);
 
         memset(error_acum, 0, sizeof(filt_angle_ADC));
+				memset(previous_error, 0, sizeof(filt_angle_ADC));
 
         state = ACTUATION;
       }
