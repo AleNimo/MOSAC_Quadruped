@@ -60,7 +60,7 @@ act_dim=12
 
 #----Preference vector----#
 #   [vel_forward, acceleration, vel_lateral, orientation, flat_back]
-pref_dim = 5
+pref_dim = 6
 
 first_time = 1
 
@@ -69,11 +69,11 @@ body_min, body_max = -10.0, 15.0
 body_mean = (body_min + body_max)/2
 body_range = (body_max - body_min)/2
 
-leg_min, leg_max = -10.0, 40.0
+leg_min, leg_max = -30.0, 30.0
 leg_mean = (leg_min + leg_max)/2
 leg_range = (leg_max - leg_min)/2
 
-paw_min, paw_max = -15.0,  5.0
+paw_min, paw_max = -15.0,  15.0
 paw_mean = (paw_min + paw_max)/2
 paw_range = (paw_max - paw_min)/2
 
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     P_net = P_Network(obs_dim, act_dim, pref_dim, hidden1_dim=64, hidden2_dim=32)
     P_net.load_checkpoint()
 
-    pref = torch.tensor([[1,1,1,1,1]]).to(P_net.device)
+    pref = torch.tensor([[1,1,1,1,1,0]]).to(P_net.device)
     
     while True:
 
@@ -96,37 +96,38 @@ if __name__ == '__main__':
                     first_time = 1
 
                     (bytes_read, joints_byte_list) = pi.spi_read(hspi, 12*4)
-                    # if bytes_read == 12*4: print("Se leyó todo")
-                    # else: print("no se leyeron la cantidad de bytes correcta")
+                    if bytes_read == 12*4: print("Se leyó todo")
+                    else: print("no se leyeron la cantidad de bytes correcta - Nucleo")
 
                     measured_joints_nucleo = np.frombuffer(bytes(joints_byte_list), dtype='<f4')   #< little endian, > big endian
                     print("measured_joints_nucleo = ", measured_joints_nucleo)
                     #Change the order from coppelia to the order the NUCLEO needs based on servo conections to the timers:
-                    measured_joints = np.zeros(12,dtype = np.float32)
+                    measured_joints = np.zeros(12,dtype = np.float64)
+
                     # Body  Front   Right
-                    measured_joints[0] = 65 - measured_joints_nucleo[4]
-                    # Leg   Front   Right
-                    measured_joints[1] = 65 - measured_joints_nucleo[3]
-                    # Paw   Front   Right
-                    measured_joints[2] = measured_joints_nucleo[0] - 65 
+                    measured_joints[0] = measured_joints_nucleo[0] - 90
+                    # Femur   Front   Right
+                    measured_joints[1] = measured_joints_nucleo[4] - 90
+                    # Tibia   Front   Right
+                    measured_joints[2] = measured_joints_nucleo[3] - 90
                     # Body  Front   Left
-                    measured_joints[3] = measured_joints_nucleo[6] - 65 
-                    # Leg   Front   Left
-                    measured_joints[4] = measured_joints_nucleo[7] - 65 
-                    # Paw   Front   Left
-                    measured_joints[5] = 65 - measured_joints_nucleo[5]
+                    measured_joints[3] = measured_joints_nucleo[5] - 90
+                    # Femur   Front   Left
+                    measured_joints[4] = 90 - measured_joints_nucleo[6]
+                    # Tibia   Front   Left
+                    measured_joints[5] = 90 - measured_joints_nucleo[7]
                     # Body  Back    Right
-                    measured_joints[6] = 65 - measured_joints_nucleo[11]
-                    # Leg   Back    Right
-                    measured_joints[7] = 65 - measured_joints_nucleo[10]
-                    # Paw   Back    Right
-                    measured_joints[8] = measured_joints_nucleo[1] - 65 
+                    measured_joints[6] = 90 - measured_joints_nucleo[1]
+                    # Femur   Back    Right
+                    measured_joints[7] = measured_joints_nucleo[11] - 90
+                    # Tibia   Back    Right
+                    measured_joints[8] = measured_joints_nucleo[10] - 90 
                     # Body  Back    Left
-                    measured_joints[9] = measured_joints_nucleo[8] - 65 
-                    # Leg   Back    Left
-                    measured_joints[10] = measured_joints_nucleo[9] - 65 
-                    # Paw   Back    Left
-                    measured_joints[11] = 65 - measured_joints_nucleo[2]
+                    measured_joints[9] = 90 - measured_joints_nucleo[2]
+                    # Femur   Back    Left
+                    measured_joints[10] = 90 - measured_joints_nucleo[8]
+                    # Tibia   Back    Left
+                    measured_joints[11] = 90 - measured_joints_nucleo[9]
 
                     for i in range(4):
                         measured_joints[i*3] =      (measured_joints[i*3]    - body_mean)   /   body_range
@@ -144,7 +145,7 @@ if __name__ == '__main__':
                 #Read 4*4 bytes (4 floats)
                 (count, data) = pi.i2c_read_device(hi2c, 4*4)
                 if count == 4*4: print("Se leyó todo")
-                else: print("no se leyeron la cantidad de bytes correcta")
+                else: print("no se leyeron la cantidad de bytes correcta - IMU")
                 #print("bytes IMU",data)
 
                 #IMU_data[4] = [roll, pitch, wx, wy]
@@ -157,14 +158,13 @@ if __name__ == '__main__':
                 
                 # Assemble the state vector from the measurements of the NUCLEO and IMU
                 target_rot = 0
-                pitch = IMU_data[0]
-                roll = IMU_data[1]
-                vel_pitch = IMU_data[2]
-                vel_roll = IMU_data[3]
+                pitch = 0#IMU_data[0]
+                roll = 0#IMU_data[1]
+                vel_pitch = 0#IMU_data[2]
+                vel_roll = 0#IMU_data[3]
                 
-                state = np.array([target_rot, pitch, roll, vel_pitch, vel_roll])
-                state = np.concatenate((state, measured_joints), axis=0) #HAY QUE NORMALIZAR LOS ANGULOS!!!!!!!
-                # print("state", state)
+                state = np.array([target_rot, pitch/np.pi, roll/np.pi, vel_pitch/np.pi, vel_roll/np.pi])
+                state = np.concatenate((state, measured_joints), axis=0)
                 state = np.expand_dims(state, axis=0)
                 print("state", state)
 
@@ -173,7 +173,7 @@ if __name__ == '__main__':
                 #Compute the action with the policy network
                 action, _ = P_net(state, pref)
                 action = torch.tanh(action) #Restrict the actions to (-1;1)
-                action = action.detach().cpu().numpy().reshape(-1).astype(np.float32)
+                action = action.detach().cpu().numpy().reshape(-1).astype(np.float64)
 
                 #Denormalize action with the ranges and midpoints of the joints
                 for i in range(4):
@@ -181,37 +181,35 @@ if __name__ == '__main__':
                     action[1+i*3] = action[1+i*3] * leg_range + leg_mean
                     action[2+i*3] = action[2+i*3] * paw_range + paw_mean
                 
-                
-
-                #Change the order from coppelia to the order the NUCLEO needs based on servo conections to the timers:
-                action_nucleo = np.zeros(12, dtype=np.float32)
-                # Body  Front   Right
-                action_nucleo[4] = 65 - action[0]
-                # Leg   Front   Right
-                action_nucleo[3] = 65 - action[1]
-                # Paw   Front   Right
-                action_nucleo[0] = 65 + action[2]
-                # Body  Front   Left
-                action_nucleo[6] = 65 + action[3]
-                # Leg   Front   Left
-                action_nucleo[7] = 65 + action[4]
-                # Paw   Front   Left
-                action_nucleo[5] = 65 - action[5]
-                # Body  Back    Right
-                action_nucleo[11] = 65 - action[6]
-                # Leg   Back    Right
-                action_nucleo[10] = 65 - action[7]
-                # Paw   Back    Right
-                action_nucleo[1] = 65 + action[8]
-                # Body  Back    Left
-                action_nucleo[8] = 65 + action[9]
-                # Leg   Back    Left
-                action_nucleo[9] = 65 + action[10]
-                # Paw   Back    Left
-                action_nucleo[2] = 65 - action[11]
+                #Change the order from coppelia to the order the NUCLEO needs based on servo connections to the timers:
+                action_nucleo = np.zeros(12, dtype=np.float64)
+                # BFR
+                action_nucleo[0] = action[0] + 90
+                # BBR
+                action_nucleo[1] = -action[6] + 90
+                # BBL
+                action_nucleo[2] = -action[9] + 90
+                # TFR
+                action_nucleo[3] = action[2] + 90
+                # FFR
+                action_nucleo[4] = action[1] + 90
+                # BFL
+                action_nucleo[5] = action[3] + 90
+                # FFL
+                action_nucleo[6] = -action[4] + 90
+                # TFL
+                action_nucleo[7] = -action[5] + 90
+                # FBL
+                action_nucleo[8] = -action[10] + 90
+                # TBL
+                action_nucleo[9] = -action[11] + 90
+                # TBR
+                action_nucleo[10] = action[8] + 90
+                # FBR
+                action_nucleo[11] = action[7] + 90
 
                 #Order of nucleo servos:
-                #0PWM_PFR,1PWM_PBR,2PWM_PBL,3PWM_LFR,4PWM_BFR,5PWM_PFL,6PWM_BFL,7PWM_LFL,8PWM_BBL,9PWM_LBL,10PWM_LBR,11PWM_BBR
+                #0PWM_BFR,1PWM_BBR, 2PWM_BBL, 3PWM_TFR, 4PWM_FFR, 5PWM_BFL, 6PWM_FFL, 7PWM_TFL, 8PWM_FBL, 9PWM_TBL, 10PWM_TBR, 11PWM_FBR
 
                 print("Action = ",          action)
                 print("Action Nucleo = ", action_nucleo)
@@ -228,49 +226,10 @@ if __name__ == '__main__':
                 #     first_time = 0
                 #Send Action with SPI
                 if rise_edge_detected:
-                    print("hola")
+                    print("Flanco ascendente detectado, envío acción")
                     rise_edge_detected = 0
                     first_time = 1
 
                     pi.spi_write(hspi, action_byte_list)
 
                     state = "RX_SPI"
-                            
-    
-        
-        #joints_byte_list = spi.readbytes(12*4)
-        
-        # #Receive target step rotation with bluetooth
-        # target_rot = 0
-
-        # ###Receive IMU data from XIAO_NRF52840 with I2C
-        # with SMBus(1) as bus:
-        #     #Read 4*4 bytes (4 floats)
-        #     msg = i2c_msg.read(IMU_address, 4*4)    #Prepare I2C read
-        #     bus.i2c_rdwr(msg)                       #Execute reading
-
-        # #IMU_data[4] = [roll, pitch, wx, wy]
-        # IMU_data = np.frombuffer(bytes(msg.buf), dtype='<f4')
-
-        # pitch = IMU_data[0]
-        # roll = IMU_data[1]
-        # vel_pitch = IMU_data[2]
-        # vel_roll = IMU_data[3]
-
-        # state = [target_rot, pitch, roll, vel_pitch, vel_roll, measured_joints]
-        # state = torch.tensor(state).to(P_net.device)
-
-        # actions, _ = P_net(state, pref)
-        # actions = torch.tanh(actions) #Restrict the actions to (-1;1)
-
-        # #Send Action with SPI
-        # action_byte_list = list(measured_joints.tobytes())
-        # #action_byte_list = list(actions.detach().cpu().numpy().tobytes())
-        # if rise_edge_detected:
-        #     #spi.writebytes(action_byte_list)
-        #     pi.spi_write(hspi, action_byte_list)
-        # else:
-        #     GPIO.wait_for_edge(spi_slave_ready, GPIO.RISING)
-        #     rise_edge_detected = 0
-        #     #spi.writebytes(action_byte_list)
-        #     pi.spi_write(hspi, action_byte_list)

@@ -30,8 +30,45 @@ def exit_handler(agent, train_history):
 
     train_history.save()
 
+bod_llim, bod_ulim = -10.0, 15.0
+femur_llim, femur_ulim = -30.0, 30.0
+tibia_llim, tibia_ulim = -15.0, 15.0
+
+jointLowerLimit = np.array(
+    [
+        bod_llim,
+        femur_llim,
+        tibia_llim,
+        bod_llim,
+        femur_llim,
+        tibia_llim,
+        bod_llim,
+        femur_llim,
+        tibia_llim,
+        bod_llim,
+        femur_llim,
+        tibia_llim,
+    ]
+)
+jointUpperLimit = np.array(
+    [
+        bod_ulim,
+        femur_ulim,
+        tibia_ulim,
+        bod_ulim,
+        femur_ulim,
+        tibia_ulim,
+        bod_ulim,
+        femur_ulim,
+        tibia_ulim,
+        bod_ulim,
+        femur_ulim,
+        tibia_ulim,
+    ]
+)
 
 def SAC_Agent_Training(q):
+    global jointLowerLimit, jointUpperLimit
 
     env = Environment(sim_measurement=31, obs_dim=17, act_dim=12, rwd_dim=7)
 
@@ -51,8 +88,8 @@ def SAC_Agent_Training(q):
     # torque of 12 joints
     # angular velocity of 12 joints
 
-    load_agent = False
-    test_agent = False 
+    load_agent = True
+    test_agent = True 
     load_replay_buffer_and_history = False # if test_agent == True, only the train history is loaded (the replay_buffer is not used)
 
     episodes = 20000
@@ -79,6 +116,7 @@ def SAC_Agent_Training(q):
 
     ep_obs = np.zeros((episode_steps+1, env.obs_dim+env.sim_measurement),dtype=data_type)        # Episode's observed states
     ep_act = np.zeros((episode_steps, env.act_dim),dtype=data_type)            # Episode's actions
+    ep_act_denorm = np.zeros(env.act_dim, dtype = data_type)
     ep_rwd = np.zeros((episode_steps, env.rwd_dim),dtype=data_type)            # Episode's rewards
     train_history = TrainHistory(max_episodes=episodes)
 
@@ -99,15 +137,28 @@ def SAC_Agent_Training(q):
         print("Episode: ", train_history.episode, flush=True)
 
         ep_obs[0], done_flag = env.reset(), False
+        
 
         # Testing
         if test_agent:
             # Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back]
-            pref = np.array([[2, 1, 1, 2, 1,1]])
+            pref = np.array([[2, 1, 1, 2, 1, 0]])
             print("Preference vector: ", pref, flush=True)
             for step in range(episode_steps):
                 # Decide action based on present observed state (taking only the mean)
-                ep_act[step] = agent.choose_action(ep_obs[step][:env.obs_dim], pref, random=False)
+                obs_hardcodeada = np.array([0,0,0,0,0,-0.30073669, -0.03526281, -0.08253123, -0.36763916, 0.06415126, 0.07235107, -0.05228882, -0.03702011, -0.1058787, -0.15217163, 0.060333, 0.07094371])
+                # print("Estado = ", ep_obs[step][:env.obs_dim])
+                print("estado = ", obs_hardcodeada)
+                # ep_act[step] = agent.choose_action(ep_obs[step][:env.obs_dim], pref, random=False)
+                ep_act[step] = agent.choose_action(obs_hardcodeada, pref, random=False)
+                print("action = ", ep_act[step])
+
+                
+
+                for i in range(12):
+                    ep_act_denorm[i] = ((jointUpperLimit[i]-jointLowerLimit[i])/2.0) * ep_act[step][i] + (jointUpperLimit[i]+jointLowerLimit[i])/2.0
+
+                print("action_denorm = ", ep_act_denorm)
                 # The agent doesn't receive the position and target direction although it is on the ep_obs vector for plotting reasons
 
                 # Act in the environment
