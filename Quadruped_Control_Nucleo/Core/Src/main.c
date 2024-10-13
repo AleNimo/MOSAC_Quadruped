@@ -97,7 +97,7 @@
 #define MAX_DELTA_TARGET 3.5    // Degrees
 #define MAX_ANG_VELOCITY 6      // Degrees/sec
 
-#define TIMEOUT 300    // miliseconds
+#define TIMEOUT 1000    // miliseconds
 
 #define ALL_FINISHED (uint16_t)0xFFF //(12 ones)
 
@@ -180,8 +180,8 @@ float32_t error_acum[JOINTS] = {0};
 float32_t error_dif = 0;
 
 // PID constants
-const float32_t kp[JOINTS] = {0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4};
-const float32_t kd[JOINTS] = {0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04};
+const float32_t kp[JOINTS] = {0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3};
+const float32_t kd[JOINTS] = {0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03};
 //const float32_t ki[JOINTS] = {0};
 
 uint16_t ton_pwm[JOINTS] = {0};
@@ -218,13 +218,10 @@ uint16_t raw_angle_ADC[2][12] = {0}; // ADC measurement with DMA
 uint8_t current_buffer = 0;
 
 // Ticks of timer
-uint8_t pid_sample = 0;
-uint8_t send_uart = 0;
-uint16_t timeout = 0;
-uint16_t time = 0; // for calibrating Servo
-
-
-uint8_t joint = 0; // joint index in for loops
+volatile uint8_t pid_sample = 0;
+volatile uint8_t send_uart = 0;
+volatile uint16_t timeout = 0;
+volatile uint16_t time = 0; // for calibrating Servo
 
 // Calibration variables
 float32_t calibrated_joints_up[MED_CALIB][12] = {0};   // For storing the results of calibration up
@@ -247,7 +244,7 @@ uint8_t uart_tx_buffer[2 + 12 * 4 + 12 * 4 + 12 * 4 + 12 * 4];
 float32_t f_last_joints[JOINTS][PREVIOUS_SAMPLES] = {0};
 uint8_t state_actuation = RESET_ACTUATION;
 uint16_t joints_finished = ALL_FINISHED; // Each bit is a flag for a joint: 1-Finished, 0-Unfinished
-int8_t step_complete = 1;           // returned by State_Machine_Actuation
+volatile int8_t step_complete = 1;           // returned by State_Machine_Actuation
 
 float f_joint_angle_aux[JOINTS] = {0}; // No se para que se usa
 
@@ -385,7 +382,7 @@ int main(void)
   uart_tx_buffer[1] = 0xFF;
 
   // Joints set to default initial angle
-  for (joint = 0; joint < JOINTS; joint++)
+  for (uint8_t joint = 0; joint < JOINTS; joint++)
   {
     ton_pwm[joint] = angle2ton_us(target_joint[joint]);
     move_servos(joint, ton_pwm[joint]);
@@ -1506,7 +1503,7 @@ int8_t State_Machine_Actuation(void)
   case RESET_ACTUATION:
 
     //Clip targets, and evaluate which joints to move
-    for (joint = 0; joint < JOINTS; joint++)
+    for (uint8_t joint = 0; joint < JOINTS; joint++)
     {
       delta_target = fabs(f_joint_angle[joint] - target_joint[joint]);
       
@@ -1555,11 +1552,11 @@ int8_t State_Machine_Actuation(void)
 
     else
     {
-      for (joint = 0; joint < JOINTS; joint++)
+      for (uint8_t joint = 0; joint < JOINTS; joint++)
       {
         if ((joints_finished & (1 << joint)) == 0) // Ignore joints that finished
         {
-          if (filt_vel[joint] < MAX_ANG_VELOCITY) // Not Moving
+          //if (filt_vel[joint] < MAX_ANG_VELOCITY) // Not Moving
           {
             delta_target = fabs(f_joint_angle[joint] - target_joint[joint]);
 
@@ -1570,14 +1567,14 @@ int8_t State_Machine_Actuation(void)
               if (joints_finished == ALL_FINISHED)
               {
                 state_actuation = RESET_ACTUATION;
-                HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0);
+                //HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0);
                 HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 1);
                 return 1;
               }
             }
           }
-          else
-						timeout = TIMEOUT;
+          //else
+						//timeout = TIMEOUT;
         }
       }
       pid_sample = 0;
@@ -1594,7 +1591,7 @@ int8_t State_Machine_Actuation(void)
 
     // Reset all joints
     // joints_finished = ALL_FINISHED;
-    for (joint = 0; joint < JOINTS; joint++)
+    for (uint8_t joint = 0; joint < JOINTS; joint++)
     {
       __HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(90));
     }

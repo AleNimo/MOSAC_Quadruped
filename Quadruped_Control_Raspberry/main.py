@@ -77,11 +77,13 @@ paw_min, paw_max = -15.0,  15.0
 paw_mean = (paw_min + paw_max)/2
 paw_range = (paw_max - paw_min)/2
 
+cant_steps = 0
+
 if __name__ == '__main__':
     P_net = P_Network(obs_dim, act_dim, pref_dim, hidden1_dim=64, hidden2_dim=32)
     P_net.load_checkpoint()
 
-    pref = torch.tensor([[1,1,1,1,1,0]]).to(P_net.device)
+    pref = torch.tensor([[2, 1, 1, 2, 1, 0]]).to(P_net.device)
     
     while True:
 
@@ -155,13 +157,13 @@ if __name__ == '__main__':
                 state = "POLICY"
 
             case "POLICY":
-                
+                cant_steps += 1
                 # Assemble the state vector from the measurements of the NUCLEO and IMU
                 target_rot = 0
-                pitch = 0#IMU_data[0]
-                roll = 0#IMU_data[1]
-                vel_pitch = 0#IMU_data[2]
-                vel_roll = 0#IMU_data[3]
+                pitch = IMU_data[0]
+                roll = IMU_data[1]
+                vel_pitch = IMU_data[2]
+                vel_roll = IMU_data[3]
                 
                 state = np.array([target_rot, pitch/np.pi, roll/np.pi, vel_pitch/np.pi, vel_roll/np.pi])
                 state = np.concatenate((state, measured_joints), axis=0)
@@ -182,7 +184,7 @@ if __name__ == '__main__':
                     action[2+i*3] = action[2+i*3] * paw_range + paw_mean
                 
                 #Change the order from coppelia to the order the NUCLEO needs based on servo connections to the timers:
-                action_nucleo = np.zeros(12, dtype=np.float64)
+                action_nucleo = np.zeros(12, dtype=np.float32)
                 # BFR
                 action_nucleo[0] = action[0] + 90
                 # BBR
@@ -210,7 +212,7 @@ if __name__ == '__main__':
 
                 #Order of nucleo servos:
                 #0PWM_BFR,1PWM_BBR, 2PWM_BBL, 3PWM_TFR, 4PWM_FFR, 5PWM_BFL, 6PWM_FFL, 7PWM_TFL, 8PWM_FBL, 9PWM_TBL, 10PWM_TBR, 11PWM_FBR
-
+                print("cant_steps = ", cant_steps)
                 print("Action = ",          action)
                 print("Action Nucleo = ", action_nucleo)
                 # print("action.dtype", action.dtype)

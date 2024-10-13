@@ -15,7 +15,7 @@ import random
 
 
 # slider = False
-# programmed_target_rotation = False
+programmed_target_rotation = False
 
 critical_failure_angle = 50 #Must match angle in environment.py
 
@@ -260,9 +260,6 @@ state = 0  # state 0 = idle / 1 = moving to intermediate position / 2 = moving t
 # Random Target step rotation for the step:
 target_step_rotation = np.float32(0.0)
 
-JOINT_MAX_NOISE = 3*np.pi/180.0  # degrees
-
-
 agentCreated = False  # To measure velocity only when there is an agent created (not between episodes where the agent is destroyed)
 step_completed = False  # To compute the mean velocities only when each step is completed
 
@@ -476,16 +473,17 @@ TIMEOUT_STATE = 3
 
 #Parameters of the actuation and time-out algorithm
 DEAD_BANDWIDTH_SERVO = 1 *np.pi/180.0 # Degrees
-MAX_DELTA_ANGLE = 1.0*np.pi/180.0  # Degrees
+MAX_DELTA_ANGLE = 3.5*np.pi/180.0  # Degrees
 MAX_DELTA_SAMPLE = 1.0 *np.pi/180.0 # Degrees
+
+JOINT_MAX_NOISE = 0.5*np.pi/180.0  # degrees
 
 SAMPLE_TIME  = 10	  #miliseconds
 TIMEOUT = 500      #miliseconds
 
-ALL_FINISHED  = 4095  #(12 ones)
+ALL_FINISHED = 0xFFF  #(12 ones)
 
 state = RESET
-joint_counter = 0
 delta_sample = 0
 delta_target = 0
 f_joint_angle = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -493,7 +491,7 @@ target_joint = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
 
 f_last_joint = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 state_actuation = RESET_ACTUATION
-joints_finished = 0x000 # Each bit is a flag for a joint: 1-Finished, 0-Unfinished
+joints_finished = ALL_FINISHED # Each bit is a flag for a joint: 1-Finished, 0-Unfinished
 stuck_servo = 0 # returned by State_Machine_Actuation
 
 #Ticks of timer
@@ -519,7 +517,6 @@ def reset_robot_position_orientation():
       #! EN RADIANES HAY QUE PONERLO!!!!//Move the servomotor
       joint[i].setPosition(0)
 
-
 def SendState():
   global environment_state, robot_node,Tx_float_length,reset_pos,reset_orientation,mean_forward_velocity,mean_lateral_velocity,max_forward_acc,target_step_rotation,slider,step_counter,attitude,ang_vel,joint_sensor,f_joint_angle,jointUpperLimit,jointLowerLimit,step_completed,joint_angular_velocity
   
@@ -542,6 +539,7 @@ def SendState():
   environment_state[1:3] = attitude/np.pi
   environment_state[3:5] = ang_vel/np.pi
   environment_state[5:17] = f_joint_angle
+  
 
     #Additional Measurements used to compute the rewards and/ or plots:
   environment_state[17:20] = current_translation
@@ -563,30 +561,28 @@ def SendState():
   #         'Target Step Rotation = %d %s', targetRotSlider, utf8.char(176)))
   #     target_step_rotation = targetRotSlider / 180
 
-  # elseif programmed_target_rotation then
-  #     if (step_counter >= 80) and (step_counter < 100) then
-  #       target_step_rotation = -6/180
-  #     elseif(step_counter >= 100) and (step_counter < 120) then
-  #       target_step_rotation = 5/180
-  #     elseif(step_counter >= 120) and (step_counter < 140) then
-  #       target_step_rotation = 0
-  #     elseif(step_counter >= 140) and (step_counter < 160) then
-  #       target_step_rotation = -10/180
-  #     elseif(step_counter >= 160) and (step_counter < 180) then
-  #       target_step_rotation = 10/180
-  #     elseif(step_counter >= 180) then
-  #       target_step_rotation = 0
-  #     end
-
-  # else:
-  #Generate next random target step rotation (std = 5?)
-  if (step_counter >= 50) and (step_counter % 50 == 0):
-    mean = 0.0
-    std_dev = 1/36
-    clip_range = 1/18
-    target_step_rotation = random.gauss(mean, std_dev) #? Cambiar a Uniforme
-    #-Clip the target step rotation to + /- 10?
-    target_step_rotation = max(-clip_range, min(clip_range, target_step_rotation))
+  if programmed_target_rotation:
+      if (step_counter >= 80) and (step_counter < 100):
+        target_step_rotation = -6/180
+      elif(step_counter >= 100) and (step_counter < 120):
+        target_step_rotation = 5/180
+      elif(step_counter >= 120) and (step_counter < 140):
+        target_step_rotation = 0
+      elif(step_counter >= 140) and (step_counter < 160):
+        target_step_rotation = -10/180
+      elif(step_counter >= 160) and (step_counter < 180):
+        target_step_rotation = 10/180
+      elif(step_counter >= 180):
+        target_step_rotation = 0
+  else:
+    #Generate next random target step rotation (std = 5?)
+    if (step_counter >= 50) and (step_counter % 50 == 0):
+      mean = 0.0
+      std_dev = 1/36
+      clip_range = 1/18
+      target_step_rotation = random.gauss(mean, std_dev) #? Cambiar a Uniforme
+      #-Clip the target step rotation to + /- 10?
+      target_step_rotation = max(-clip_range, min(clip_range, target_step_rotation))
 
   #Target Rotation for the step
   #print("target_step_rotation",target_step_rotation)
@@ -725,23 +721,7 @@ def State_Machine_Control():
         # data = float(client.recv(Rx_float_length).decode('utf-8'))
         target_joint[i] = ((jointUpperLimit[i]-jointLowerLimit[i])/2.0) * normalized_action[i] + (jointUpperLimit[i]+jointLowerLimit[i])/2.0
 
-      joints_finished = 0
-      # Check if the new target is too close to the actual position, in which case the servo wouldn't move because of the dead bandwidth
-      # Therefore consider the joint already finished
-      joint_counter = 0
-      for i in range(len(joint)):
-        delta_target = np.abs(f_joint_angle[i] - target_joint[i])
-        if delta_target < DEAD_BANDWIDTH_SERVO:
-          joints_finished |= 1 << i  # Set respective bit in 1
-        joint_counter += 1
-
-      # Start first measure of joints before ACTUATION
-
-      if joints_finished == ALL_FINISHED:  # Si ninguna articulacion se tiene que mover, salteo la actuacion
-        state = TX_RASPBERRY
-
-      else:
-        state = ACTUATION
+      state = ACTUATION
 
   elif state == ACTUATION:
     stuck_servo = State_Machine_Actuation()
@@ -763,16 +743,28 @@ def State_Machine_Actuation():
   global sample_time,state_actuation,joint,joint_sensor,f_joint_angle,f_last_joint,timeout,joints_finished,delta_sample,target_joint,delta_target,joint
 
   if state_actuation == RESET_ACTUATION:
-
+    # Check if the new target is too close to the actual position, in which case the servo wouldn't move because of the dead bandwidth
+    # Therefore consider the joint already finished
+    
     for i in range(len(joint)):
-      f_last_joint[i] = joint_sensor[i].getValue()
-      #! EN RADIANES HAY QUE PONERLO!!!!//Move the servomotor
-      joint[i].setPosition(target_joint[i])      
-							
-    sample_time = SAMPLE_TIME
-    state_actuation = DELAY_STATE
-    timeout = TIMEOUT
+      f_joint_angle[i] = joint_sensor[i].getValue()
+      f_last_joint[i] = f_joint_angle[i]
 
+      delta_target = np.abs(f_joint_angle[i] - target_joint[i])
+      if delta_target >= DEAD_BANDWIDTH_SERVO:
+        joints_finished &= ~(1 << i)  # Set respective bit in 0
+        #! EN RADIANES HAY QUE PONERLO!!!!//Move the servomotor
+        joint[i].setPosition(target_joint[i]+np.random.uniform(-JOINT_MAX_NOISE,JOINT_MAX_NOISE))      
+
+    # Start first measure of joints before ACTUATION
+
+    if joints_finished == ALL_FINISHED:  # Si ninguna articulación se tiene que mover, salteo la actuacion
+      print("Salteo paso")
+      return 1
+    else:
+      sample_time = SAMPLE_TIME
+      state_actuation = DELAY_STATE
+      timeout = TIMEOUT
 		
   elif state_actuation == DELAY_STATE:
     if timeout == 0:
@@ -787,7 +779,6 @@ def State_Machine_Actuation():
       #print("Timeout, joints finished",bin(joints_finished))
 
     else:
-      joint_counter = 0
       for i in range(len(joint)):
 
         if (joints_finished & (1 << i)) == 0:  # Ignore joints that finished
@@ -795,22 +786,21 @@ def State_Machine_Actuation():
           f_joint_angle[i] = joint_sensor[i].getValue()
           delta_sample = np.abs(f_joint_angle[i] - f_last_joint[i])
 
-          if delta_sample < MAX_DELTA_SAMPLE:  # Not Moving
+          #if delta_sample < MAX_DELTA_SAMPLE:  # Not Moving
 
-            delta_target = np.abs(f_joint_angle[i] - target_joint[i]);
+          delta_target = np.abs(f_joint_angle[i] - target_joint[i])
 
-            if delta_target < MAX_DELTA_ANGLE:  # If the stable joint reached target
+          if delta_target < MAX_DELTA_ANGLE:  # If the stable joint reached target
 
-              joints_finished |= 1 << i  # Set respective bit in 1
-              #print(bin(joints_finished))
-              if joints_finished == ALL_FINISHED:
+            joints_finished |= 1 << i  # Set respective bit in 1
+            #print(bin(joints_finished))
+            if joints_finished == ALL_FINISHED:
 
 
-                state_actuation = RESET_ACTUATION
-                return 1
-          else:
-            timeout = TIMEOUT
-        joint_counter += 1
+              state_actuation = RESET_ACTUATION
+              return 1
+          #else:
+            # timeout = TIMEOUT
 
         
       f_last_joint = np.copy(f_joint_angle)	# Remember joint
