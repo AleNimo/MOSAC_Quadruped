@@ -22,7 +22,11 @@ critical_failure_angle = 50 #Must match angle in environment.py
 robot = Supervisor()
 root = robot.getSelf()
 robot_node = robot.getFromDef('MOSAC')
-bola = robot.getFromDef('bola')
+
+paw_FR = robot.getFromDef('PFR')
+paw_FL = robot.getFromDef('PFL')
+paw_BR = robot.getFromDef('PBR')
+paw_BL = robot.getFromDef('PBL')
 
 # Create Socket
 HOST, PORT = "127.0.0.1", 57175
@@ -176,12 +180,8 @@ BL_servo_femur_joint.enableTorqueFeedback(timestep)
 BL_servo_body_joint.enableTorqueFeedback(timestep)
 
 
-# bod_llim, bod_ulim = -10.0 * np.pi / 180.0, 15.0 * np.pi / 180.0
-# femur_llim, femur_ulim = -10.0 * np.pi / 180.0, 40.0 * np.pi / 180.0
-# tibia_llim, tibia_ulim = -5.0 * np.pi / 180.0, 5.0 * np.pi / 180.0
-
-bod_llim, bod_ulim = -10.0 * np.pi / 180.0, 15.0 * np.pi / 180.0
-femur_llim, femur_ulim = -30.0 * np.pi / 180.0, 30.0 * np.pi / 180.0
+bod_llim, bod_ulim = -15.0 * np.pi / 180.0, 15.0 * np.pi / 180.0
+femur_llim, femur_ulim = -35.0 * np.pi / 180.0, 35.0 * np.pi / 180.0
 tibia_llim, tibia_ulim = -15.0 * np.pi / 180.0, 15.0 * np.pi / 180.0
 
 jointLowerLimit = np.array(
@@ -292,7 +292,7 @@ attitude = np.array([0.0,0.0])
 ang_vel = np.array([0.0,0.0])
 reset_orientation = np.array([0.0,0.0,0.0])
 
-sim_measure_dim = 31
+sim_measure_dim = 35
 obs_dim = 17
 environment_state = np.zeros(sim_measure_dim+obs_dim, dtype=np.float32)
 
@@ -472,7 +472,7 @@ COMPARE_MEASURE = 2
 TIMEOUT_STATE = 3
 
 #Parameters of the actuation and time-out algorithm
-DEAD_BANDWIDTH_SERVO = 1 *np.pi/180.0 # Degrees
+DEAD_BANDWIDTH_SERVO = 5 *np.pi/180.0 # Degrees
 MAX_DELTA_ANGLE = 3.5*np.pi/180.0  # Degrees
 MAX_DELTA_SAMPLE = 1.0 *np.pi/180.0 # Degrees
 
@@ -518,7 +518,7 @@ def reset_robot_position_orientation():
       joint[i].setPosition(0)
 
 def SendState():
-  global environment_state, robot_node,Tx_float_length,reset_pos,reset_orientation,mean_forward_velocity,mean_lateral_velocity,max_forward_acc,target_step_rotation,slider,step_counter,attitude,ang_vel,joint_sensor,f_joint_angle,jointUpperLimit,jointLowerLimit,step_completed,joint_angular_velocity
+  global environment_state, robot_node,Tx_float_length,reset_pos,reset_orientation,mean_forward_velocity,mean_lateral_velocity,max_forward_acc,target_step_rotation,slider,step_counter,attitude,ang_vel,joint_sensor,f_joint_angle,jointUpperLimit,jointLowerLimit,step_completed,joint_angular_velocity,paw_FR,paw_FL,paw_BR,paw_BL
   
   for i in range(len(joint)):
     #without noise in joints for now
@@ -532,6 +532,10 @@ def SendState():
   rotation = Rotation.from_rotvec(np.array(current_rotation[:3]) * current_rotation[3])
   # Extract yaw, pitch, and roll (in radians)
   current_rotation = rotation.as_euler('zyx', degrees=False)
+
+  
+  
+  
 
   #Fill the state array with the observed state and additional measurements:
     #Measurements used for the observation state of the agent
@@ -549,6 +553,10 @@ def SendState():
   environment_state[23] = current_rotation[0]
   environment_state[24:36] = joint_torque
   environment_state[36:48] = joint_angular_velocity
+  environment_state[48] = paw_FR.getPosition()[2]
+  environment_state[49] = paw_FL.getPosition()[2]
+  environment_state[50] = paw_BR.getPosition()[2]
+  environment_state[51] = paw_BL.getPosition()[2]
 
   client.sendall(environment_state.tobytes())
 
@@ -817,45 +825,28 @@ def State_Machine_Actuation():
   return 0
 
 def computeVelocityMaxAccelerationAngularVelocityTorque():
-  global robot,bola,root,velocity,forward_acceleration,forward_velocity,lateral_velocity,mean_forward_velocity,mean_lateral_velocity,lateral_acceleration,max_forward_acc,prev_time,prev_forward_velocity,prev_lateral_velocity,vel_samples,step_completed,step_counter,joint,current_position,prev_angular_position,joint_angular_velocity,joint_torque
+  global robot,root,velocity,forward_acceleration,forward_velocity,lateral_velocity,mean_forward_velocity,mean_lateral_velocity,lateral_acceleration,max_forward_acc,prev_time,prev_forward_velocity,prev_lateral_velocity,vel_samples,step_completed,step_counter,joint,current_position,prev_angular_position,joint_angular_velocity,joint_torque
   world_velocity = root.getVelocity()
-  #bola_velocity = bola.getVelocity()
 
 
   current_rotation = robot_node.getField("rotation").getSFRotation()
-  #bola_current_rotation = bola.getField("rotation").getSFRotation()
   # Convert axis-angle to a rotation object
   rotation = Rotation.from_rotvec(np.array(current_rotation[:3]) * current_rotation[3])
-  #bola_rotation = Rotation.from_rotvec(np.array(bola_current_rotation[:3]) * bola_current_rotation[3])
   # Extract yaw, pitch, and roll (in radians)
   current_rotation = rotation.as_euler('zyx', degrees=False)
-  #bola_current_rotation = bola_rotation.as_euler('zyx', degrees=False) - np.pi/2
+  
   #print("Yaw", current_rotation[0]*180/np.pi)
 
   A2[0] = np.cos(current_rotation[0])
   A2[1] = np.sin(current_rotation[0])
-
-  #bola_A2 = np.array([0.0, 0.0])
-  #bola_A_orth = np.array([0.0, 0.0])
-
-  #bola_A2[0] = np.cos(bola_current_rotation[0])
-  #bola_A2[1] = np.sin(bola_current_rotation[0])
 
   #print("Yaw,pitch,roll",current_rotation[0],current_rotation[1],current_rotation[2])
 
   A_orth[0] = A2[1]
   A_orth[1] = -A2[0]
 
-  #bola_A_orth[0] = bola_A2[1]
-  #bola_A_orth[1] = -bola_A2[0]
-
   forward_velocity = world_velocity[0] * A2[0] + world_velocity[1] * A2[1]
   lateral_velocity = world_velocity[0] * A_orth[0] + world_velocity[1] * A_orth[1]
-
-  #bola_forward_velocity = bola_velocity[0] * bola_A2[0] + bola_velocity[1] * bola_A2[1]
-  #bola_lateral_velocity = bola_velocity[0] * bola_A_orth[0] + bola_velocity[1] * bola_A_orth[1]
-
-  #print("Vf, Vl", bola_forward_velocity,bola_lateral_velocity)
 
 
 
@@ -917,6 +908,8 @@ if __name__ == "__main__":
       
       if sample_time >0: sample_time-=timestep
       if timeout >0: timeout-=timestep
+
+      
 
       measure-=timestep
       if(measure<=0):          

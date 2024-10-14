@@ -44,18 +44,23 @@ class Environment:
         self.__vmin_lat = -2
         self.__curvature_lateral = 3
 
-        # Parameters for orientation reward
+        # Parameters for rotation penalization
         self.rotation_penalty = 0
         self.__vmin_rotation = -4
         self.__curvature_rotation = 4
 
-        # Parameters for flat back reward
+        # Parameters for flat back penalization
         self.flat_back_penalty = np.zeros(2)
         self.__vmin_back = -2
         self.__curvature_back = 3
 
         # Parameters for energy penalization
         self.energy_penalty = 0.0
+
+        # Parameters for paws penalization
+        self.paws_penalty = 0
+        self.__curvature_paws = 80
+        self.__target_height = 0.07 #meters
         
         # Reward for not flipping over
         self.__not_flipping_reward = 0.5
@@ -98,10 +103,12 @@ class Environment:
 
         max_forward_acceleration = next_obs[:, 17+5]
 
-        torque = next_obs[:,17+7:17+7+12]
-        angular_velocity = next_obs[:,17+7+12:]
+        torque = next_obs[:,17+7:17+19]
+        angular_velocity = next_obs[:,17+19:17+31]
 
         total_mech_power = np.dot(torque,np.transpose(angular_velocity))
+
+        paws_height = next_obs[:,17+31:17+35]
 
         #print("Torque",torque)
         #print("angular_velocity",angular_velocity)
@@ -164,14 +171,21 @@ class Environment:
                 
             '''Reward for energy consumption'''
             self.energy_penalty = -50e-3 * np.abs(total_mech_power) * 100
-            reward[i,5] =  self.energy_penalty
+            reward[i,5] = self.energy_penalty
+
+            '''Reward for clearance between floor and paws'''
+            height_deviation = np.abs(paws_height[i] - self.__target_height)
+
+            self.paws_penalty = np.mean(-self.__curvature_paws * np.power(height_deviation, 2))
+
+            reward[i, 6] = self.paws_penalty
 
             '''Reward for avoiding critical failure (flipping over)'''
-            reward[i, 6] = self.__not_flipping_reward
+            reward[i, 7] = self.__not_flipping_reward
 
             # If the absolute value of X or Y angle is greater than 50° there is a penalization and the episode ends
             if abs(next_obs[i, 1])*180 >= 50 or abs(next_obs[i, 2])*180 >= 50:
-                reward[i, 6] -= self.__not_flipping_reward
+                reward[i, 7] -= self.__not_flipping_reward
                 end[i] = True
 
             elif dist_fin[i] >= self.__end_cond:

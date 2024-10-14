@@ -14,7 +14,7 @@ WorldInfo {
 }
 Viewpoint {
   orientation 0.23787157008857576 -0.16908140691965207 -0.9564667239259644 4.374127074946839
-  position 0.4554847878713555 -0.8916200104306089 0.5982445349106241
+  position 1.4116275654212926 -3.0895903464660006 1.7327449330017328
 }
 TexturedBackground {
 }
@@ -91,7 +91,7 @@ DEF MOSAC Robot {
             ]
             endPoint Solid {
               translation 0.035125 0.010265 -0.02005
-              rotation 0 1 0 1.570796
+              rotation 7.850463576164696e-17 1 7.850463576164696e-17 1.570796
               children [
                 Shape {
                   appearance DEF FR_servo_femur_link_material PBRAppearance {
@@ -186,7 +186,7 @@ DEF MOSAC Robot {
                       }
                     ]
                     name "FR_tibia_link"
-                    boundingObject Pose {
+                    boundingObject DEF PFR Pose {
                       translation 0.074 -0.065 0
                       children [
                         Cylinder {
@@ -238,7 +238,7 @@ DEF MOSAC Robot {
             ]
             endPoint Solid {
               translation 0.02375 -0.010265 -0.04005
-              rotation 0 1 0 1.570796
+              rotation -3.743392742235516e-23 1 -3.743392742235516e-23 1.570796
               children [
                 Shape {
                   appearance DEF FR_servo_tibia_link_material PBRAppearance {
@@ -332,7 +332,7 @@ DEF MOSAC Robot {
             ]
             endPoint Solid {
               translation 0.035125 0.010265 -0.02005
-              rotation 0 1 0 1.570796
+              rotation -1.9626158940411747e-17 1 1.9626158940411747e-17 1.5707959999999996
               children [
                 Shape {
                   appearance DEF FR_shoulder_link_material PBRAppearance {
@@ -392,7 +392,7 @@ DEF MOSAC Robot {
       ]
       endPoint Solid {
         translation -0.095 -0.05275 0.0032
-        rotation 0.5773496025226482 -0.5773516025212713 -0.5773496025226482 2.094399
+        rotation 0.5773496025226483 -0.5773516025212714 -0.5773496025226483 2.0943989999999997
         children [
           Shape {
             appearance DEF BBR_link_material PBRAppearance {
@@ -421,7 +421,7 @@ DEF MOSAC Robot {
             ]
             endPoint Solid {
               translation 0.035125 0.010265 0.04005
-              rotation 0 1 0 1.570796
+              rotation 3.743392742235516e-23 1 0 1.5707959999999996
               children [
                 Shape {
                   appearance DEF BR_servo_femur_link_material PBRAppearance {
@@ -516,7 +516,7 @@ DEF MOSAC Robot {
                       }
                     ]
                     name "BR_tibia_link"
-                    boundingObject Pose {
+                    boundingObject DEF PBR Pose {
                       translation 0.074 -0.065 0
                       children [
                         Cylinder {
@@ -662,7 +662,7 @@ DEF MOSAC Robot {
             ]
             endPoint Solid {
               translation 0.035125 0.010265 0.04005
-              rotation 0 1 0 1.570796
+              rotation 9.81307947020587e-18 1 -9.81307947020587e-18 1.570796
               children [
                 Shape {
                   appearance DEF BR_shoulder_link_material PBRAppearance {
@@ -722,7 +722,7 @@ DEF MOSAC Robot {
       ]
       endPoint Solid {
         translation 0.095 0.05275 0.0032
-        rotation 0.5773496025226482 0.5773516025212713 0.5773496025226482 2.094399
+        rotation 0.5773496025226483 0.5773516025212714 0.5773496025226483 2.0943989999999992
         children [
           Shape {
             appearance DEF BFL_link_material PBRAppearance {
@@ -752,7 +752,7 @@ DEF MOSAC Robot {
             ]
             endPoint Solid {
               translation 0.035125 0.010265 0.02005
-              rotation 0 1 0 1.570796
+              rotation 0 1 7.850463576164695e-17 1.5707959999999996
               children [
                 Shape {
                   appearance DEF FL_servo_femur_link_material PBRAppearance {
@@ -847,7 +847,7 @@ DEF MOSAC Robot {
                       }
                     ]
                     name "FL_tibia_link"
-                    boundingObject Pose {
+                    boundingObject DEF PFL Pose {
                       translation -0.074 -0.065 0
                       children [
                         Cylinder {
@@ -900,7 +900,7 @@ DEF MOSAC Robot {
             ]
             endPoint Solid {
               translation 0.02375 -0.010265 0.04005
-              rotation 0 1 0 1.570796
+              rotation 3.7433927422355164e-23 1 -3.7433927422355164e-23 1.570796
               children [
                 Shape {
                   appearance DEF FL_servo_tibia_link_material PBRAppearance {
@@ -996,7 +996,7 @@ DEF MOSAC Robot {
             ]
             endPoint Solid {
               translation 0.035125 0.010265 0.02005
-              rotation 0 1 0 1.570796
+              rotation 9.81307947020587e-18 1 0 1.570796
               children [
                 Shape {
                   appearance DEF FL_shoulder_link_material PBRAppearance {
@@ -1084,7 +1084,7 @@ DEF MOSAC Robot {
             ]
             endPoint Solid {
               translation 0.035125 0.010265 -0.04005
-              rotation 0 1 0 1.570796
+              rotation 0 1 7.850463576164695e-17 1.5707959999999996
               children [
                 Shape {
                   appearance DEF BL_servo_femur_link_material PBRAppearance {
@@ -1178,7 +1178,7 @@ DEF MOSAC Robot {
                       }
                     ]
                     name "BL_tibia_link"
-                    boundingObject Pose {
+                    boundingObject DEF PBL Pose {
                       translation -0.074 -0.065 0
                       children [
                         Cylinder {
