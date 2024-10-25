@@ -123,7 +123,7 @@ def SAC_Agent_Training(q):
     # Preference vector maximum and minimum values - [vel_forward, acceleration, vel_lateral, orientation, flat_back, energy]
     # If pref_min_vector == pref_max_vector then the multi-objective approach is disabled, and constant reward weights
     # equal to pref_max_vector are defined
-    pref_max_vector = np.array([2, 1, 1, 2, 1, 0, 1])
+    pref_max_vector = np.array([2, 1, 1, 2, 1, 0, 0])
     pref_min_vector = np.array([0.5, 0, 0, 0, 0, 0,0])
 
     pref_dim = pref_max_vector.size
@@ -164,8 +164,8 @@ def SAC_Agent_Training(q):
 
         # Testing
         if test_agent:
-            # Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back]
-            pref = np.array([[2, 1, 1, 2, 1, 0, 1]])
+            # Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back, energy, paws]
+            pref = np.array([[2, 1, 1, 2, 1, 0, 0]])
             # pref = np.array([[1, 1, 1, 1, 1, 0]])
             print("Preference vector: ", pref, flush=True)
             for step in range(episode_steps):

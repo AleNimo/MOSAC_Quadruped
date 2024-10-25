@@ -108,7 +108,7 @@ class Environment:
 
         total_mech_power = np.dot(torque,np.transpose(angular_velocity))
 
-        paws_height = next_obs[:,17+31:17+35]
+        paws_up_total_ratio = next_obs[:,17+31:17+35]
 
         #print("Torque",torque)
         #print("angular_velocity",angular_velocity)
@@ -174,11 +174,22 @@ class Environment:
             reward[i,5] = self.energy_penalty
 
             '''Reward for clearance between floor and paws'''
-            height_deviation = np.abs(paws_height[i] - self.__target_height)
+            # I keep only the 2 with the highest ratio, the other ones are probably on the floor supporting the robot's body
+            
+            highest_ratio_paws = paws_up_total_ratio[i][np.argpartition(paws_up_total_ratio[i], -2)[-2]]
 
-            self.paws_penalty = np.mean(-self.__curvature_paws * np.power(height_deviation, 2))
+            if highest_ratio_paws.size == 1 :
+                highest_ratio_paws = np.ones(2) * highest_ratio_paws
 
-            reward[i, 6] = self.paws_penalty
+            for ratio in highest_ratio_paws:
+                if ratio < 0.6:
+                    reward[i, 6] -= 0.1
+
+            # height_deviation = np.abs(highest_paws - self.__target_height)
+
+            # self.paws_penalty = np.mean(-self.__curvature_paws * np.power(height_deviation, 2))
+
+            # reward[i, 6] = self.paws_penalty
 
             '''Reward for avoiding critical failure (flipping over)'''
             reward[i, 7] = self.__not_flipping_reward
