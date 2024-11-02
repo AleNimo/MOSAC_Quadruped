@@ -105,7 +105,7 @@
 #define NUM_STAGE_IIR 1
 #define NUM_ORDER_IIR (NUM_STAGE_IIR * 2)
 #define NUM_STD_COEFS 5 // b0, b1, b2, a1, a2
-#define ALPHA_ANGLE (float32_t)0.01
+#define ALPHA_ANGLE (float32_t)0.05
 #define ALPHA_VEL (float32_t)0.08
 
 /* USER CODE END PD */
@@ -155,7 +155,7 @@ arm_biquad_cascade_df2T_instance_f32 S_angle[12];
 
 float32_t iir_in_arm_angle[12];
 
-float32_t filt_angle_ADC[12] = {0};  // Filtered ADC values
+float32_t filt_angle_ADC[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};  // Filtered ADC values
 
 static float32_t iirState_vel[12][NUM_ORDER_IIR];
 
@@ -167,30 +167,30 @@ arm_biquad_cascade_df2T_instance_f32 S_vel[12];
 
 float32_t iir_in_arm_vel[12];
 
-float32_t filt_vel[12] = {0};
+float32_t filt_vel[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 volatile uint8_t spi_rx_cplt = 0;
 //uint8_t spi_tx_cplt = 0;
 
 // PID Variables
 float32_t error = 0;
-float32_t previous_error[JOINTS] = {0};
+float32_t previous_error[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint16_t control_signal = 0;
-float32_t error_acum[JOINTS] = {0};
+float32_t error_acum[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 float32_t error_dif = 0;
 
 // PID constants
-const float32_t kp[JOINTS] = {0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3};
-const float32_t kd[JOINTS] = {0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03,0.03};
+const float32_t kp[JOINTS] = {0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6};
+const float32_t kd[JOINTS] = {0,0,0,0,0,0,0,0,0,0,0,0};
 //const float32_t ki[JOINTS] = {0};
 
-uint16_t ton_pwm[JOINTS] = {0};
+uint16_t ton_pwm[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 // Vectors to control joints manually
-float test_quadruped_nucleo[12] = {0};//{PWM_BFR, PWM_BBR, PWM_BBL, PWM_TFR, PWM_FFR, PWM_BFL, PWM_FFL, PWM_TFL, PWM_FBL, PWM_TBL, PWM_TBR, PWM_FBR};
+float test_quadruped_nucleo[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};//{PWM_BFR, PWM_BBR, PWM_BBL, PWM_TFR, PWM_FFR, PWM_BFL, PWM_FFL, PWM_TFL, PWM_FBL, PWM_TBL, PWM_TBR, PWM_FBR};
 
 // Global Flags for state machines
-uint8_t up_down_ADC[JOINTS] = {0}; // To know if the servos have to go up or down: 1 is up, 0 is down
+uint8_t up_down_ADC[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // To know if the servos have to go up or down: 1 is up, 0 is down
 
 // Arrays used to set the pwm of each servo in a for loop
 TIM_HandleTypeDef* htim[3];
@@ -213,7 +213,7 @@ float32_t joint_range[12][2] = {{BODY_RANGE_MIN, BODY_RANGE_MAX},
 // Global Buffers
 // Buffer rx SPI
 float target_joint[12] = {PWM_BFR, PWM_BBR, PWM_BBL, PWM_TFR, PWM_FFR, PWM_BFL, PWM_FFL, PWM_TFL, PWM_FBL, PWM_TBL, PWM_TBR, PWM_FBR};
-uint16_t raw_angle_ADC[2][12] = {0}; // ADC measurement with DMA
+uint16_t raw_angle_ADC[2][12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // ADC measurement with DMA
 
 uint8_t current_buffer = 0;
 
@@ -222,10 +222,15 @@ volatile uint8_t pid_sample = 0;
 volatile uint8_t send_uart = 0;
 volatile uint16_t timeout = 0;
 volatile uint16_t time = 0; // for calibrating Servo
+volatile uint16_t time_debounce = 0;  //To debounce user button
+
+// Init program at reset with user button
+volatile uint8_t init_nucleo = 0;
+volatile uint8_t reset_system = 0;
 
 // Calibration variables
-float32_t calibrated_joints_up[MED_CALIB][12] = {0};   // For storing the results of calibration up
-float32_t calibrated_joints_down[MED_CALIB][12] = {0}; // For storing the results of calibration down
+float32_t calibrated_joints_up[MED_CALIB][12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};   // For storing the results of calibration up
+float32_t calibrated_joints_down[MED_CALIB][12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // For storing the results of calibration down
 
 const float32_t *calibration_table[12] = {&ADC_VALUES_SERVO_0[0][0], &ADC_VALUES_SERVO_1[0][0], &ADC_VALUES_SERVO_2[0][0], &ADC_VALUES_SERVO_3[0][0], &ADC_VALUES_SERVO_4[0][0], &ADC_VALUES_SERVO_5[0][0], &ADC_VALUES_SERVO_6[0][0], &ADC_VALUES_SERVO_7[0][0], &ADC_VALUES_SERVO_8[0][0], &ADC_VALUES_SERVO_9[0][0], &ADC_VALUES_SERVO_10[0][0], &ADC_VALUES_SERVO_11[0][0]};
 
@@ -234,9 +239,9 @@ const float32_t *calibration_table[12] = {&ADC_VALUES_SERVO_0[0][0], &ADC_VALUES
 // VARIABLES QUE NO DEBEN SER GLOBALES, pero es mas cómodo para debuggear
 
 // podrían ser locales
-float32_t iir_in_arm_vel[JOINTS] = {0};
+float32_t iir_in_arm_vel[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 float32_t delta_target = 0;
-float32_t f_joint_angle[JOINTS] = {0};
+float32_t f_joint_angle[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t uart_tx_buffer[2 + 12 * 4 + 12 * 4 + 12 * 4 + 12 * 4];
 
 // podrían ser estáticas locales
@@ -246,7 +251,7 @@ uint8_t state_actuation = RESET_ACTUATION;
 uint16_t joints_finished = ALL_FINISHED; // Each bit is a flag for a joint: 1-Finished, 0-Unfinished
 volatile int8_t step_complete = 1;           // returned by State_Machine_Actuation
 
-float f_joint_angle_aux[JOINTS] = {0}; // No se para que se usa
+float f_joint_angle_aux[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // No se para que se usa
 
 /* USER CODE END PV */
 
@@ -332,6 +337,9 @@ int main(void)
   MX_TIM5_Init();
   MX_TIM9_Init();
   /* USER CODE BEGIN 2 */
+	
+	while(init_nucleo == 0) HAL_Delay(10);
+	
   HAL_TIM_Base_Start(&htim2);
   HAL_TIM_Base_Start(&htim2);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
@@ -427,8 +435,9 @@ int main(void)
         //u_dummy1.angle = adc2angle(dummy1[i], up_down_ADC[i], calibration_table[i]); // there is no way to define the up_down vector, initial values are used
         u_dummy2.angle = f_joint_angle[i];
 				//u_dummy3.angle = fabs(u_dummy1.angle - u_dummy2.angle);
-        u_dummy3.angle = iir_in_arm_vel[i];
-				u_dummy4.angle = filt_vel[i];
+        //u_dummy3.angle = iir_in_arm_vel[i];
+        u_dummy3.angle = adc2angle(iir_in_arm_angle[i], up_down_ADC[i], calibration_table[i]);
+				u_dummy4.angle = ton_us2angle(ton_pwm[i]);
 				
 				last_joint[i] = u_dummy2.angle;
 
@@ -1155,6 +1164,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USB_OverCurrent_GPIO_Port, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
@@ -1179,6 +1192,18 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
   }
 }
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == USER_Btn_Pin && init_nucleo == 0)
+	{
+		init_nucleo = 1;
+    time_debounce = 1000; //1seg
+	}else if(GPIO_Pin == USER_Btn_Pin && init_nucleo == 1 && time_debounce == 0)
+  {
+    reset_system = 1;
+  }
+}
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 {
   // static float32_t t_step = 0;
@@ -1191,6 +1216,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
     // for calibration
     if (time > 0)
       time--;
+
+    if (time_debounce > 0)
+      time_debounce--;
 
     uint8_t buffer_to_copy = current_buffer;
 
@@ -1269,11 +1297,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 				
 				up_down_ADC[joint] = control_signal > 0;
 
-       ton_pwm[joint] = ton_pwm[joint] + control_signal;
+        ton_pwm[joint] = ton_pwm[joint] + control_signal;
 
-       if((int16_t)ton_pwm[joint] < 0) ton_pwm[joint] = 0;   //Impido que ton_pwm haga overflow por ser negativo
+        if((int16_t)ton_pwm[joint] < 0) ton_pwm[joint] = 0;   //Impido que ton_pwm haga overflow por ser negativo
 
-       move_servos(joint, ton_pwm[joint]); // Move the servomotor
+        move_servos(joint, ton_pwm[joint]); // Move the servomotor
+       
 			}
 		}
     pid_sample = 1;
@@ -1418,6 +1447,29 @@ void State_Machine_Control(void)
   switch (state)
   {
     case TX_RASPBERRY:
+
+      if(reset_system)
+			{
+				step_complete = 1;  //disable PID
+
+				for (uint8_t joint = 0; joint < JOINTS; joint++)
+				{
+					__HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(90));
+				}
+
+        HAL_Delay(1000);  //Delay to ignore bouncing of user button, and establish the default position before reset
+
+				//Turn off pwm without interrupting ton.
+				for(uint8_t i= 0; i<JOINTS;i++)
+				{  
+					//wait for ton to finish
+					while(__HAL_TIM_GET_COUNTER(htim[i / 4]) < __HAL_TIM_GET_COMPARE(htim[i / 4], channel[i % 4]));
+					
+					HAL_TIM_PWM_Stop(htim[i / 4], channel[i % 4]);
+				}
+		
+				HAL_NVIC_SystemReset();
+			}
       // Request master to transmit target step rotation and joint angles
       HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)f_joint_angle, 12*2);
       HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
@@ -1515,7 +1567,7 @@ int8_t State_Machine_Actuation(void)
         joints_finished &= ~(1 << joint); // Set respective bit in 0
 
         //*Solo si no se usa PID
-        // move_servos(joint, angle2ton_us(target_joint[joint]));
+        //move_servos(joint, angle2ton_us(target_joint[joint]));
       }
     }
     
