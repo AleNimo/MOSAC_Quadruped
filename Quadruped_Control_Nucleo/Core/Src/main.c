@@ -94,7 +94,7 @@
 
 // Parameters of the actuation and time-out algorithm
 #define DEAD_BANDWIDTH_SERVO 2	// Degrees
-#define MAX_DELTA_TARGET 3.5    // Degrees
+#define MAX_DELTA_TARGET 1    // Degrees
 #define MAX_ANG_VELOCITY 6      // Degrees/sec
 
 #define TIMEOUT 1000    // miliseconds
@@ -175,19 +175,19 @@ volatile uint8_t spi_rx_cplt = 0;
 // PID Variables
 float32_t error = 0;
 float32_t previous_error[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-uint16_t control_signal = 0;
+float32_t control_signal = 0;
 float32_t error_acum[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 float32_t error_dif = 0;
 
 // PID constants
-const float32_t kp[JOINTS] = {0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6};
-const float32_t kd[JOINTS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-//const float32_t ki[JOINTS] = {0};
+float32_t kp[JOINTS] = {0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6};
+float32_t kd[JOINTS] = {0,0,0,0,0,0,0,0,0,0,0,0};
+float32_t ki[JOINTS] = {0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02};
 
-uint16_t ton_pwm[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+//uint16_t ton_pwm[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 // Vectors to control joints manually
-float test_quadruped_nucleo[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};//{PWM_BFR, PWM_BBR, PWM_BBL, PWM_TFR, PWM_FFR, PWM_BFL, PWM_FFL, PWM_TFL, PWM_FBL, PWM_TBL, PWM_TBR, PWM_FBR};
+float test_quadruped_nucleo[12] = {PWM_BFR, PWM_BBR, PWM_BBL, PWM_TFR, PWM_FFR, PWM_BFL, PWM_FFL, PWM_TFL, PWM_FBL, PWM_TBL, PWM_TBR, PWM_FBR};//{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 // Global Flags for state machines
 uint8_t up_down_ADC[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // To know if the servos have to go up or down: 1 is up, 0 is down
@@ -235,6 +235,11 @@ float32_t calibrated_joints_down[MED_CALIB][12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 const float32_t *calibration_table[12] = {&ADC_VALUES_SERVO_0[0][0], &ADC_VALUES_SERVO_1[0][0], &ADC_VALUES_SERVO_2[0][0], &ADC_VALUES_SERVO_3[0][0], &ADC_VALUES_SERVO_4[0][0], &ADC_VALUES_SERVO_5[0][0], &ADC_VALUES_SERVO_6[0][0], &ADC_VALUES_SERVO_7[0][0], &ADC_VALUES_SERVO_8[0][0], &ADC_VALUES_SERVO_9[0][0], &ADC_VALUES_SERVO_10[0][0], &ADC_VALUES_SERVO_11[0][0]};
 
 /////////////////////////////
+
+//Para pruebas
+// float32_t square_wave[2] = {104, 80};
+// uint8_t selected_value = 0;
+// volatile uint8_t test_new_move = 0;
 
 // VARIABLES QUE NO DEBEN SER GLOBALES, pero es mas cómodo para debuggear
 
@@ -392,8 +397,10 @@ int main(void)
   // Joints set to default initial angle
   for (uint8_t joint = 0; joint < JOINTS; joint++)
   {
-    ton_pwm[joint] = angle2ton_us(target_joint[joint]);
-    move_servos(joint, ton_pwm[joint]);
+    //ton_pwm[joint] = angle2ton_us(target_joint[joint]);
+    //move_servos(joint, ton_pwm[joint]);
+
+    move_servos(joint, angle2ton_us(target_joint[joint]));
   }
 
   while (HAL_TIM_Base_Start_IT(&htim5) == HAL_BUSY);
@@ -427,46 +434,54 @@ int main(void)
 //    }
 			
 
-    if (send_uart)
-    {
-      for (int i = 0; i < JOINTS; i++)
-      {
-				u_dummy1.angle = target_joint[i];
-        //u_dummy1.angle = adc2angle(dummy1[i], up_down_ADC[i], calibration_table[i]); // there is no way to define the up_down vector, initial values are used
-        u_dummy2.angle = f_joint_angle[i];
-				//u_dummy3.angle = fabs(u_dummy1.angle - u_dummy2.angle);
-        //u_dummy3.angle = iir_in_arm_vel[i];
-        u_dummy3.angle = adc2angle(iir_in_arm_angle[i], up_down_ADC[i], calibration_table[i]);
-				u_dummy4.angle = ton_us2angle(ton_pwm[i]);
+    // if (send_uart)
+    // {
+    //   for (int i = 0; i < JOINTS; i++)
+    //   {
+		// 		u_dummy1.angle = target_joint[i];
+    //     //u_dummy1.angle = adc2angle(dummy1[i], up_down_ADC[i], calibration_table[i]); // there is no way to define the up_down vector, initial values are used
+    //     u_dummy2.angle = f_joint_angle[i];
+		// 		//u_dummy3.angle = fabs(u_dummy1.angle - u_dummy2.angle);
+    //     //u_dummy3.angle = iir_in_arm_vel[i];
+    //     u_dummy3.angle = adc2angle(iir_in_arm_angle[i], up_down_ADC[i], calibration_table[i]);
+		// 		u_dummy4.angle = 0;//ton_us2angle(ton_pwm[i]);
 				
-				last_joint[i] = u_dummy2.angle;
+		// 		last_joint[i] = u_dummy2.angle;
 
-        uart_tx_buffer[16 * i + 2] = u_dummy1.angle_bytes[3];
-        uart_tx_buffer[16 * i + 3] = u_dummy1.angle_bytes[2];
-        uart_tx_buffer[16 * i + 4] = u_dummy1.angle_bytes[1];
-        uart_tx_buffer[16 * i + 5] = u_dummy1.angle_bytes[0];
+    //     uart_tx_buffer[16 * i + 2] = u_dummy1.angle_bytes[3];
+    //     uart_tx_buffer[16 * i + 3] = u_dummy1.angle_bytes[2];
+    //     uart_tx_buffer[16 * i + 4] = u_dummy1.angle_bytes[1];
+    //     uart_tx_buffer[16 * i + 5] = u_dummy1.angle_bytes[0];
 
-        uart_tx_buffer[16 * i + 6] = u_dummy2.angle_bytes[3];
-        uart_tx_buffer[16 * i + 7] = u_dummy2.angle_bytes[2];
-        uart_tx_buffer[16 * i + 8] = u_dummy2.angle_bytes[1];
-        uart_tx_buffer[16 * i + 9] = u_dummy2.angle_bytes[0];
+    //     uart_tx_buffer[16 * i + 6] = u_dummy2.angle_bytes[3];
+    //     uart_tx_buffer[16 * i + 7] = u_dummy2.angle_bytes[2];
+    //     uart_tx_buffer[16 * i + 8] = u_dummy2.angle_bytes[1];
+    //     uart_tx_buffer[16 * i + 9] = u_dummy2.angle_bytes[0];
 				
-				uart_tx_buffer[16 * i + 10] = u_dummy3.angle_bytes[3];
-        uart_tx_buffer[16 * i + 11] = u_dummy3.angle_bytes[2];
-        uart_tx_buffer[16 * i + 12] = u_dummy3.angle_bytes[1];
-        uart_tx_buffer[16 * i + 13] = u_dummy3.angle_bytes[0];
+		// 		uart_tx_buffer[16 * i + 10] = u_dummy3.angle_bytes[3];
+    //     uart_tx_buffer[16 * i + 11] = u_dummy3.angle_bytes[2];
+    //     uart_tx_buffer[16 * i + 12] = u_dummy3.angle_bytes[1];
+    //     uart_tx_buffer[16 * i + 13] = u_dummy3.angle_bytes[0];
 				
-				uart_tx_buffer[16 * i + 14] = u_dummy4.angle_bytes[3];
-        uart_tx_buffer[16 * i + 15] = u_dummy4.angle_bytes[2];
-        uart_tx_buffer[16 * i + 16] = u_dummy4.angle_bytes[1];
-        uart_tx_buffer[16 * i + 17] = u_dummy4.angle_bytes[0];
-      }
+		// 		uart_tx_buffer[16 * i + 14] = u_dummy4.angle_bytes[3];
+    //     uart_tx_buffer[16 * i + 15] = u_dummy4.angle_bytes[2];
+    //     uart_tx_buffer[16 * i + 16] = u_dummy4.angle_bytes[1];
+    //     uart_tx_buffer[16 * i + 17] = u_dummy4.angle_bytes[0];
+    //   }
 
-      HAL_UART_Transmit(&huart3, uart_tx_buffer, 16 * JOINTS + 2, HAL_MAX_DELAY);
+    //   HAL_UART_Transmit(&huart3, uart_tx_buffer, 16 * JOINTS + 2, HAL_MAX_DELAY);
       
-      send_uart = 0;
-    }
-    // HAL_Delay(1); // Adjust delay as necessary
+    //   send_uart = 0;
+    // }
+    // if(test_new_move)
+    // {
+    //   test_new_move = 0;
+    //   for (uint8_t joint = 0; joint < 12; joint++)
+    //   {
+    //     move_servos(joint, angle2ton_us(test_quadruped_nucleo[joint]));
+    //   }
+    // }
+    HAL_Delay(1); // Adjust delay as necessary
 
     State_Machine_Control();
   }
@@ -1230,27 +1245,29 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
     // for controlling trajectory
     // t_step += 0.001;
 
-    // Tibia   Back    Right
-  //  test_quadruped_nucleo[10] = -8 * sin(2 * M_PI * 0.5 * t_step) + 90.0;
+    // // Tibia   Back    Right
+    // test_quadruped_nucleo[10] = -8 * sin(2 * M_PI * 2 * t_step) + 90.0;
 
-    // Femur   Back    Right
-  //  test_quadruped_nucleo[11] = 8 * sin(2 * M_PI * 0.5 * t_step) + 90.0;
+    // // Femur   Back    Right
+    // test_quadruped_nucleo[11] = 8 * sin(2 * M_PI * 2 * t_step) + 90.0;
 
-    // Tibia Front Right
-//    test_quadruped_nucleo[3] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
-    //Femur Front Right
-//    test_quadruped_nucleo[4] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+    // // Tibia Front Right
+    // test_quadruped_nucleo[3] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+    // //Femur Front Right
+    // test_quadruped_nucleo[4] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
 
-    //Tibia Back left
+    // //Tibia Back left
     // test_quadruped_nucleo[9] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
 
-    //Femur Back left
+    // //Femur Back left
     // test_quadruped_nucleo[8] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
 
-    //Tibia Front left
-//    test_quadruped_nucleo[7] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
-    //Femur Front left
-//    test_quadruped_nucleo[6] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+    // //Tibia Front left
+    // test_quadruped_nucleo[7] = 15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+    // //Femur Front left
+    // test_quadruped_nucleo[6] = -15 * sin(2 * M_PI * 2 * t_step) + 90.0;
+
+    // test_new_move = 1;
   }
 
   if (timer == &htim9)
@@ -1287,21 +1304,23 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 			if (((joints_finished & (1 << joint)) == 0) && step_complete == 0)
 			{
 				error = target_joint[joint] - f_joint_angle[joint];
-				//error_acum[joint] += error;
+				error_acum[joint] += error;
 				error_dif = (error - previous_error[joint]) * DIV_TIM9_TICK; //(divido por 10ms, tick de tim9)
 
 				previous_error[joint] = error;
 
 				//control_signal = __round_int(kp[joint] * error + ki[joint] * error_acum[joint] + kd[joint] * error_dif); //Delta_PWM
-				control_signal = __round_int(kp[joint] * error + kd[joint] * error_dif); //Delta_PWM
+				// control_signal = __round_int(kp[joint] * error + kd[joint] * error_dif); //Delta_PWM
+        control_signal = kp[joint] * error + ki[joint] * error_acum[joint] + kd[joint] * error_dif; //Delta_angle
 				
 				up_down_ADC[joint] = control_signal > 0;
 
-        ton_pwm[joint] = ton_pwm[joint] + control_signal;
+        // ton_pwm[joint] = ton_pwm[joint] + control_signal;
 
-        if((int16_t)ton_pwm[joint] < 0) ton_pwm[joint] = 0;   //Impido que ton_pwm haga overflow por ser negativo
+        // if((int16_t)ton_pwm[joint] < 0) ton_pwm[joint] = 0;   //Impido que ton_pwm haga overflow por ser negativo
 
-        move_servos(joint, ton_pwm[joint]); // Move the servomotor
+        // move_servos(joint, ton_pwm[joint]); // Move the servomotor
+        move_servos(joint, angle2ton_us(f_joint_angle[joint] + control_signal)); // Move the servomotor
        
 			}
 		}
@@ -1519,7 +1538,7 @@ void State_Machine_Control(void)
       while(spi_rx_cplt == 0);
       spi_rx_cplt = 0;
 
-      memcpy(test_quadruped_nucleo, target_joint, sizeof(target_joint));  //PARA poder leer target_joint con debugger
+      // memcpy(test_quadruped_nucleo, target_joint, sizeof(target_joint));  //PARA poder leer target_joint con debugger
 
       // Check if the new target is too close to the actual position, in which case the servo wouldn't move because of the dead bandwidth
       // Therefore consider the joint already finished
@@ -1528,6 +1547,8 @@ void State_Machine_Control(void)
       
       //*Only for testing without raspberry
       // memcpy(target_joint, test_quadruped_nucleo, sizeof(target_joint));
+      // target_joint[6] = square_wave[selected_value];
+      // selected_value = 1 - selected_value;
 
       state = ACTUATION;
 
