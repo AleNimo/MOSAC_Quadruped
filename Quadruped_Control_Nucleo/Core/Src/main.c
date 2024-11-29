@@ -153,9 +153,9 @@ static float32_t iirCoeffs_angle[NUM_STAGE_IIR * NUM_STD_COEFS] =
 
 arm_biquad_cascade_df2T_instance_f32 S_angle[12];
 
-float32_t iir_in_arm_angle[12];
+volatile float32_t iir_in_arm_angle[12];
 
-float32_t filt_angle_ADC[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};  // Filtered ADC values
+volatile float32_t filt_angle_ADC[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};  // Filtered ADC values
 
 static float32_t iirState_vel[12][NUM_ORDER_IIR];
 
@@ -173,16 +173,17 @@ volatile uint8_t spi_rx_cplt = 0;
 //uint8_t spi_tx_cplt = 0;
 
 // PID Variables
-float32_t error = 0;
-float32_t previous_error[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-float32_t control_signal = 0;
-float32_t error_acum[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-float32_t error_dif = 0;
+volatile float32_t error = 0;
+volatile float32_t previous_error[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+volatile float32_t control_signal = 0;
+volatile float32_t error_acum[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+volatile float32_t error_dif = 0;
+volatile float32_t pid_out_debug[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 // PID constants
 float32_t kp[JOINTS] = {0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6};
 float32_t kd[JOINTS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-float32_t ki[JOINTS] = {0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02};
+float32_t ki[JOINTS] = {0.015,0.015,0.015,0.015,0.015,0.015,0.015,0.015,0.015,0.015,0.015,0.015};
 
 //uint16_t ton_pwm[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -190,12 +191,11 @@ float32_t ki[JOINTS] = {0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0
 float test_quadruped_nucleo[12] = {PWM_BFR, PWM_BBR, PWM_BBL, PWM_TFR, PWM_FFR, PWM_BFL, PWM_FFL, PWM_TFL, PWM_FBL, PWM_TBL, PWM_TBR, PWM_FBR};//{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 // Global Flags for state machines
-uint8_t up_down_ADC[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // To know if the servos have to go up or down: 1 is up, 0 is down
+volatile uint8_t up_down_ADC[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // To know if the servos have to go up or down: 1 is up, 0 is down
 
 // Arrays used to set the pwm of each servo in a for loop
 TIM_HandleTypeDef* htim[3];
 uint32_t channel[4] = {TIM_CHANNEL_1, TIM_CHANNEL_2, TIM_CHANNEL_3, TIM_CHANNEL_4};
-
 
 float32_t joint_range[12][2] = {{BODY_RANGE_MIN, BODY_RANGE_MAX},
                                 {-BODY_RANGE_MAX, -BODY_RANGE_MIN},
@@ -210,10 +210,12 @@ float32_t joint_range[12][2] = {{BODY_RANGE_MIN, BODY_RANGE_MAX},
                                 {TIBIA_RANGE_MIN, TIBIA_RANGE_MAX},
                                 {FEMUR_RANGE_MIN, FEMUR_RANGE_MAX}};
 
+uint8_t effort_up_down[12] = {1, 0, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0};
+
 // Global Buffers
 // Buffer rx SPI
-float target_joint[12] = {PWM_BFR, PWM_BBR, PWM_BBL, PWM_TFR, PWM_FFR, PWM_BFL, PWM_FFL, PWM_TFL, PWM_FBL, PWM_TBL, PWM_TBR, PWM_FBR};
-uint16_t raw_angle_ADC[2][12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // ADC measurement with DMA
+volatile float32_t target_joint[12] = {PWM_BFR, PWM_BBR, PWM_BBL, PWM_TFR, PWM_FFR, PWM_BFL, PWM_FFL, PWM_TFL, PWM_FBL, PWM_TBL, PWM_TBR, PWM_FBR};
+volatile uint16_t raw_angle_ADC[2][12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // ADC measurement with DMA
 
 uint8_t current_buffer = 0;
 
@@ -244,19 +246,16 @@ const float32_t *calibration_table[12] = {&ADC_VALUES_SERVO_0[0][0], &ADC_VALUES
 // VARIABLES QUE NO DEBEN SER GLOBALES, pero es mas cómodo para debuggear
 
 // podrían ser locales
-float32_t iir_in_arm_vel[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-float32_t delta_target = 0;
-float32_t f_joint_angle[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-uint8_t uart_tx_buffer[2 + 12 * 4 + 12 * 4 + 12 * 4 + 12 * 4];
+volatile float32_t delta_target = 0;
+volatile float32_t f_joint_angle[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+volatile uint8_t uart_tx_buffer[2 + 12 * 4 + 12 * 4 + 12 * 4 + 12 * 4];
 
 // podrían ser estáticas locales
 #define PREVIOUS_SAMPLES 10
-float32_t f_last_joints[JOINTS][PREVIOUS_SAMPLES] = {0};
-uint8_t state_actuation = RESET_ACTUATION;
-uint16_t joints_finished = ALL_FINISHED; // Each bit is a flag for a joint: 1-Finished, 0-Unfinished
+volatile float32_t f_last_joints[JOINTS][PREVIOUS_SAMPLES] = {0};
+volatile uint8_t state_actuation = RESET_ACTUATION;
+volatile uint16_t joints_finished = ALL_FINISHED; // Each bit is a flag for a joint: 1-Finished, 0-Unfinished
 volatile int8_t step_complete = 1;           // returned by State_Machine_Actuation
-
-float f_joint_angle_aux[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; // No se para que se usa
 
 /* USER CODE END PV */
 
@@ -389,7 +388,7 @@ int main(void)
 
   // ton = angle2ton_us(ANGULO_INICIAL);
 
-  memset(filt_angle_ADC, 0, sizeof(filt_angle_ADC));
+  memset((void*)filt_angle_ADC, 0, sizeof(filt_angle_ADC));
 
   uart_tx_buffer[0] = 0xFF;
   uart_tx_buffer[1] = 0xFF;
@@ -434,45 +433,45 @@ int main(void)
 //    }
 			
 
-    // if (send_uart)
-    // {
-    //   for (int i = 0; i < JOINTS; i++)
-    //   {
-		// 		u_dummy1.angle = target_joint[i];
-    //     //u_dummy1.angle = adc2angle(dummy1[i], up_down_ADC[i], calibration_table[i]); // there is no way to define the up_down vector, initial values are used
-    //     u_dummy2.angle = f_joint_angle[i];
-		// 		//u_dummy3.angle = fabs(u_dummy1.angle - u_dummy2.angle);
-    //     //u_dummy3.angle = iir_in_arm_vel[i];
-    //     u_dummy3.angle = adc2angle(iir_in_arm_angle[i], up_down_ADC[i], calibration_table[i]);
-		// 		u_dummy4.angle = 0;//ton_us2angle(ton_pwm[i]);
+    if (send_uart)
+    {
+      for (int i = 0; i < JOINTS; i++)
+      {
+				u_dummy1.angle = target_joint[i];
+        //u_dummy1.angle = adc2angle(dummy1[i], up_down_ADC[i], calibration_table[i]); // there is no way to define the up_down vector, initial values are used
+        u_dummy2.angle = f_joint_angle[i];
+				//u_dummy3.angle = fabs(u_dummy1.angle - u_dummy2.angle);
+        //u_dummy3.angle = iir_in_arm_vel[i];
+        u_dummy3.angle = error_acum[i]*ki[i];
+				u_dummy4.angle = pid_out_debug[i];//ton_us2angle(ton_pwm[i]);
 				
-		// 		last_joint[i] = u_dummy2.angle;
+				last_joint[i] = u_dummy2.angle;
 
-    //     uart_tx_buffer[16 * i + 2] = u_dummy1.angle_bytes[3];
-    //     uart_tx_buffer[16 * i + 3] = u_dummy1.angle_bytes[2];
-    //     uart_tx_buffer[16 * i + 4] = u_dummy1.angle_bytes[1];
-    //     uart_tx_buffer[16 * i + 5] = u_dummy1.angle_bytes[0];
+        uart_tx_buffer[16 * i + 2] = u_dummy1.angle_bytes[3];
+        uart_tx_buffer[16 * i + 3] = u_dummy1.angle_bytes[2];
+        uart_tx_buffer[16 * i + 4] = u_dummy1.angle_bytes[1];
+        uart_tx_buffer[16 * i + 5] = u_dummy1.angle_bytes[0];
 
-    //     uart_tx_buffer[16 * i + 6] = u_dummy2.angle_bytes[3];
-    //     uart_tx_buffer[16 * i + 7] = u_dummy2.angle_bytes[2];
-    //     uart_tx_buffer[16 * i + 8] = u_dummy2.angle_bytes[1];
-    //     uart_tx_buffer[16 * i + 9] = u_dummy2.angle_bytes[0];
+        uart_tx_buffer[16 * i + 6] = u_dummy2.angle_bytes[3];
+        uart_tx_buffer[16 * i + 7] = u_dummy2.angle_bytes[2];
+        uart_tx_buffer[16 * i + 8] = u_dummy2.angle_bytes[1];
+        uart_tx_buffer[16 * i + 9] = u_dummy2.angle_bytes[0];
 				
-		// 		uart_tx_buffer[16 * i + 10] = u_dummy3.angle_bytes[3];
-    //     uart_tx_buffer[16 * i + 11] = u_dummy3.angle_bytes[2];
-    //     uart_tx_buffer[16 * i + 12] = u_dummy3.angle_bytes[1];
-    //     uart_tx_buffer[16 * i + 13] = u_dummy3.angle_bytes[0];
+				uart_tx_buffer[16 * i + 10] = u_dummy3.angle_bytes[3];
+        uart_tx_buffer[16 * i + 11] = u_dummy3.angle_bytes[2];
+        uart_tx_buffer[16 * i + 12] = u_dummy3.angle_bytes[1];
+        uart_tx_buffer[16 * i + 13] = u_dummy3.angle_bytes[0];
 				
-		// 		uart_tx_buffer[16 * i + 14] = u_dummy4.angle_bytes[3];
-    //     uart_tx_buffer[16 * i + 15] = u_dummy4.angle_bytes[2];
-    //     uart_tx_buffer[16 * i + 16] = u_dummy4.angle_bytes[1];
-    //     uart_tx_buffer[16 * i + 17] = u_dummy4.angle_bytes[0];
-    //   }
+				uart_tx_buffer[16 * i + 14] = u_dummy4.angle_bytes[3];
+        uart_tx_buffer[16 * i + 15] = u_dummy4.angle_bytes[2];
+        uart_tx_buffer[16 * i + 16] = u_dummy4.angle_bytes[1];
+        uart_tx_buffer[16 * i + 17] = u_dummy4.angle_bytes[0];
+      }
 
-    //   HAL_UART_Transmit(&huart3, uart_tx_buffer, 16 * JOINTS + 2, HAL_MAX_DELAY);
+      HAL_UART_Transmit(&huart3, (const uint8_t*) uart_tx_buffer, 16 * JOINTS + 2, HAL_MAX_DELAY);
       
-    //   send_uart = 0;
-    // }
+      send_uart = 0;
+    }
     // if(test_new_move)
     // {
     //   test_new_move = 0;
@@ -1240,7 +1239,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
     for (uint8_t joint = 0; joint < 12; joint++)
     {
       iir_in_arm_angle[joint] = raw_angle_ADC[buffer_to_copy][joint];
-      arm_biquad_cascade_df2T_f32(&S_angle[joint], &iir_in_arm_angle[joint], &filt_angle_ADC[joint], 1); // perform filtering
+      arm_biquad_cascade_df2T_f32(&S_angle[joint], (const float32_t*) &iir_in_arm_angle[joint], (float32_t*) &filt_angle_ADC[joint], 1); // perform filtering
     }
     // for controlling trajectory
     // t_step += 0.001;
@@ -1301,8 +1300,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 //          target_joint[joint] = 75.0;
 //      }
 //			
-			if (((joints_finished & (1 << joint)) == 0) && step_complete == 0)
+			//if (((joints_finished & (1 << joint)) == 0) && step_complete == 0)
+			if (step_complete == 0)
 			{
+
 				error = target_joint[joint] - f_joint_angle[joint];
 				error_acum[joint] += error;
 				error_dif = (error - previous_error[joint]) * DIV_TIM9_TICK; //(divido por 10ms, tick de tim9)
@@ -1311,16 +1312,29 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 
 				//control_signal = __round_int(kp[joint] * error + ki[joint] * error_acum[joint] + kd[joint] * error_dif); //Delta_PWM
 				// control_signal = __round_int(kp[joint] * error + kd[joint] * error_dif); //Delta_PWM
-        control_signal = kp[joint] * error + ki[joint] * error_acum[joint] + kd[joint] * error_dif; //Delta_angle
+
+        if(up_down_ADC[joint] == effort_up_down[joint])
+        {
+          control_signal = 2* kp[joint] * error + ki[joint] * error_acum[joint] + kd[joint] * error_dif; //Delta_angle
+        }
+        else
+        {
+          control_signal = kp[joint] * error + ki[joint] * error_acum[joint] + kd[joint] * error_dif; //Delta_angle
+        }
 				
 				up_down_ADC[joint] = control_signal > 0;
+
+        if(f_joint_angle[joint] < (90.0 + joint_range[joint][0]) && up_down_ADC[joint] == 0) continue;
+
+        else if(f_joint_angle[joint] > (90.0 + joint_range[joint][1]) && up_down_ADC[joint] == 1) continue;
 
         // ton_pwm[joint] = ton_pwm[joint] + control_signal;
 
         // if((int16_t)ton_pwm[joint] < 0) ton_pwm[joint] = 0;   //Impido que ton_pwm haga overflow por ser negativo
 
         // move_servos(joint, ton_pwm[joint]); // Move the servomotor
-        move_servos(joint, angle2ton_us(f_joint_angle[joint] + control_signal)); // Move the servomotor
+				pid_out_debug[joint] = f_joint_angle[joint] + control_signal;
+        move_servos(joint, angle2ton_us(pid_out_debug[joint])); // Move the servomotor
        
 			}
 		}
@@ -1371,20 +1385,6 @@ float ton_us2angle(uint16_t ton_us)
 }
 void move_servos(uint8_t joint, uint16_t ton)
 {
-
-  float32_t angle_value = ton_us2angle(ton);
-
-  if(angle_value < (90.0 + joint_range[joint][0]))
-  {
-    angle_value = 90.0 + joint_range[joint][0];
-    ton = angle2ton_us(angle_value);
-  }
-  else if(angle_value > (90.0 + joint_range[joint][1])) 
-  {
-    angle_value = 90.0 + joint_range[joint][1];
-    ton = angle2ton_us(angle_value);
-  }
-
   __HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], ton);
 }
 
