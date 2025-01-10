@@ -45,7 +45,7 @@ robot_node.getField("translation").setSFVec3f([reset_pos[0],reset_pos[1],reset_p
 robot_node.getField("rotation").setSFRotation(ypr_to_axis_angle(reset_orientation[2],reset_orientation[1],reset_orientation[0]))
 
 # get the time step of the current world.
-timestep = 1
+timestep = 10
 
 
 
@@ -116,43 +116,6 @@ BL_servo_body_joint.enableTorqueFeedback(timestep)
 
 
 
-KP = 7.5
-FL_servo_tibia_joint.setControlPID(KP,0,0)
-FL_servo_femur_joint.setControlPID(KP,0,0)
-FL_servo_body_joint.setControlPID(KP,0,0)
-
-FR_servo_tibia_joint.setControlPID(KP,0,0)
-FR_servo_femur_joint.setControlPID(KP,0,0)
-FR_servo_body_joint.setControlPID(KP,0,0)
-
-BR_servo_tibia_joint.setControlPID(KP,0,0)
-BR_servo_femur_joint.setControlPID(KP,0,0)
-BR_servo_body_joint.setControlPID(KP,0,0)
-
-BL_servo_tibia_joint.setControlPID(KP,0,0)
-BL_servo_femur_joint.setControlPID(KP,0,0)
-BL_servo_body_joint.setControlPID(KP,0,0)
-
-
-
-FL_servo_tibia_joint.setVelocity(9.5)
-FL_servo_femur_joint.setVelocity(9.5)
-FL_servo_body_joint.setVelocity(9.5)
-
-FR_servo_tibia_joint.setVelocity(9.5)
-FR_servo_femur_joint.setVelocity(9.5)
-FR_servo_body_joint.setVelocity(9.5)
-
-BR_servo_tibia_joint.setVelocity(9.5)
-BR_servo_femur_joint.setVelocity(9.5)
-BR_servo_body_joint.setVelocity(9.5)
-
-BL_servo_tibia_joint.setVelocity(9.5)
-BL_servo_femur_joint.setVelocity(9.5)
-BL_servo_body_joint.setVelocity(9.5)
-
-
-
 joints_number = 12
 leg_number = 4
 joint = [
@@ -200,12 +163,12 @@ acum_error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np
 Ia = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
 enable_torque_control = 0
 
-KP = 10
-KD = 0
-KI = 0 
+KP = 18.847
+KD = 0.023541
+KI = 2.0231
 KM = 0.9853919147
 RA = 1.45
-LA = 0.00019652
+TF = 0.03262365753
 
 target_joint = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])*np.pi/180
 
@@ -254,7 +217,7 @@ def computeTorques():
     joint_torque = Ia * KM
     joint_torque = np.clip(joint_torque - DAMPING_FACTOR * joint_angular_velocity, -MAX_TORQUE, MAX_TORQUE)
 
-    if print_counter%1000 == 0:
+    if print_counter%100 == 0:
       print("VA", VA)
       print("Error", error*180/np.pi)
     # print("Eb", Eb)
@@ -266,7 +229,7 @@ def computeTorques():
     
     for i in range(len(joint)):
         # if np.abs(VA[i]) >500e-3:
-        joint[i].setTorque(joint_torque[i])
+        joint[i].setTorque(VA[i]*KM/RA - TF)
         # else:
           # joint[i].setTorque(0)
         #print("Torque %d: %f" %(i,joint[i].getTorqueFeedback()))
@@ -317,30 +280,45 @@ joint_filtereds = [[] for _ in range(12)]
 
 data = [] 
 current_time = 0
+sign = 1
 
 if __name__ == "__main__":
     
    
     while supervisor.step(timestep) != -1:
-      current_time = supervisor.getTime() * 1000  # Convert seconds to milliseconds
+      current_time = supervisor.getTime()  # Convert seconds to milliseconds
       print_counter+=1
 
-      t = t + timestep
+      t = t + timestep *1e-3
 
 
-      angle_tibia = 10 * np.sin(2 * np.pi * 0.5 * t * 1e-3)
-      angle_femur = 10 * np.sin(2 * np.pi * 0.5 * t * 1e-3)
+      # angle_tibia = 10 * np.sin(2 * np.pi * 0.5 * t * 1e-3)
+      # angle_femur = 10 * np.sin(2 * np.pi * 0.5 * t * 1e-3)
 
-      target_joint[1] = angle_femur * np.pi / 180
-      target_joint[2] = -angle_tibia * np.pi / 180
-      target_joint[4] = angle_femur * np.pi / 180
-      target_joint[5] = -angle_tibia * np.pi / 180
-      target_joint[7] = angle_femur * np.pi / 180
-      target_joint[8] = -angle_tibia * np.pi / 180
-      target_joint[10] = angle_femur * np.pi / 180
-      target_joint[11] = -angle_tibia * np.pi / 180
-
+      # target_joint[1] = angle_femur * np.pi / 180
+      # target_joint[2] = -angle_tibia * np.pi / 180
+      # target_joint[4] = angle_femur * np.pi / 180
+      # target_joint[5] = -angle_tibia * np.pi / 180
+      # target_joint[7] = angle_femur * np.pi / 180
+      # target_joint[8] = -angle_tibia * np.pi / 180
+      # target_joint[10] = angle_femur * np.pi / 180
+      # target_joint[11] = -angle_tibia * np.pi / 180
     
+         
+      if(t >=1.0):
+      
+        sign = - sign
+        t = 0.0
+        target_joint[1] = 5 * sign* np.pi / 180
+        target_joint[2] = -5 * sign * np.pi / 180
+        target_joint[4] = 5 * sign* np.pi / 180
+        target_joint[5] = -5 * sign * np.pi / 180
+        target_joint[7] = 5 * sign * np.pi / 180
+        target_joint[8] = -5 * sign * np.pi / 180
+        target_joint[10] = 5 * sign* np.pi / 180
+        target_joint[11] = -5 * sign* np.pi / 180
+      
+          
       computeTorques()
       for i in range(12):
         joint_targets[i].append(target_joint[i])  
@@ -350,19 +328,17 @@ if __name__ == "__main__":
       row = [current_time]  # Start with the timestamp
       for i in range(12):
         row.append(target_joint[i] * 180 / np.pi)
+        # row.append(joint_angular_position[i] * 180 / np.pi+np.random.normal(0,0.5,None))
         row.append(joint_angular_position[i] * 180 / np.pi)
-
       # Append the row to the data list
       data.append(row)
 
-      # Check if simulation has reached 10,000 ms
-      if current_time >= 10000:
+      if current_time >= 10.0:
         # Write all collected data to CSV
         with open(output_file, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(header)  # Write header
             writer.writerows(data)  # Write all rows
         print(f"Data saved to {output_file}")
-        break
-        
+        break        
         

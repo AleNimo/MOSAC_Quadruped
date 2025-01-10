@@ -5,7 +5,7 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/project
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/appearances/protos/Parquetry.proto"
 
 WorldInfo {
-  basicTimeStep 1
+  basicTimeStep 10
   contactProperties [
     ContactProperties {
       maxContactJoints 10000
@@ -67,12 +67,11 @@ DEF MOSAC Robot {
     HingeJoint {
       jointParameters HingeJointParameters {
         anchor 0.095 -0.05275 0.0032
-        dampingConstant 0.0106
+        dampingConstant 0.673885
       }
       device [
         RotationalMotor {
           name "BFR_joint"
-          controlPID 7.5 0 0
           maxTorque 3.43
         }
         PositionSensor {
@@ -98,12 +97,11 @@ DEF MOSAC Robot {
           HingeJoint {
             jointParameters HingeJointParameters {
               anchor 0.035125 0.010265 -0.02005
-              dampingConstant 0.0106
+              dampingConstant 0.673885
             }
             device [
               RotationalMotor {
                 name "FR_servo_femur_joint"
-                controlPID 7.5 0 0
                 maxTorque 3.43
               }
               PositionSensor {
@@ -247,12 +245,11 @@ DEF MOSAC Robot {
           HingeJoint {
             jointParameters HingeJointParameters {
               anchor 0.02375 -0.010265 -0.04005
-              dampingConstant 0.0106
+              dampingConstant 0.673885
             }
             device [
               RotationalMotor {
                 name "FR_servo_tibia_joint"
-                controlPID 7.5 0 0
                 maxTorque 3.43
               }
               PositionSensor {
@@ -403,12 +400,11 @@ DEF MOSAC Robot {
       jointParameters HingeJointParameters {
         axis 1 -4e-06 4e-06
         anchor -0.095 -0.05275 0.0032
-        dampingConstant 0.0106
+        dampingConstant 0.673885
       }
       device [
         RotationalMotor {
           name "BBR_joint"
-          controlPID 7.5 0 0
           maxTorque 3.43
         }
         PositionSensor {
@@ -434,12 +430,11 @@ DEF MOSAC Robot {
           HingeJoint {
             jointParameters HingeJointParameters {
               anchor 0.035125 0.010265 0.04005
-              dampingConstant 0.0106
+              dampingConstant 0.673885
             }
             device [
               RotationalMotor {
                 name "BR_servo_femur_joint"
-                controlPID 7.5 0 0
                 maxTorque 3.43
               }
               PositionSensor {
@@ -583,12 +578,11 @@ DEF MOSAC Robot {
           HingeJoint {
             jointParameters HingeJointParameters {
               anchor 0.02375 -0.010265 0.02005
-              dampingConstant 0.0106
+              dampingConstant 0.673885
             }
             device [
               RotationalMotor {
                 name "BR_servo_tibia_joint"
-                controlPID 7.5 0 0
                 maxTorque 3.43
               }
               PositionSensor {
@@ -739,12 +733,11 @@ DEF MOSAC Robot {
       jointParameters HingeJointParameters {
         axis 1 4e-06 -4e-06
         anchor 0.095 0.05275 0.0032
-        dampingConstant 0.0106
+        dampingConstant 0.673885
       }
       device [
         RotationalMotor {
           name "BFL_joint"
-          controlPID 7.5 0 0
           maxTorque 3.43
         }
         PositionSensor {
@@ -771,12 +764,11 @@ DEF MOSAC Robot {
             jointParameters HingeJointParameters {
               axis -1 0 0
               anchor 0.035125 0.010265 0.02005
-              dampingConstant 0.0106
+              dampingConstant 0.673885
             }
             device [
               RotationalMotor {
                 name "FL_servo_femur_joint"
-                controlPID 7.5 0 0
                 maxTorque 3.43
               }
               PositionSensor {
@@ -921,12 +913,11 @@ DEF MOSAC Robot {
             jointParameters HingeJointParameters {
               axis -1 0 0
               anchor 0.02375 -0.010265 0.04005
-              dampingConstant 0.0106
+              dampingConstant 0.673885
             }
             device [
               RotationalMotor {
                 name "FL_servo_tibia_joint"
-                controlPID 7.5 0 0
                 maxTorque 3.43
               }
               PositionSensor {
@@ -1078,12 +1069,11 @@ DEF MOSAC Robot {
     HingeJoint {
       jointParameters HingeJointParameters {
         anchor -0.095 0.05275 0.0032
-        dampingConstant 0.0106
+        dampingConstant 0.673885
       }
       device [
         RotationalMotor {
           name "BBL_joint"
-          controlPID 7.5 0 0
           maxTorque 3.43
         }
         PositionSensor {
@@ -1109,12 +1099,11 @@ DEF MOSAC Robot {
             jointParameters HingeJointParameters {
               axis -1 0 0
               anchor 0.035125 0.010265 -0.04005
-              dampingConstant 0.0106
+              dampingConstant 0.673885
             }
             device [
               RotationalMotor {
                 name "BL_servo_femur_joint"
-                controlPID 7.5 0 0
                 maxTorque 3.43
               }
               PositionSensor {
@@ -1258,12 +1247,11 @@ DEF MOSAC Robot {
             jointParameters HingeJointParameters {
               axis -1 0 0
               anchor 0.02375 -0.010265 -0.02005
-              dampingConstant 0.0106
+              dampingConstant 0.673885
             }
             device [
               RotationalMotor {
                 name "BL_servo_tibia_joint"
-                controlPID 7.5 0 0
                 maxTorque 3.43
               }
               PositionSensor {
