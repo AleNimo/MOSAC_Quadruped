@@ -28,26 +28,26 @@ class Environment:
         # Parameters for forward velocity reward
         self.forward_velocity_reward = 0
         self.__target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
-        self.__vmax = 2
+        self.__vmax = 4
         self.__delta_vel = 2 * self.__target_velocity
         self.__vmin = -6
-
+        self.__n = -6.5
         self.__curvature_forward_vel = - 2 * \
             self.__vmax / (self.__delta_vel * self.__vmin)
 
         # Parameters for forward acceleration penalization
         self.forward_acc_penalty = 0
-        self.__max_acc = 6 #m/s^2  (Acceleration at which the penalization is -1)
+        self.__max_acc = 12 #m/s^2  (Acceleration at which the penalization is -1)
 
         # Parameters for lateral velocity penalization
         self.lateral_velocity_penalty = 0
-        self.__vmin_lat = -2
-        self.__curvature_lateral = 3
+        self.__vmin_lat = -4
+        self.__curvature_lateral = 6
 
         # Parameters for rotation penalization
         self.rotation_penalty = 0
         self.__vmin_rotation = -4
-        self.__curvature_rotation = 4
+        self.__curvature_rotation = 5
 
         # Parameters for flat back penalization
         self.flat_back_penalty = np.zeros(2)
@@ -63,7 +63,7 @@ class Environment:
         self.__target_height = 0.07 #meters
         
         # Reward for not flipping over
-        self.__not_flipping_reward = 0.5
+        self.__not_flipping_reward = 1.1
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -109,6 +109,7 @@ class Environment:
         total_mech_power = np.dot(torque,np.transpose(angular_velocity))
 
         paws_up_total_ratio = next_obs[:,17+31:17+35]
+        step_omitted = next_obs[:,17+35]
 
         #print("Torque",torque)
         #print("angular_velocity",angular_velocity)
@@ -121,17 +122,23 @@ class Environment:
 
             '''Reward for forward velocity reaching target velocity'''
             if forward_velocity[i] > 0:
-                self.forward_velocity_reward = (self.__vmax - self.__vmin)/(self.__curvature_forward_vel * np.abs(self.__target_velocity - forward_velocity[i]) + 1) + self.__vmin
+                self.forward_velocity_reward = (self.__vmax - self.__vmin)/(self.__curvature_forward_vel * np.abs(self.__target_velocity - forward_velocity[i]) + 1) + self.__n
             else:
-                self.forward_velocity_reward = self.__vmax / self.__target_velocity * forward_velocity[i]
+                self.forward_velocity_reward = self.__vmax / self.__target_velocity * forward_velocity[i] + (self.__vmax-self.__vmin)/(self.__curvature_forward_vel*self.__target_velocity+1)+self.__n
+            
+            # self.forward_velocity_reward = -0.5+15*forward_velocity[i]
 
+            # if self.forward_velocity_reward>=2:
+            #     self.forward_velocity_reward = 2
+            # if self.forward_velocity_reward<=-4:
+            #     self.forward_velocity_reward = -4
             reward[i, 0] = self.forward_velocity_reward
 
             '''Penalization for peak abs forward acceleration'''
             if max_forward_acceleration[i] < self.__max_acc:
                 self.forward_acc_penalty = - max_forward_acceleration[i]/self.__max_acc
             else:
-                self.forward_acc_penalty = - np.power(max_forward_acceleration[i], 4)/np.power(self.__max_acc, 4)
+                self.forward_acc_penalty = - np.power(max_forward_acceleration[i], 2)/np.power(self.__max_acc, 2)
 
             reward[i, 1] = self.forward_acc_penalty
 
@@ -192,11 +199,15 @@ class Environment:
             # reward[i, 6] = self.paws_penalty
 
             '''Reward for avoiding critical failure (flipping over)'''
-            reward[i, 7] = self.__not_flipping_reward
+            if step_omitted[i] == 0:
+                reward[i, 7] = self.__not_flipping_reward
+            else:
+                print("Step Omitted")
 
             # If the absolute value of X or Y angle is greater than 50° there is a penalization and the episode ends
-            if abs(next_obs[i, 1])*180 >= 50 or abs(next_obs[i, 2])*180 >= 50:
-                reward[i, 7] -= self.__not_flipping_reward
+            if abs(next_obs[i, 1])*180 >= 50 or abs(next_obs[i, 2])*180 >= 50:                
+                if step_omitted[i] == 0:                    
+                    reward[i, 7] -= self.__not_flipping_reward
                 end[i] = True
 
             elif dist_fin[i] >= self.__end_cond:

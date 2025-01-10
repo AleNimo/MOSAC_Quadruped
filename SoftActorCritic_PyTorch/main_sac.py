@@ -93,7 +93,7 @@ def testing_step(agent, pref):
 def SAC_Agent_Training(q):
     global jointLowerLimit, jointUpperLimit
 
-    env = Environment(sim_measurement=35, obs_dim=17, act_dim=12, rwd_dim=8)
+    env = Environment(sim_measurement=36, obs_dim=17, act_dim=12, rwd_dim=8)
 
     # The 24 values from coppelia, in order:
 
@@ -111,6 +111,7 @@ def SAC_Agent_Training(q):
     # torque of 12 joints
     # angular velocity of 12 joints
     # the heights of the 4 paws
+    # step omitted flag
 
     load_agent = False
     test_agent = False
@@ -120,17 +121,17 @@ def SAC_Agent_Training(q):
     episode_steps = 200  # Maximum steps allowed per episode
     save_period = 500
 
-    # Preference vector maximum and minimum values - [vel_forward, acceleration, vel_lateral, orientation, flat_back, energy]
+    # Preference vector maximum and minimum values - [vel_forward, acceleration, vel_lateral, orientation, flat_back, energy,paws]
     # If pref_min_vector == pref_max_vector then the multi-objective approach is disabled, and constant reward weights
     # equal to pref_max_vector are defined
-    pref_max_vector = np.array([2, 1, 1, 2, 1, 0, 0])
+    pref_max_vector = np.array([2,0.8, 1, 2, 1, 0, 0])
     pref_min_vector = np.array([0.5, 0, 0, 0, 0, 0,0])
 
     pref_dim = pref_max_vector.size
 
     agent = SAC_Agent('Cuadruped', env, pref_max_vector,pref_min_vector, replay_buffer_size=1000000)
 
-    agent.replay_batch_size = 10000
+    agent.replay_batch_size = 1000
 
     agent.update_Q = 1  # The Q function is updated every episode
     agent.update_P = 1  # The policy is updated every 1 episode
