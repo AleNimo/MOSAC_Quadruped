@@ -9,23 +9,23 @@ import numpy as np
 # get the time step of the current world.
 timestep = 10
 
-robot = Supervisor()
+supervisor = Supervisor()
 
-FL_servo_tibia_joint = robot.getDevice("FL_servo_tibia_joint")
-FL_servo_femur_joint = robot.getDevice("FL_servo_femur_joint")
-FL_servo_body_joint = robot.getDevice("BFL_joint")
+FL_servo_tibia_joint = supervisor.getDevice("FL_servo_tibia_joint")
+FL_servo_femur_joint = supervisor.getDevice("FL_servo_femur_joint")
+FL_servo_body_joint = supervisor.getDevice("BFL_joint")
 
-FR_servo_tibia_joint = robot.getDevice("FR_servo_tibia_joint")
-FR_servo_femur_joint = robot.getDevice("FR_servo_femur_joint")
-FR_servo_body_joint = robot.getDevice("BFR_joint")
+FR_servo_tibia_joint = supervisor.getDevice("FR_servo_tibia_joint")
+FR_servo_femur_joint = supervisor.getDevice("FR_servo_femur_joint")
+FR_servo_body_joint = supervisor.getDevice("BFR_joint")
 
-BR_servo_tibia_joint = robot.getDevice("BR_servo_tibia_joint")
-BR_servo_femur_joint = robot.getDevice("BR_servo_femur_joint")
-BR_servo_body_joint = robot.getDevice("BBR_joint")
+BR_servo_tibia_joint = supervisor.getDevice("BR_servo_tibia_joint")
+BR_servo_femur_joint = supervisor.getDevice("BR_servo_femur_joint")
+BR_servo_body_joint = supervisor.getDevice("BBR_joint")
 
-BL_servo_tibia_joint = robot.getDevice("BL_servo_tibia_joint")
-BL_servo_femur_joint = robot.getDevice("BL_servo_femur_joint")
-BL_servo_body_joint = robot.getDevice("BBL_joint")
+BL_servo_tibia_joint = supervisor.getDevice("BL_servo_tibia_joint")
+BL_servo_femur_joint = supervisor.getDevice("BL_servo_femur_joint")
+BL_servo_body_joint = supervisor.getDevice("BBL_joint")
 
 if __name__ == "__main__":
 
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     FR_servo_tibia_joint.setPosition(0)
     FR_servo_femur_joint.setPosition(0)
 
-    while robot.step(timestep) != -1:
+    while supervisor.step(timestep) != -1:
 
       t = t + timestep
 
