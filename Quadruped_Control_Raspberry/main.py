@@ -59,8 +59,8 @@ obs_dim=17
 act_dim=12
 
 #----Preference vector----#
-#   [vel_forward, acceleration, vel_lateral, orientation, flat_back]
-pref_dim = 6
+#   [vel_forward, acceleration, vel_lateral, orientation, flat_back, energy, paws]
+pref_dim = 7
 
 first_time = 1
 
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     P_net = P_Network(obs_dim, act_dim, pref_dim, hidden1_dim=64, hidden2_dim=32)
     P_net.load_checkpoint()
 
-    pref = torch.tensor([[2, 1, 1, 2, 1, 0]]).to(P_net.device)
+    pref = torch.tensor([[2, 1, 1, 2, 1, 0, 0]]).to(P_net.device)
     
     while True:
 
@@ -103,7 +103,8 @@ if __name__ == '__main__':
 
                     measured_joints_nucleo = np.frombuffer(bytes(joints_byte_list), dtype='<f4')   #< little endian, > big endian
                     print("measured_joints_nucleo = ", measured_joints_nucleo)
-                    #Change the order from coppelia to the order the NUCLEO needs based on servo conections to the timers:
+                    
+                    #Change the order from webots to the order the NUCLEO needs based on servo conections to the timers:
                     measured_joints = np.zeros(12,dtype = np.float64)
 
                     # Body  Front   Right
@@ -131,6 +132,7 @@ if __name__ == '__main__':
                     # Tibia   Back    Left
                     measured_joints[11] = 90 - measured_joints_nucleo[9]
 
+                    #Normalization
                     for i in range(4):
                         measured_joints[i*3] =      (measured_joints[i*3]    - body_mean)   /   body_range
                         measured_joints[1+i*3] =    (measured_joints[1+i*3]  - leg_mean)    /   leg_range
@@ -183,32 +185,33 @@ if __name__ == '__main__':
                     action[1+i*3] = action[1+i*3] * leg_range + leg_mean
                     action[2+i*3] = action[2+i*3] * paw_range + paw_mean
                 
-                #Change the order from coppelia to the order the NUCLEO needs based on servo connections to the timers:
+                #Change the order from webots to the order the NUCLEO needs based on servo connections to the timers:
+                #Mid point is added inside the NUCLEO
                 action_nucleo = np.zeros(12, dtype=np.float32)
                 # BFR
-                action_nucleo[0] = action[0] + 90
+                action_nucleo[0] = action[0]
                 # BBR
-                action_nucleo[1] = -action[6] + 90
+                action_nucleo[1] = -action[6]
                 # BBL
-                action_nucleo[2] = -action[9] + 90
+                action_nucleo[2] = -action[9]
                 # TFR
-                action_nucleo[3] = action[2] + 90
+                action_nucleo[3] = action[2]
                 # FFR
-                action_nucleo[4] = action[1] + 90
+                action_nucleo[4] = action[1]
                 # BFL
-                action_nucleo[5] = action[3] + 90
+                action_nucleo[5] = action[3]
                 # FFL
-                action_nucleo[6] = -action[4] + 90
+                action_nucleo[6] = -action[4]
                 # TFL
-                action_nucleo[7] = -action[5] + 90
+                action_nucleo[7] = -action[5]
                 # FBL
-                action_nucleo[8] = -action[10] + 90
+                action_nucleo[8] = -action[10]
                 # TBL
-                action_nucleo[9] = -action[11] + 90
+                action_nucleo[9] = -action[11]
                 # TBR
-                action_nucleo[10] = action[8] + 90
+                action_nucleo[10] = action[8]
                 # FBR
-                action_nucleo[11] = action[7] + 90
+                action_nucleo[11] = action[7]
 
                 #Order of nucleo servos:
                 #0PWM_BFR,1PWM_BBR, 2PWM_BBL, 3PWM_TFR, 4PWM_FFR, 5PWM_BFL, 6PWM_FFL, 7PWM_TFL, 8PWM_FBL, 9PWM_TBL, 10PWM_TBR, 11PWM_FBR
