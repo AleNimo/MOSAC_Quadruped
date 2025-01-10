@@ -415,6 +415,11 @@
               <FileType>5</FileType>
               <FilePath>..\Core\Inc\calibration_ADC.h</FilePath>
             </File>
+            <File>
+              <FileName>median.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\median.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
