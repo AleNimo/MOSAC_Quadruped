@@ -26,7 +26,7 @@
 #include <arm_math.h>
 #include "calibration_ADC.h"
 
-#include "median.h"
+#include "SignalProcessing.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,18 +49,18 @@
 #define TIBIA_RANGE_MAX 15.0
 #define TIBIA_RANGE_MIN -15.0
 // 0PWM_BFR,1PWM_BBR, 2PWM_BBL, 3PWM_TFR, 4PWM_FFR, 5PWM_BFL, 6PWM_FFL, 7PWM_TFL, 8PWM_FBL, 9PWM_TBL, 10PWM_TBR, 11PWM_FBR
-#define MID_POINT_BFR 90
-#define MID_POINT_BBR 90
-#define MID_POINT_BBL 90
+#define MID_POINT_BFR 96
+#define MID_POINT_BBR 82
+#define MID_POINT_BBL 88
 #define MID_POINT_TFR 90
-#define MID_POINT_FFR 90
-#define MID_POINT_BFL 90
-#define MID_POINT_FFL 90
-#define MID_POINT_TFL 90
-#define MID_POINT_FBL 90
-#define MID_POINT_TBL 90
-#define MID_POINT_TBR 90
-#define MID_POINT_FBR 90
+#define MID_POINT_FFR 86
+#define MID_POINT_BFL 94
+#define MID_POINT_FFL 87
+#define MID_POINT_TFL 97
+#define MID_POINT_FBL 92
+#define MID_POINT_TBL 95
+#define MID_POINT_TBR 82
+#define MID_POINT_FBR 84
 
 
 // States for Main State Machine
@@ -162,11 +162,10 @@ float32_t iir_in_arm_vel[12];
 float32_t filt_vel[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 //Median filter
-volatile float32_t window_buffer[JOINTS][WINDOW_SIZE];
-volatile float32_t* ptBufferSorted[JOINTS][WINDOW_SIZE];
 volatile float32_t median_filteredValue[JOINTS];
 
-median median_filter[JOINTS];
+//median median_filter[JOINTS];
+spMedianFilter median_filter[JOINTS];
 
 //SPI
 volatile uint8_t spi_rx_cplt = 0;
@@ -244,6 +243,7 @@ volatile uint32_t delta_time;
 // podrían ser locales
 volatile float32_t delta_target = 0;
 volatile float32_t f_joint_angle[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+volatile float32_t f_joint_angle_rpi[JOINTS] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 volatile uint8_t uart_tx_buffer[2 + 12 * 4 + 12 * 4 + 12 * 4 + 12 * 4];
 
 // podrían ser estáticas locales
@@ -359,7 +359,7 @@ int main(void)
   {
     arm_biquad_cascade_df2T_init_f32(&S_angle[joint], NUM_STAGE_IIR, &iirCoeffs_angle[0], &iirState_angle[joint][0]);
     arm_biquad_cascade_df2T_init_f32(&S_vel[joint], NUM_STAGE_IIR, &iirCoeffs_vel[0], &iirState_vel[joint][0]);
-    MedianInit(&median_filter[joint],window_buffer[joint],ptBufferSorted[joint],WINDOW_SIZE);
+		median_filter[joint] = spCreateMedianFilter(WINDOW_SIZE);
   }
     
 
@@ -401,8 +401,8 @@ int main(void)
 
     
 
-    for (uint8_t joint = 0; joint < JOINTS; joint++)
-			__HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(test_quadruped_nucleo[joint]));
+//    for (uint8_t joint = 0; joint < JOINTS; joint++)
+//			__HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(test_quadruped_nucleo[joint]));
 
 
 		//memcpy(target_joint, test_quadruped_nucleo, sizeof(test_quadruped_nucleo));
@@ -465,7 +465,7 @@ int main(void)
 		
     //HAL_Delay(1); // Adjust delay as necessary
 
-    //State_Machine_Control();
+    State_Machine_Control();
   }
 
     /* USER CODE END WHILE */
@@ -1189,7 +1189,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
     {
       iir_in_arm_angle[joint] = raw_angle_ADC[buffer_to_copy][joint];
       arm_biquad_cascade_df2T_f32(&S_angle[joint], (const float32_t*) &iir_in_arm_angle[joint], (float32_t*) &filt_angle_ADC[joint], 1); // perform filtering
-      median_filteredValue[joint] = MedianFilter(&median_filter[joint], iir_in_arm_angle[joint]);
+			median_filteredValue[joint] = spMedianFilterInsert(median_filter[joint], iir_in_arm_angle[joint]);
     }
 		uint32_t final_value = __HAL_TIM_GetCounter(&htim5);
 		
@@ -1270,7 +1270,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
       //!Solo 1 de cada 10 muestras filtradas pasa a f_joint_angle, lo dejamos así?
 
 			f_joint_angle[joint] = adc2angle(median_filteredValue[joint], up_down_vector[joint], calibration_table[joint]);
-			/*
+			
 			if (step_complete == 0)
 			{
 				error = target_joint[joint] - f_joint_angle[joint];
@@ -1301,7 +1301,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 				
         move_servos(joint, angle2ton_us(pid_out_debug[joint])); // Move the servomotor
 			}
-		*/
+		
 		}
     pid_sample = 1;
     send_uart = 1;
@@ -1315,21 +1315,21 @@ float adc2angle(uint16_t adc_value, uint8_t up_down, const float32_t *table_ptr)
 
   const float32_t *ADC_VALUES = table_ptr;
 
-  while (adc_value > ADC_VALUES[up_down * TABLE_LENGTH + index] / 10) // Busco el c�digo en la tabla obtenida en la calibracion
+  while (adc_value > ADC_VALUES[up_down * MED_CALIB + index] / 5) // Busco el c�digo en la tabla obtenida en la calibracion
   {
     index++;
-    if (index > TABLE_LENGTH - 1)
+    if (index > MED_CALIB - 1)
       return 180; //! HAY QUE CAMBIARLO??? adc_value greater than maximum value of table
   }
 
-  if (adc_value == ADC_VALUES[up_down * TABLE_LENGTH + index] / 10) // Si el c�digo est� en la tabla, devuelvo el angulo correspondiente
+  if (adc_value == ADC_VALUES[up_down * MED_CALIB + index] / 5) // Si el c�digo est� en la tabla, devuelvo el angulo correspondiente
     return ANGLES[index];
 
   else if (index == 0)
     return 0; // adc_value lesser than minimum value of table
 
   else // Si es menor al codigo de la tabla, realizo una interpolacion lineal
-    return (ANGLES[index - 1] * (ADC_VALUES[up_down * TABLE_LENGTH + index] / 10 - adc_value) + ANGLES[index] * (adc_value - ADC_VALUES[up_down * TABLE_LENGTH + index - 1] / 10)) / (ADC_VALUES[up_down * TABLE_LENGTH + index] / 10 - ADC_VALUES[up_down * TABLE_LENGTH + index - 1] / 10);
+    return (ANGLES[index - 1] * (ADC_VALUES[up_down * MED_CALIB + index] / 5 - adc_value) + ANGLES[index] * (adc_value - ADC_VALUES[up_down * MED_CALIB + index - 1] / 5)) / (ADC_VALUES[up_down * MED_CALIB + index] / 5 - ADC_VALUES[up_down * MED_CALIB + index - 1] / 5);
 }
 
 uint16_t angle2ton_us(float angle_value)
@@ -1364,7 +1364,11 @@ void State_Machine_Control(void)
     case TX_RASPBERRY:
 
       // Request master to transmit target step rotation and joint angles
-      HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)f_joint_angle, 12*2);
+		
+			for(uint8_t joint = 0; joint<JOINTS ; joint++)
+				f_joint_angle_rpi[joint] = f_joint_angle[joint] - mid_point_joints[joint];
+		
+      HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)f_joint_angle_rpi, 12*2);
       HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
       HAL_Delay(1);
       HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET); // !POSIBLE PROBLEMA ACA (tiempo que tarda el master en iniciar desde que lee el 1 en el GPIO)
@@ -1468,7 +1472,7 @@ int8_t State_Machine_Actuation(void)
         joints_finished &= ~(1 << joint); // Set respective bit in 0
 
         //*Solo si no se usa PID
-        move_servos(joint, angle2ton_us(target_joint[joint]));
+        //move_servos(joint, angle2ton_us(target_joint[joint]));
 				
       }
     }

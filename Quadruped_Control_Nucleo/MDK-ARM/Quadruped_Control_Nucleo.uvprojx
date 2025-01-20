@@ -420,6 +420,11 @@
               <FileType>1</FileType>
               <FilePath>..\Core\Src\median.c</FilePath>
             </File>
+            <File>
+              <FileName>SignalProcessing.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\SignalProcessing.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
