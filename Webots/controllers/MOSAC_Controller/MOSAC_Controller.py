@@ -180,8 +180,8 @@ BL_servo_femur_joint.enableTorqueFeedback(timestep)
 BL_servo_body_joint.enableTorqueFeedback(timestep)
 
 
-bod_llim, bod_ulim = -15.0 * np.pi / 180.0, 15.0 * np.pi / 180.0
-femur_llim, femur_ulim = -35.0 * np.pi / 180.0, 35.0 * np.pi / 180.0
+bod_llim, bod_ulim = -10.0 * np.pi / 180.0, 15.0 * np.pi / 180.0
+femur_llim, femur_ulim = -30.0 * np.pi / 180.0, 30.0 * np.pi / 180.0
 tibia_llim, tibia_ulim = -15.0 * np.pi / 180.0, 15.0 * np.pi / 180.0
 
 jointLowerLimit = np.array(
@@ -285,24 +285,38 @@ lateral_acceleration = 0.0
 max_forward_acc = 0.0
 
 
-
-prev_joint_angular_position = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
-joint_angular_velocity = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+#Servo Control Variables
+prev_joint_angular_position_servo = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+prev_joint_angular_position_servo = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
 joint_torque = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
-error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
-prev_error= np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
-delta_error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
-acum_error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+error_servo = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+prev_error_servo= np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+delta_error_servo = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+acum_error_servo = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
 Ia = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
 enable_torque_control = 0
 pid_sample = 0
 
-KP = 18.847
-KD = 0.023541
-KI = 2.0231
+KP_servo = 18.847
+KD_servo = 0.023541
+KI_SERVO = 2.0231
 KM = 0.9853919147
 RA = 1.45
 TF = 0.03262365753
+
+#PID Control Variables
+prev_joint_angular_position = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+prev_joint_angular_position = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+prev_error= np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+delta_error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+acum_error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+WINDOW_SIZE = 20
+TIMER_MEDIAN_FILTER = 5#ms
+delay_buffer = np.zeros((12,(WINDOW_SIZE/2 *  TIMER_MEDIAN_FILTER)/timestep),dtype=np.float32) #For median filter
+KP = 0.6
+KD = 0.0
+KI = 0.015 / (timestep * 1e-3)
 
 paws_heights = np.zeros(4, dtype=np.float32)
 paws_up_acum = np.zeros(4, dtype=int)
@@ -507,10 +521,9 @@ state = RESET
 delta_sample = 0
 delta_target = 0
 f_joint_angle = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-f_joint_angle_norm = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 target_joint = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-f_last_joint = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
 state_actuation = RESET_ACTUATION
 joints_finished = ALL_FINISHED # Each bit is a flag for a joint: 1-Finished, 0-Unfinished
 stuck_servo = 0 # returned by State_Machine_Actuation
@@ -540,7 +553,9 @@ def reset_robot_position_orientation():
       joint[i].setPosition(0)
 
 def SendState():
-  global environment_state, robot_node,Tx_float_length,reset_pos,reset_orientation,mean_forward_velocity,mean_lateral_velocity,max_forward_acc,target_step_rotation,slider,step_counter,attitude,ang_vel,joint_sensor,f_joint_angle,f_joint_angle_norm,jointUpperLimit,jointLowerLimit,step_completed,joint_angular_velocity, paws_up_acum, paws_down_acum,step_ommited
+  global environment_state, robot_node,Tx_float_length,reset_pos,reset_orientation,mean_forward_velocity,mean_lateral_velocity,max_forward_acc,target_step_rotation,slider,step_counter,attitude,ang_vel,joint_sensor,f_joint_angle,jointUpperLimit,jointLowerLimit,step_completed,prev_joint_angular_position_servo, paws_up_acum, paws_down_acum,step_ommited
+  
+  f_joint_angle_norm = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
   
   for i in range(len(joint)):
     #without noise in joints for now
@@ -571,7 +586,7 @@ def SendState():
   environment_state[22] = max_forward_acc
   environment_state[23] = current_rotation[0]
   environment_state[24:36] = joint_torque
-  environment_state[36:48] = joint_angular_velocity
+  environment_state[36:48] = prev_joint_angular_position_servo
 
   
   environment_state[48] = 0#paws_up_acum[0] / (paws_up_acum[0] + paws_down_acum[0])
@@ -676,20 +691,20 @@ def SendState():
   #   client.send(Tx_float_length.format(joint_torque[i]).encode('utf-8'))
 
   #Send Angular Velocity
-  #print("joint_angular_velocity",joint_angular_velocity)
+  #print("prev_joint_angular_position_servo",prev_joint_angular_position_servo)
   # for i in range(len(joint)):
-  #   client.send(Tx_float_length.format(joint_angular_velocity[i]).encode('utf-8'))      
+  #   client.send(Tx_float_length.format(prev_joint_angular_position_servo[i]).encode('utf-8'))      
   
 def State_Machine_Control():
 
   global state,state_actuation, joint_sensor
-  global enable_torque_control, f_joint_angle,f_last_joint 
+  global enable_torque_control, f_joint_angle
   global joints_finished, target_joint, delta_target, joint
-  global stuck_servo,prev_forward_velocity,target_step_rotation
+  global prev_forward_velocity,target_step_rotation
   global prev_lateral_velocity,max_forward_acc,step_completed,step_counter
   global mean_forward_velocity,mean_lateral_velocity,max_forward_acc,vel_samples,prev_time
-  global prev_joint_angular_position,acum_error
-  global pid_sample
+  global prev_joint_angular_position_servo,acum_error_servo,prev_joint_angular_position,acum_error
+  global pid_sample,step_complete,delay_buffer
   global repeat
   
 
@@ -740,14 +755,20 @@ def State_Machine_Control():
       max_forward_acc = 0.0
       prev_time = 0.0
 
-      prev_joint_angular_position = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+      prev_joint_angular_position_servo = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+      acum_error_servo = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+      
+      prev_joint_angular_position= np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
       acum_error = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+      delay_buffer = np.zeros((12,(WINDOW_SIZE/2 *  TIMER_MEDIAN_FILTER)/timestep),dtype=np.float32) #For median filter
 
+      
       max_forward_acc = 0.0
 
       vel_samples = 0.0
 
       step_completed = False 
+      step_complete = 0
 
       target_step_rotation = 0.0
 
@@ -756,8 +777,7 @@ def State_Machine_Control():
 
       f_joint_angle = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
       target_joint = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-      f_last_joint = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-
+      
       state = RESET
       state_actuation = RESET_ACTUATION
       repeat = 1
@@ -772,17 +792,17 @@ def State_Machine_Control():
       repeat = 1
 
   elif state == ACTUATION:
-    stuck_servo = State_Machine_Actuation()
+    step_complete = State_Machine_Actuation()
 
     # if (pitch*180/np.pi >= critical_failure_angle or roll*180/np.pi >= critical_failure_angle):
     #     supervisor.simulationSetMode(Supervisor.SIMULATION_MODE_PAUSE)
     #     state = TX_RASPBERRY
 
-    if stuck_servo == 1:
+    if step_complete == 1:
       state = TX_RASPBERRY
       repeat = 1
 
-    elif stuck_servo == -1:
+    elif step_complete == -1:
       state = TX_RASPBERRY  # ESTADO STOP DE EMERGENCIA EN EL FUTURO
       repeat = 1
 
@@ -791,17 +811,16 @@ def State_Machine_Control():
 
 def State_Machine_Actuation():
   global state_actuation,joint,joint_sensor
-  global f_joint_angle,f_last_joint,timeout,joints_finished
+  global f_joint_angle,timeout,joints_finished
   global delta_sample,target_joint,delta_target,joint
-  global step_ommited,enable_torque_control, pid_sample
+  global step_ommited,enable_torque_control, pid_sample, step_complete
   global repeat
 
   if state_actuation == RESET_ACTUATION:
     # Check if the new target is too close to the actual position, in which case the servo wouldn't move because of the dead bandwidth
     # Therefore consider the joint already finished
     
-    for i in range(len(joint)):
-      
+    for i in range(len(joint)):      
 
       delta_target = np.abs(f_joint_angle[i] - target_joint[i])
       if delta_target >= DEAD_BANDWIDTH_SERVO:
@@ -823,6 +842,7 @@ def State_Machine_Actuation():
       enable_torque_control = 1 
       timeout = TIMEOUT
       pid_sample = 0  
+      step_complete = 0
       repeat = 1 
       
 		
@@ -851,7 +871,6 @@ def State_Machine_Actuation():
           if delta_target < MAX_DELTA_ANGLE:  # If the stable joint reached target
 
             joints_finished |= 1 << i  # Set respective bit in 1
-            #print(bin(joints_finished))
             if joints_finished == ALL_FINISHED:
 
               #enable_torque_control = 0
@@ -871,13 +890,12 @@ def State_Machine_Actuation():
     #enable_torque_control = 0
     state_actuation = RESET_ACTUATION
     repeat  = 1
-
     return -1
   
   return 0
 
 def computeMeasurementsForRewards():
-  global supervisor,root,forward_acceleration,forward_velocity,lateral_velocity,mean_forward_velocity,mean_lateral_velocity,lateral_acceleration,max_forward_acc,prev_time,prev_forward_velocity,prev_lateral_velocity,vel_samples,step_completed,step_counter,joint,current_position,joint_angular_velocity,joint_torque, paws_heights, paws_up_acum, paws_down_acum, paw_FR,paw_FL,paw_BR,paw_BL
+  global supervisor,root,forward_acceleration,forward_velocity,lateral_velocity,mean_forward_velocity,mean_lateral_velocity,lateral_acceleration,max_forward_acc,prev_time,prev_forward_velocity,prev_lateral_velocity,vel_samples,step_completed,step_counter,joint,current_position,prev_joint_angular_position_servo,joint_torque, paws_heights, paws_up_acum, paws_down_acum, paw_FR,paw_FL,paw_BR,paw_BL
   world_velocity = root.getVelocity()
 
 
@@ -920,8 +938,6 @@ def computeMeasurementsForRewards():
 
   vel_samples = vel_samples + 1.0
   prev_time = time
-
-
     
   
   #Paws measurements:
@@ -953,55 +969,87 @@ def computeMeasurementsForRewards():
 
       step_completed = False
 
-def computeTorques():
-    global joint, joint_angular_velocity, joint_sensor, f_joint_angle
-    global prev_joint_angular_position, joint_torque, error, delta_error, acum_error
-    global prev_error, Ia, enable_torque_control
-    global pid_sample
+def computeTorques(target_servo):
+    global joint, joint_angular_velocity_servo, joint_sensor
+    global prev_joint_angular_position_servo, joint_torque, error_servo, delta_error_servo, acum_error_servo
+    global prev_error_servo, Ia, enable_torque_control
 
     # print("New Simulation Step")
 
     if enable_torque_control == 0:
        return
+    
+    f_joint_angle_servo = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-    for i in range(len(joint)):
-        
-        f_joint_angle[i] = joint_sensor[i].getValue()
-        # print("Angular Position %d: %f" % (i, f_joint_angle[i]))
-        # print("Previous Angular Position %d: %f" % (i,prev_joint_angular_position[i]))
-        joint_angular_velocity = (f_joint_angle[i] - prev_joint_angular_position[i]) / (timestep * 1e-3)
-        prev_joint_angular_position[i] = f_joint_angle[i]
+    for i in range(len(joint)):        
+      f_joint_angle_servo[i] = joint_sensor[i].getValue()
+      joint_angular_velocity_servo[i] = (f_joint_angle_servo[i] - prev_joint_angular_position_servo[i]) / (timestep * 1e-3)
+      prev_joint_angular_position_servo[i] = f_joint_angle_servo[i]
 
     # PID control
-    error = target_joint - f_joint_angle
-    delta_error = (error - prev_error) / (timestep * 1e-3)
-    acum_error += error * timestep * 1e-3
-    prev_error = error
+    error_servo = target_servo - f_joint_angle_servo
+    delta_error_servo = (error_servo - prev_error_servo) / (timestep * 1e-3)
+    acum_error_servo += error_servo * timestep * 1e-3
+    prev_error_servo = error_servo
 
     # Voltage and current calculations
-    VA = KP * error + KD * delta_error + KI * acum_error
+    VA = KP_servo * error_servo + KD_servo * delta_error_servo + KI_SERVO * acum_error_servo
 
-    Eb = joint_angular_velocity * KM
+    Eb = joint_angular_velocity_servo * KM
     Ia = (VA - Eb) / RA
 
     # Torque calculation
     joint_torque = Ia * KM  #Not used, only useful to know the real torque
 
-
-    # print("VA", VA)
-    # print("Eb", Eb)
-    
-    # print("Omega", joint_angular_velocity)  
-    # print("Ia", Ia)
-    # print("joint_torque", joint_torque)
     # Apply torque to joints
     for i in range(len(joint)):
-        joint[i].setTorque(VA[i]*KM/RA - TF)
-        #After computing the DC Motor Control, add noise for the rest of the controller 
-        #f_joint_angle[i] = f_joint_angle[i]+ np.random.normal(0,0.5*np.pi/180.0,None)  #!(Optional noise)
-    pid_sample = 1
+      if VA[i] < 0:
+        friction_direction = -1
+      else:
+        friction_direction = +1
+
+      joint[i].setTorque(VA[i]*KM/RA - friction_direction*TF)
+      #After computing the DC Motor Control, add noise for the rest of the controller 
+      #f_joint_angle[i] = f_joint_angle[i]+ np.random.normal(0,0.5*np.pi/180.0,None)  #!(Optional noise)
 
 
+def PIDControl():
+  global joint, joint_angular_velocity, joint_sensor, f_joint_angle
+  global prev_joint_angular_position, error, delta_error, acum_error
+  global prev_error
+  global pid_sample,step_complete
+  global jointUpperLimit,jointLowerLimit
+  global delay_buffer
+
+
+  for i in range(len(joint)):            
+    delay_buffer[i][1:]=  delay_buffer[i][0:-1] 
+    delay_buffer[i][0] = joint_sensor[i].getValue()
+    f_joint_angle[i] = delay_buffer[i][-1]
+
+    joint_angular_velocity = (f_joint_angle[i] - prev_joint_angular_position[i]) / (timestep * 1e-3)
+    prev_joint_angular_position_servo[i] = f_joint_angle[i]
+
+    #f_joint_angle[joint] = adc2angle(median_filteredValue[joint], up_down_vector[joint], calibration_table[joint]);
+    
+  if step_complete == 0:
+  
+    error = target_joint - f_joint_angle
+    delta_error = (error_servo - prev_error_servo) / (timestep * 1e-3)
+    acum_error_servo += error_servo * timestep * 1e-3
+    prev_error_servo = error_servo
+
+    control_signal = KP * error + KD * delta_error + KI * acum_error 
+        
+    move_servo = not((f_joint_angle < jointLowerLimit and control_signal< 0) or (f_joint_angle >  jointUpperLimit and control_signal >0))
+
+
+    pid_out_debug = f_joint_angle +control_signal * move_servo      
+    computeTorques(pid_out_debug)
+
+  pid_sample = 1
+
+  
 repeat = 1
 if __name__ == "__main__":
     
@@ -1041,7 +1089,7 @@ if __name__ == "__main__":
     
     # Main loop:
     while supervisor.step(timestep) != -1:
-      computeTorques()
+      PIDControl()
       
       if timeout >0: 
          timeout-=timestep
