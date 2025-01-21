@@ -979,30 +979,32 @@ def computeTorques(target_servo):
     if enable_torque_control == 0:
        return
     
-    f_joint_angle_servo = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    internal_angle_servo = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
     for i in range(len(joint)):        
-      f_joint_angle_servo[i] = joint_sensor[i].getValue()
-      joint_angular_velocity_servo[i] = (f_joint_angle_servo[i] - prev_joint_angular_position_servo[i]) / (timestep * 1e-3)
-      prev_joint_angular_position_servo[i] = f_joint_angle_servo[i]
+      internal_angle_servo[i] = joint_sensor[i].getValue()
+      joint_angular_velocity_servo[i] = (internal_angle_servo[i] - prev_joint_angular_position_servo[i]) / (timestep * 1e-3)
+      prev_joint_angular_position_servo[i] = internal_angle_servo[i]
 
     # PID control
-    error_servo = target_servo - f_joint_angle_servo
+    error_servo = target_servo - internal_angle_servo
     delta_error_servo = (error_servo - prev_error_servo) / (timestep * 1e-3)
     acum_error_servo += error_servo * timestep * 1e-3
     prev_error_servo = error_servo
 
     # Voltage and current calculations
     VA = KP_servo * error_servo + KD_servo * delta_error_servo + KI_SERVO * acum_error_servo
+    VA = np.clip(VA, -8.4, 8.4)
 
-    Eb = joint_angular_velocity_servo * KM
+    ####### Not used, only useful to know real back emf, current and torque #######
+    Eb = joint_angular_velocity * KM
     Ia = (VA - Eb) / RA
-
-    # Torque calculation
-    joint_torque = Ia * KM  #Not used, only useful to know the real torque
+    joint_torque = Ia * KM
+    ###############################################################################
 
     # Apply torque to joints
     for i in range(len(joint)):
+      #Make sure the constant friction always opposes the motor's torque
       if VA[i] < 0:
         friction_direction = -1
       else:
@@ -1049,44 +1051,8 @@ def PIDControl():
 
   pid_sample = 1
 
-  
-repeat = 1
 if __name__ == "__main__":
-    
-    ####Init the floor####
-    # terrain_x_size = 20          #meters
-    # terrain_y_size = 20          #meters
-    # terrain_resolution = 0.05   #meters
-
-    # terrain_x_dimension = int(terrain_x_size/terrain_resolution)
-    # terrain_y_dimension = int(terrain_y_size/terrain_resolution)
-
-    #Set position of solid node based on size:
-    # terrain_node = supervisor.getFromDef('uneven_terrain')
-    # terrain_translation_field = terrain_node.getField('translation')
-    # terrain_translation_field.setSFVec3f([-terrain_x_size/2, -terrain_y_size/2, 0.01])
-
-    # #Set dimension and spacing fields of the terrain grid node:
-    # terrain_grid_node = supervisor.getFromDef('terrain_grid')
-
-    # terrain_grid_node.getField('xDimension').setSFInt32(terrain_x_dimension)
-    # terrain_grid_node.getField('yDimension').setSFInt32(terrain_y_dimension)
-    # terrain_grid_node.getField('xSpacing').setSFFloat(terrain_resolution)
-    # terrain_grid_node.getField('ySpacing').setSFFloat(terrain_resolution)
-
-    #Set the height array of the terrain grid node:
-    # terrain_grid_height_field = terrain_grid_node.getField('height')
-
-    # print('hola')
-    # for x_index in range(terrain_x_dimension):
-
-    #   for y_index in range(terrain_y_dimension):
-        
-    #     if x_index % 3 == 0 or y_index % 3 == 0:
-    #       terrain_grid_height_field.setMFFloat(x_index*terrain_x_dimension + y_index, -0.01)
-    #     else:
-    #       terrain_grid_height_field.setMFFloat(x_index*terrain_x_dimension + y_index, 0)
-    
+    repeat = 1
     # Main loop:
     while supervisor.step(timestep) != -1:
       PIDControl()
@@ -1104,7 +1070,3 @@ if __name__ == "__main__":
         repeat = 0
         State_Machine_Control()
       repeat = 1
-
-      
-
-
