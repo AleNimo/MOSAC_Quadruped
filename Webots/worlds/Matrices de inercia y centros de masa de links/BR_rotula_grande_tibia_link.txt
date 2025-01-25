@@ -1,0 +1,32 @@
+Mass properties of selected components
+     Coordinate system: Coord_Rot_Grande_Tibia_BR
+
+The center of mass and the moments of inertia are output in the coordinate system of Cuerpo_completo
+Mass = 0.02503141 kilograms
+
+Volume = 8013.2643 cubic millimeters
+
+Surface area = 0.00692827 square meters
+
+Center of mass: ( meters )
+	X = 0.03730578
+	Y = 0.03329082
+	Z = 0
+
+Principal axes of inertia and principal moments of inertia: ( kilograms * square meters )
+Taken at the center of mass.
+	 Ix = (-0.74611557, -0.66581646,  0)   	Px = 4.8e-07
+	 Iy = ( 0.66581646, -0.74611557,  0)   	Py = 4.264e-05
+	 Iz = ( 0,  0,  1)   	Pz = 4.294e-05
+
+Moments of inertia: ( kilograms * square meters )
+Taken at the center of mass and aligned with the output coordinate system.
+	Lxx = 1.917e-05	Lxy = 2.094e-05	Lxz = 0
+	Lyx = 2.094e-05	Lyy = 2.395e-05	Lyz = 0
+	Lzx = 0	Lzy = 0	Lzz = 4.294e-05
+
+Moments of inertia: ( kilograms * square meters )
+Taken at the output coordinate system.
+	Ixx = 4.691e-05	Ixy = 5.203e-05	Ixz = 0
+	Iyx = 5.203e-05	Iyy = 5.879e-05	Iyz = 0
+	Izx = 0	Izy = 0	Izz = 0.00010552

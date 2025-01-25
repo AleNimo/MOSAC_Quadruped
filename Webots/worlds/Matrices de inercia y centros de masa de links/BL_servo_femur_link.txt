@@ -1,0 +1,32 @@
+Mass properties of selected components
+     Coordinate system: Coord_Servo_Femur_BL
+
+The center of mass and the moments of inertia are output in the coordinate system of Cuerpo_completo
+Mass = 0.03248915 kilograms
+
+Volume = 37073.666 cubic millimeters
+
+Surface area = 0.01622547 square meters
+
+Center of mass: ( meters )
+	X = 0.02792369
+	Y = -0.0219658
+	Z = 0.01700247
+
+Principal axes of inertia and principal moments of inertia: ( kilograms * square meters )
+Taken at the center of mass.
+	 Ix = ( 0.78086185, -0.61429354,  0.11357032)   	Px = 2.7e-06
+	 Iy = ( 0.08874869, -0.07087004, -0.99352962)   	Py = 5.591e-05
+	 Iz = ( 0.61836757,  0.78588859, -0.00082196)   	Pz = 5.648e-05
+
+Moments of inertia: ( kilograms * square meters )
+Taken at the center of mass and aligned with the output coordinate system.
+	Lxx = 2.368e-05	Lxy = -2.58e-05	Lxz = 4.72e-06
+	Lyx = -2.58e-05	Lyy = 3.618e-05	Lyz = -3.71e-06
+	Lzx = 4.72e-06	Lzy = -3.71e-06	Lzz = 5.523e-05
+
+Moments of inertia: ( kilograms * square meters )
+Taken at the output coordinate system.
+	Ixx = 4.875e-05	Ixy = -4.573e-05	Ixz = 2.014e-05
+	Iyx = -4.573e-05	Iyy = 7.09e-05	Iyz = -1.585e-05
+	Izx = 2.014e-05	Izy = -1.585e-05	Izz = 9.623e-05

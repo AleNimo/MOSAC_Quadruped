@@ -1,0 +1,32 @@
+Mass properties of selected components
+     Coordinate system: Coord_Rot_Chica_Servo_FR
+
+The center of mass and the moments of inertia are output in the coordinate system of Cuerpo_completo
+Mass = 0.02124141 kilograms
+
+Volume = 3922.9106 cubic millimeters
+
+Surface area = 0.00420137 square meters
+
+Center of mass: ( meters )
+	X = -0.01194467
+	Y = 0.01635198
+	Z = 0
+
+Principal axes of inertia and principal moments of inertia: ( kilograms * square meters )
+Taken at the center of mass.
+	 Ix = (-0.58986049,  0.80750517,  0)   	Px = 4.3e-07
+	 Iy = (-0.80750517, -0.58986049,  0)   	Py = 6.15e-06
+	 Iz = ( 0,  0,  1)   	Pz = 6.45e-06
+
+Moments of inertia: ( kilograms * square meters )
+Taken at the center of mass and aligned with the output coordinate system.
+	Lxx = 4.16e-06	Lxy = -2.72e-06	Lxz = 0
+	Lyx = -2.72e-06	Lyy = 2.42e-06	Lyz = 0
+	Lzx = 0	Lzy = 0	Lzz = 6.45e-06
+
+Moments of inertia: ( kilograms * square meters )
+Taken at the output coordinate system.
+	Ixx = 9.84e-06	Ixy = -6.87e-06	Ixz = 0
+	Iyx = -6.87e-06	Iyy = 5.45e-06	Iyz = 0
+	Izx = 0	Izy = 0	Izz = 1.516e-05
