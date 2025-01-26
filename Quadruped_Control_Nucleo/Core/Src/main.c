@@ -76,7 +76,7 @@
 #define COMPARE_MEASURE 2
 #define TIMEOUT_STATE 3
 
-#define DIV_TIM9_TICK 100
+#define TIM9_TICK 0.01
 
 #define ONE_SECOND 200  //milliseconds*5
 
@@ -87,7 +87,7 @@
 
 // Parameters of the actuation and time-out algorithm
 #define DEAD_BANDWIDTH_SERVO 5	// Degrees
-#define MAX_DELTA_TARGET 3.5    // Degrees
+#define MAX_DELTA_TARGET 2.5    // Degrees
 #define MAX_ANG_VELOCITY 6      // Degrees/sec
 
 #define TIMEOUT 100    // miliseconds*5
@@ -163,9 +163,7 @@ float32_t filt_vel[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 //Median filter
 volatile float32_t median_filteredValue[JOINTS];
-
-//median median_filter[JOINTS];
-spMedianFilter median_filter[JOINTS];
+volatile spMedianFilter median_filter[JOINTS];
 
 //SPI
 volatile uint8_t spi_rx_cplt = 0;
@@ -182,7 +180,7 @@ volatile float32_t pid_out_debug[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 // PID constants
 float32_t kp[JOINTS] = {0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6};
 float32_t kd[JOINTS] = {0,0,0,0,0,0,0,0,0,0,0,0};
-float32_t ki[JOINTS] = {0.015,0.015,0.015,0.015,0.015,0.015,0.015,0.015,0.015,0.015,0.015,0.015};
+float32_t ki[JOINTS] = {1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5};
 
 // Vectors to control joints manually
 const float32_t mid_point_joints[12] = {MID_POINT_BFR, MID_POINT_BBR, MID_POINT_BBL, MID_POINT_TFR, MID_POINT_FFR, MID_POINT_BFL, MID_POINT_FFL, MID_POINT_TFL, MID_POINT_FBL, MID_POINT_TBL, MID_POINT_TBR, MID_POINT_FBR};
@@ -233,6 +231,7 @@ const float32_t *calibration_table[12] = {&ADC_VALUES_SERVO_0[0][0], &ADC_VALUES
 /////////////////////////////
 
 //Para pruebas
+// volatile uint16_t debug_delay = 0;
 float32_t square_wave[2] = {75, 105};
 volatile uint8_t selected_value = 0;
 
@@ -428,12 +427,12 @@ int main(void)
       {
 				u_dummy1.angle = target_joint[i];
         //u_dummy1.angle = adc2angle(dummy1[i], up_down_vector[i], calibration_table[i]); // there is no way to define the up_down vector, initial values are used
-        u_dummy2.angle = adc2angle(filt_angle_ADC[i], up_down_vector[i], calibration_table[i]);
+        //u_dummy2.angle = adc2angle(filt_angle_ADC[i], up_down_vector[i], calibration_table[i]);
 				//u_dummy3.angle = fabs(u_dummy1.angle - u_dummy2.angle);
         //u_dummy3.angle = iir_in_arm_vel[i];
-				u_dummy3.angle = adc2angle(iir_in_arm_angle[i], up_down_vector[i], calibration_table[i]);
-        //u_dummy3.angle = error_acum[i]*ki[i];
-				//u_dummy4.angle = pid_out_debug[i];//ton_us2angle(ton_pwm[i]);
+				//u_dummy3.angle = adc2angle(iir_in_arm_angle[i], up_down_vector[i], calibration_table[i]);
+        u_dummy3.angle = error_acum[i]*ki[i];
+				u_dummy2.angle = pid_out_debug[i];//ton_us2angle(ton_pwm[i]);
         u_dummy4.angle = f_joint_angle[i];
 				
 				last_joint[i] = u_dummy2.angle;
@@ -458,7 +457,7 @@ int main(void)
         uart_tx_buffer[16 * i + 16] = u_dummy4.angle_bytes[1];
         uart_tx_buffer[16 * i + 17] = u_dummy4.angle_bytes[0];
       }
-			//HAL_UART_Transmit(&huart3, (const uint8_t*) uart_tx_buffer, 16 * JOINTS + 2, HAL_MAX_DELAY);
+			HAL_UART_Transmit(&huart3, (const uint8_t*) uart_tx_buffer, 16 * JOINTS + 2, HAL_MAX_DELAY);
 
       send_uart = 0;
     }
@@ -733,7 +732,7 @@ static void MX_TIM2_Init(void)
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 3100;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
     Error_Handler();
@@ -804,7 +803,7 @@ static void MX_TIM3_Init(void)
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim3.Init.Period = 3100;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
   {
     Error_Handler();
@@ -875,7 +874,7 @@ static void MX_TIM4_Init(void)
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim4.Init.Period = 3100;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
   {
     Error_Handler();
@@ -1170,7 +1169,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 {
   static float32_t t_step = 0;
-	static int sign = 1;
+	//static int sign = 1;
 
   if (timer == &htim5)
   {
@@ -1180,6 +1179,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 
     if (time_debounce > 0)
       time_debounce--;
+		
+		// if (debug_delay > 0)
+		// 	debug_delay--;
 
     uint8_t buffer_to_copy = current_buffer;
 
@@ -1198,7 +1200,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
     // for controlling trajectory
     t_step += 0.005;
 		
-//		if(t_step >=1)
+//		if(t_step >=3)
 //		{
 //			sign = - sign;
 //			t_step = 0.0;
@@ -1212,7 +1214,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 //			//target_joint[6] = -5 * sign+ mid_point_joints[6];
 //			for(uint8_t i = 0;i<JOINTS;i++)		
 //				move_servos(i, angle2ton_us(target_joint[i]));
-//			
 //		}	
 		
 			
@@ -1274,8 +1275,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 			if (step_complete == 0)
 			{
 				error = target_joint[joint] - f_joint_angle[joint];
-				error_acum[joint] += error;
-				error_dif = (error - previous_error[joint]) * DIV_TIM9_TICK; //(divido por 10ms, tick de tim9)
+				error_acum[joint] += error * TIM9_TICK;
+				error_dif = (error - previous_error[joint]) / TIM9_TICK; //(divido por 10ms, tick de tim9)
 
 				previous_error[joint] = error;
         
@@ -1290,16 +1291,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 				control_signal = kp[joint] * error + ki[joint] * error_acum[joint] + kd[joint] * error_dif; //Delta_angle
 				up_down_vector[joint] = control_signal > 0;
 				
-				if(f_joint_angle[joint] < (mid_point_joints[joint] + joint_range[joint][0]) && up_down_vector[joint] == 0) continue;
+				if((f_joint_angle[joint] + control_signal) < (mid_point_joints[joint] + joint_range[joint][0]))
+					move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][0]));
 
-
-				else if(f_joint_angle[joint] > (mid_point_joints[joint] + joint_range[joint][1])&& up_down_vector[joint] == 1) continue;
-
-        pid_out_debug[joint] = f_joint_angle[joint] + control_signal;
-
-
-				
-        move_servos(joint, angle2ton_us(pid_out_debug[joint])); // Move the servomotor
+				else if((f_joint_angle[joint] + control_signal) > (mid_point_joints[joint] + joint_range[joint][1]))
+					move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][1]));
+        
+				else
+				{
+					pid_out_debug[joint] = f_joint_angle[joint] + control_signal;
+					move_servos(joint, angle2ton_us(pid_out_debug[joint])); // Move the servomotor
+				}
 			}
 		
 		}
@@ -1319,7 +1321,7 @@ float adc2angle(uint16_t adc_value, uint8_t up_down, const float32_t *table_ptr)
   {
     index++;
     if (index > MED_CALIB - 1)
-      return 180; //! HAY QUE CAMBIARLO??? adc_value greater than maximum value of table
+      return 266; //adc_value greater than maximum value of table
   }
 
   if (adc_value == ADC_VALUES[up_down * MED_CALIB + index] / 5) // Si el c�digo est� en la tabla, devuelvo el angulo correspondiente
@@ -1358,23 +1360,26 @@ void move_servos(uint8_t joint, uint16_t ton)
 void State_Machine_Control(void)
 {
   static uint8_t state = TX_RASPBERRY;
+	//static int sign = 1;
 
   switch (state)
   {
     case TX_RASPBERRY:
+			// if(debug_delay == 0)
+			{
+				// Request master to transmit target step rotation and joint angles
+				// debug_delay = 600;
+				
+				for(uint8_t joint = 0; joint<JOINTS ; joint++)
+					f_joint_angle_rpi[joint] = f_joint_angle[joint] - mid_point_joints[joint];
+			
+				HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)f_joint_angle_rpi, 12*2);
+				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
+				HAL_Delay(1);
+				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET); // !POSIBLE PROBLEMA ACA (tiempo que tarda el master en iniciar desde que lee el 1 en el GPIO)
 
-      // Request master to transmit target step rotation and joint angles
-		
-			for(uint8_t joint = 0; joint<JOINTS ; joint++)
-				f_joint_angle_rpi[joint] = f_joint_angle[joint] - mid_point_joints[joint];
-		
-      HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)f_joint_angle_rpi, 12*2);
-      HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
-      HAL_Delay(1);
-      HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET); // !POSIBLE PROBLEMA ACA (tiempo que tarda el master en iniciar desde que lee el 1 en el GPIO)
-
-      state = RX_RASPBERRY;
-
+				state = RX_RASPBERRY;
+			}
       break;
     case RX_RASPBERRY:
       //As reference:
@@ -1420,7 +1425,7 @@ void State_Machine_Control(void)
 			{
 				target_joint[joint] = target_joint[joint] + mid_point_joints[joint];
 			}
-      // memcpy(test_quadruped_nucleo, target_joint, sizeof(target_joint));  //PARA poder leer target_joint con debugger
+      
 
       // Check if the new target is too close to the actual position, in which case the servo wouldn't move because of the dead bandwidth
       // Therefore consider the joint already finished
@@ -1429,8 +1434,17 @@ void State_Machine_Control(void)
       
       //*Only for testing without raspberry
       // memcpy(target_joint, test_quadruped_nucleo, sizeof(target_joint));
-      // target_joint[6] = square_wave[selected_value];
-      // selected_value = 1 - selected_value;
+      /*
+			sign = - sign;
+			target_joint[10] = -5 * sign+ mid_point_joints[10];
+			//target_joint[11] = 5 * sign + mid_point_joints[11];
+			target_joint[3] = -5 * sign + mid_point_joints[3];
+			//target_joint[4] = 5 * sign + mid_point_joints[4];
+			target_joint[9] = 5 * sign + mid_point_joints[9];
+			//target_joint[8] = -5 * sign + mid_point_joints[8];
+			target_joint[7] = 5 * sign+ mid_point_joints[7];
+			//target_joint[6] = -5 * sign+ mid_point_joints[6];
+			*/
 
       state = ACTUATION;
 
@@ -1440,15 +1454,18 @@ void State_Machine_Control(void)
       step_complete = State_Machine_Actuation();
 
       if (step_complete == 1)
-        state = TX_RASPBERRY;
+				state = TX_RASPBERRY;
+			
       else if (step_complete == -1)
         //state = ERROR;
 				state = TX_RASPBERRY;
         //state = TX_ERROR;   // TODO: ESTADO STOP DE EMERGENCIA EN EL FUTURO
+			
       break;
     case ERROR:
       HAL_Delay(1);
       break;
+		
   }
 }
 
@@ -1486,9 +1503,9 @@ int8_t State_Machine_Actuation(void)
     else
     {        
       // Clear PID buffers
-      // memset(error_acum, 0, sizeof(filt_angle_ADC));
+      memset((void*)error_acum, 0, sizeof(error_acum));
       // TODO: Checkear si esto puede quedar comentado:
-      // memset(previous_error, 0, sizeof(filt_angle_ADC));
+      memset((void*)previous_error, 0, sizeof(filt_angle_ADC));
 
       state_actuation = DELAY_STATE;
       timeout = TIMEOUT;

@@ -22,6 +22,8 @@ Resultados*/
 *.uvgui
 *.uvgui.*
 *.uvguix.*
+*.uvprojx
+
 
 # Listing files
 *.cod
