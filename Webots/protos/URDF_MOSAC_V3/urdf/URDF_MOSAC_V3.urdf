@@ -1,0 +1,1955 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-1-g15f4949  Build Version: 1.6.7594.29634
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="URDF_MOSAC_V3">
+  <link
+    name="chasis_base_link">
+    <inertial>
+      <origin
+        xyz="0.000198302223956212 0.000790016683473714 -0.00256053674183077"
+        rpy="0 0 0" />
+      <mass
+        value="1.29553274341194" />
+      <inertia
+        ixx="0.000833202744245101"
+        ixy="1.96875703381211E-06"
+        ixz="1.64481390115865E-06"
+        iyy="0.00168512814866586"
+        iyz="-6.88739932513045E-07"
+        izz="0.00189970230471747" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/chasis_base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.298039215686275 0.298039215686275 0.298039215686275 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/chasis_base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="BFR_link">
+    <inertial>
+      <origin
+        xyz="0.00580357222295728 -2.21430391836308E-06 -0.0309194296267032"
+        rpy="0 0 0" />
+      <mass
+        value="0.146947300702439" />
+      <inertia
+        ixx="2.30747655080909E-05"
+        ixy="-2.91317781385845E-09"
+        ixz="-1.15103600422596E-09"
+        iyy="2.03168443493353E-05"
+        iyz="8.25173484736573E-10"
+        izz="8.62893173137048E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BFR_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BFR_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BFR_joint"
+    type="continuous">
+    <origin
+      xyz="0.0950000000000001 -0.0527500000000021 0.0031999999999997"
+      rpy="1.5707963267949 0 -1.5707963267949" />
+    <parent
+      link="chasis_base_link" />
+    <child
+      link="BFR_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="FR_servo_femur_link">
+    <inertial>
+      <origin
+        xyz="-0.026115 -0.024055 0.017002"
+        rpy="0 0 0" />
+      <mass
+        value="0.032489" />
+      <inertia
+        ixx="9.1106E-06"
+        ixy="-8.2102E-06"
+        ixz="4.3945E-07"
+        iyy="1.046E-05"
+        iyz="4.0437E-07"
+        izz="1.829E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_servo_femur_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_servo_femur_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FR_servo_femur_joint"
+    type="continuous">
+    <origin
+      xyz="0.02675 0.010265 -0.02005"
+      rpy="0 1.5708 0" />
+    <parent
+      link="BFR_link" />
+    <child
+      link="FR_servo_femur_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="FR_tibia_link">
+    <inertial>
+      <origin
+        xyz="0.033067 -0.033197 -0.00099587"
+        rpy="0 0 0" />
+      <mass
+        value="0.028632" />
+      <inertia
+        ixx="1.1409E-05"
+        ixy="1.3197E-05"
+        ixz="-2.0267E-07"
+        iyy="1.81E-05"
+        iyz="2.003E-07"
+        izz="2.8685E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FR_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="-0.0735503585991124 -0.0677520829933813 0.0222499999999993"
+      rpy="0 0 0" />
+    <parent
+      link="FR_servo_femur_link" />
+    <child
+      link="FR_tibia_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="FR_rotula_grande_tibia_link">
+    <inertial>
+      <origin
+        xyz="0.036775 0.033876 -8.1021E-10"
+        rpy="0 0 0" />
+      <mass
+        value="0.025031" />
+      <inertia
+        ixx="2.1948E-06"
+        ixy="-1.8582E-06"
+        ixz="-2.3509E-20"
+        iyy="2.5003E-06"
+        iyz="-2.2887E-20"
+        izz="4.5145E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_rotula_grande_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.60392 0.22745 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_rotula_grande_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FR_rotula_grande_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="-0.0190918830920368 0.0190918830920368 -0.00424999999999992"
+      rpy="0 0 0" />
+    <parent
+      link="FR_tibia_link" />
+    <child
+      link="FR_rotula_grande_tibia_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="FR_rotula_grande_shoulder_link">
+    <inertial>
+      <origin
+        xyz="-0.101895366872607 -0.0363666817231912 -0.0979013501139168"
+        rpy="0 0 0" />
+      <mass
+        value="2.44638584956499" />
+      <inertia
+        ixx="0.0115356914385574"
+        ixy="-0.000546449948935326"
+        ixz="1.09216778904861E-06"
+        iyy="0.0374696790390071"
+        iyz="-3.64842253552065E-06"
+        izz="0.0306418924734276" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_rotula_grande_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_rotula_grande_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FR_rotula_grande_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="0.0735503585991122 0.067752082993381 0"
+      rpy="0 0 0" />
+    <parent
+      link="FR_rotula_grande_tibia_link" />
+    <child
+      link="FR_rotula_grande_shoulder_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="FR_servo_tibia_link">
+    <inertial>
+      <origin
+        xyz="0.0159833578481644 0.00481570219064981 0.0107580300482716"
+        rpy="0 0 0" />
+      <mass
+        value="0.00954145739699784" />
+      <inertia
+        ixx="1.8817405945261E-07"
+        ixy="-9.31511413619109E-08"
+        ixz="-6.30528372353463E-09"
+        iyy="4.5799518668205E-07"
+        iyz="-1.87962496032623E-09"
+        izz="4.80025653135766E-07" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_servo_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_servo_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FR_servo_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="0.0237499999999999 -0.0102651900000003 -0.0400500000000001"
+      rpy="0 1.5707963267949 0" />
+    <parent
+      link="BFR_link" />
+    <child
+      link="FR_servo_tibia_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="FR_rotula_chica_servo_link">
+    <inertial>
+      <origin
+        xyz="-0.0119446749891011 0.0163519796784593 -3.53728038526846E-09"
+        rpy="0 0 0" />
+      <mass
+        value="0.0212411021526319" />
+      <inertia
+        ixx="1.37894414692167E-06"
+        ixy="6.94555173246614E-07"
+        ixz="2.96953436390863E-21"
+        iyy="9.3547732569323E-07"
+        iyz="-7.43056569167925E-21"
+        izz="2.18875834241513E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_rotula_chica_servo_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.603921568627451 0.227450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_rotula_chica_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FR_rotula_chica_servo_joint"
+    type="continuous">
+    <origin
+      xyz="0.0229812330702389 0.00691830373511843 0.0175000000000001"
+      rpy="0 0 0" />
+    <parent
+      link="FR_servo_tibia_link" />
+    <child
+      link="FR_rotula_chica_servo_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="FR_rotula_chica_shoulder_link">
+    <inertial>
+      <origin
+        xyz="-0.14007913305668 -0.0363666817231914 -0.0944013501139169"
+        rpy="0 0 0" />
+      <mass
+        value="2.44638584956499" />
+      <inertia
+        ixx="0.0115356914385574"
+        ixy="-0.000546449948935327"
+        ixz="1.09216778905103E-06"
+        iyy="0.0374696790390071"
+        iyz="-3.64842253551714E-06"
+        izz="0.0306418924734276" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_rotula_chica_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_rotula_chica_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FR_rotula_chica_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="-0.0238893499782023 0.0327039593569184 0"
+      rpy="0 0 0" />
+    <parent
+      link="FR_rotula_chica_servo_link" />
+    <child
+      link="FR_rotula_chica_shoulder_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="FR_shoulder_link">
+    <inertial>
+      <origin
+        xyz="-0.000274227616470418 0.0161255561090121 0.0133503586733236"
+        rpy="0 0 0" />
+      <mass
+        value="0.0142287480697829" />
+      <inertia
+        ixx="9.00193195438369E-07"
+        ixy="3.62222484143162E-08"
+        ixz="4.92972428113553E-09"
+        iyy="8.69950129333093E-07"
+        iyz="2.80535145518183E-08"
+        izz="1.55990763016637E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0 0 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FR_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FR_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="0.0267500000000001 0.0102651899999998 -0.02005"
+      rpy="0 1.5707963267949 0" />
+    <parent
+      link="BFR_link" />
+    <child
+      link="FR_shoulder_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="BBR_link">
+    <inertial>
+      <origin
+        xyz="0.00580357222295726 2.21430391783572E-06 0.0309194296267045"
+        rpy="0 0 0" />
+      <mass
+        value="0.146947300702438" />
+      <inertia
+        ixx="2.30747655080907E-05"
+        ixy="2.91317781383468E-09"
+        ixz="1.15103600420103E-09"
+        iyy="2.03168443493352E-05"
+        iyz="8.25173484750015E-10"
+        izz="8.62893173137044E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BBR_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BBR_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BBR_joint"
+    type="continuous">
+    <origin
+      xyz="-0.0950000000000004 -0.0527500000000012 0.00319999999999929"
+      rpy="1.5707963267949 0 -1.5707963267949" />
+    <parent
+      link="chasis_base_link" />
+    <child
+      link="BBR_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="BR_servo_femur_link">
+    <inertial>
+      <origin
+        xyz="-0.0261151066511311 -0.0240545491579214 0.0170024536324109"
+        rpy="0 0 0" />
+      <mass
+        value="0.0324890881993818" />
+      <inertia
+        ixx="9.11061609093014E-06"
+        ixy="-8.21022128364947E-06"
+        ixz="4.39453441553311E-07"
+        iyy="1.04603368281781E-05"
+        iyz="4.04373160912624E-07"
+        izz="1.82902270895199E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_servo_femur_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.298039215686275 0.298039215686275 0.298039215686275 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_servo_femur_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BR_servo_femur_joint"
+    type="continuous">
+    <origin
+      xyz="0.0267500000000001 0.01026519 0.0400500000000006"
+      rpy="0 1.5707963267949 0" />
+    <parent
+      link="BBR_link" />
+    <child
+      link="BR_servo_femur_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="BR_tibia_link">
+    <inertial>
+      <origin
+        xyz="0.0330667145752144 -0.033196726755879 -0.000995868740702996"
+        rpy="0 0 0" />
+      <mass
+        value="0.0286324614496181" />
+      <inertia
+        ixx="1.14089648000804E-05"
+        ixy="1.31970155140238E-05"
+        ixz="-2.02666470709918E-07"
+        iyy="1.80998449745051E-05"
+        iyz="2.0030448756035E-07"
+        izz="2.86846084154572E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BR_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="-0.073550358599111 -0.067752082993381 0.0222499999999999"
+      rpy="0 0 0" />
+    <parent
+      link="BR_servo_femur_link" />
+    <child
+      link="BR_tibia_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="BR_rotula_grande_tibia_link">
+    <inertial>
+      <origin
+        xyz="0.0367751792995561 0.0338760414966905 -8.10212494317675E-10"
+        rpy="0 0 0" />
+      <mass
+        value="0.025031101713345" />
+      <inertia
+        ixx="2.19479528395989E-06"
+        ixy="-1.85820838337537E-06"
+        ixz="-6.85226835904646E-21"
+        iyy="2.50030996841478E-06"
+        iyz="-8.63715538299049E-21"
+        izz="4.51448703938679E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_rotula_grande_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.776470588235294 0.756862745098039 0.737254901960784 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_rotula_grande_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BR_rotula_grande_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="-0.0190918830920369 0.0190918830920367 -0.004249999999999"
+      rpy="0 0 0" />
+    <parent
+      link="BR_tibia_link" />
+    <child
+      link="BR_rotula_grande_tibia_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="BR_rotula_grande_shoulder_link">
+    <inertial>
+      <origin
+        xyz="0.148204633127393 -0.0363666817231914 -0.0979013501139178"
+        rpy="0 0 0" />
+      <mass
+        value="2.44638584956499" />
+      <inertia
+        ixx="0.0115356914385574"
+        ixy="-0.000546449948935318"
+        ixz="1.09216778917441E-06"
+        iyy="0.0374696790390071"
+        iyz="-3.64842253551653E-06"
+        izz="0.0306418924734276" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_rotula_grande_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_rotula_grande_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BR_rotula_grande_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="0.0735503585991123 0.067752082993381 0"
+      rpy="0 0 0" />
+    <parent
+      link="BR_rotula_grande_tibia_link" />
+    <child
+      link="BR_rotula_grande_shoulder_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="BR_servo_tibia_link">
+    <inertial>
+      <origin
+        xyz="0.0159833578481567 0.00481570219064661 0.0107580300482714"
+        rpy="0 0 0" />
+      <mass
+        value="0.00954145739699796" />
+      <inertia
+        ixx="1.88174059452613E-07"
+        ixy="-9.31511413619149E-08"
+        ixz="-6.30528372352818E-09"
+        iyy="4.57995186682055E-07"
+        iyz="-1.87962496032899E-09"
+        izz="4.80025653135774E-07" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_servo_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_servo_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BR_servo_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="0.0237499999999999 -0.0102651899999999 0.0200499999999995"
+      rpy="0 1.5707963267949 0" />
+    <parent
+      link="BBR_link" />
+    <child
+      link="BR_servo_tibia_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="BR_rotula_chica_servo_link">
+    <inertial>
+      <origin
+        xyz="-0.0119446749891012 0.0163519796784591 -3.53728037139067E-09"
+        rpy="0 0 0" />
+      <mass
+        value="0.021241102152632" />
+      <inertia
+        ixx="1.37894414692167E-06"
+        ixy="6.94555173246615E-07"
+        ixz="6.99463364019295E-21"
+        iyy="9.35477325693231E-07"
+        iyz="-1.01893368014401E-20"
+        izz="2.18875834241514E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_rotula_chica_servo_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.603921568627451 0.227450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_rotula_chica_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BR_rotula_chica_servo_joint"
+    type="continuous">
+    <origin
+      xyz="0.0229812330702279 0.00691830373511376 0.0174999999999999"
+      rpy="0 0 0" />
+    <parent
+      link="BR_servo_tibia_link" />
+    <child
+      link="BR_rotula_chica_servo_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="BR_rotula_chica_shoulder_link">
+    <inertial>
+      <origin
+        xyz="0.110020866943331 -0.0363666817231867 -0.0944013501139167"
+        rpy="0 0 0" />
+      <mass
+        value="2.44638584956499" />
+      <inertia
+        ixx="0.0115356914385574"
+        ixy="-0.000546449948935318"
+        ixz="1.09216778915106E-06"
+        iyy="0.0374696790390071"
+        iyz="-3.64842253552516E-06"
+        izz="0.0306418924734276" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_rotula_chica_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_rotula_chica_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BR_rotula_chica_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="-0.0238893499782024 0.0327039593569184 0"
+      rpy="0 0 0" />
+    <parent
+      link="BR_rotula_chica_servo_link" />
+    <child
+      link="BR_rotula_chica_shoulder_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="BR_shoulder_link">
+    <inertial>
+      <origin
+        xyz="-0.000274227616472091 0.016125556109011 0.0133503586733241"
+        rpy="0 0 0" />
+      <mass
+        value="0.0142287480697829" />
+      <inertia
+        ixx="9.00193195438369E-07"
+        ixy="3.62222484143161E-08"
+        ixz="4.92972428114097E-09"
+        iyy="8.69950129333091E-07"
+        iyz="2.80535145518168E-08"
+        izz="1.55990763016637E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0 0 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BR_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BR_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="0.0267500000000001 0.01026519 0.0400500000000006"
+      rpy="0 1.5707963267949 0" />
+    <parent
+      link="BBR_link" />
+    <child
+      link="BR_shoulder_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="BFL_link">
+    <inertial>
+      <origin
+        xyz="0.005803572222957 -2.21430391561528E-06 0.0309194296267054"
+        rpy="0 0 0" />
+      <mass
+        value="0.146947300702439" />
+      <inertia
+        ixx="2.30747655080909E-05"
+        ixy="-2.91317781383704E-09"
+        ixz="1.15103600409299E-09"
+        iyy="2.03168443493354E-05"
+        iyz="-3.55822581511769E-10"
+        izz="8.62893173137048E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BFL_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BFL_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BFL_joint"
+    type="continuous">
+    <origin
+      xyz="0.0950000000000004 0.0527500000000002 0.00320000000000001"
+      rpy="1.5707963267949 0 1.57079632679489" />
+    <parent
+      link="chasis_base_link" />
+    <child
+      link="BFL_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="FL_servo_femur_link">
+    <inertial>
+      <origin
+        xyz="0.0261317238002625 -0.0240698674822808 0.0170024541502923"
+        rpy="0 0 0" />
+      <mass
+        value="0.0324890856452215" />
+      <inertia
+        ixx="9.10972316627451E-06"
+        ixy="8.20930248584696E-06"
+        ixz="-4.43505560196217E-07"
+        iyy="1.04593958349946E-05"
+        iyz="4.08107026195181E-07"
+        izz="1.82883924190664E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_servo_femur_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_servo_femur_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FL_servo_femur_joint"
+    type="continuous">
+    <origin
+      xyz="0.0267499999999958 0.0102651900000083 0.0200500000000051"
+      rpy="0 1.5707963267949 0" />
+    <parent
+      link="BFL_link" />
+    <child
+      link="FL_servo_femur_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="FL_tibia_link">
+    <inertial>
+      <origin
+        xyz="-0.032767128872167 -0.0328964314539006 -0.00106889875377028"
+        rpy="0 0 0" />
+      <mass
+        value="0.0287978610705322" />
+      <inertia
+        ixx="1.14203774071489E-05"
+        ixy="-1.31970344020781E-05"
+        ixz="2.02631681826873E-07"
+        iyy="1.811119246808E-05"
+        iyz="2.00375112861422E-07"
+        izz="2.86847900046626E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.243137254901961 0.243137254901961 0.243137254901961 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FL_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="0.073550358599116 -0.0677520829933906 0.0222500000000008"
+      rpy="0 0 0" />
+    <parent
+      link="FL_servo_femur_link" />
+    <child
+      link="FL_tibia_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="FL_rotula_grande_tibia_link">
+    <inertial>
+      <origin
+        xyz="-0.0367751792995578 0.0338760414966946 7.98866570117518E-10"
+        rpy="0 0 0" />
+      <mass
+        value="0.0250311017155977" />
+      <inertia
+        ixx="2.19479528423576E-06"
+        ixy="1.85820838339779E-06"
+        ixz="-3.75194249146041E-22"
+        iyy="2.50030996816245E-06"
+        iyz="2.23115102877261E-22"
+        izz="4.51448703938884E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_rotula_grande_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.603921568627451 0.227450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_rotula_grande_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FL_rotula_grande_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="0.019092 0.019092 -0.00425"
+      rpy="0 0 0" />
+    <parent
+      link="FL_tibia_link" />
+    <child
+      link="FL_rotula_grande_tibia_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="FL_rotula_grande_shoulder_link">
+    <inertial>
+      <origin
+        xyz="0.101895366872606 -0.0363666817231929 -0.0970986498860829"
+        rpy="0 0 0" />
+      <mass
+        value="2.44638584956499" />
+      <inertia
+        ixx="0.0115356914385574"
+        ixy="0.000546449948935329"
+        ixz="1.09216778904768E-06"
+        iyy="0.0374696790390071"
+        iyz="3.64842253551044E-06"
+        izz="0.0306418924734276" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_rotula_grande_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_rotula_grande_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FL_rotula_grande_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="-0.0735503585991109 0.0677520829933825 0"
+      rpy="0 0 0" />
+    <parent
+      link="FL_rotula_grande_tibia_link" />
+    <child
+      link="FL_rotula_grande_shoulder_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="FL_servo_tibia_link">
+    <inertial>
+      <origin
+        xyz="-0.0159855888090539 0.00480828941362624 0.0107580265249396"
+        rpy="0 0 0" />
+      <mass
+        value="0.00954146204923297" />
+      <inertia
+        ixx="1.84648262524237E-07"
+        ixy="8.78258016589265E-08"
+        ixz="6.29515453981357E-09"
+        iyy="4.61520652790883E-07"
+        iyz="-1.91373727192469E-09"
+        izz="4.80025352626312E-07" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_servo_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_servo_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FL_servo_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="0.023749999999999 -0.0102651899999995 0.04005"
+      rpy="0 1.5707963267949 0" />
+    <parent
+      link="BFL_link" />
+    <child
+      link="FL_servo_tibia_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="FL_rotula_chica_servo_link">
+    <inertial>
+      <origin
+        xyz="0.0119446749890998 0.0163519796784599 3.52406125114779E-09"
+        rpy="0 0 0" />
+      <mass
+        value="0.0212411021610206" />
+      <inertia
+        ixx="1.37894414671625E-06"
+        ixy="-6.94555173328909E-07"
+        ixz="1.49492436627535E-21"
+        iyy="9.35477325987543E-07"
+        iyz="1.45680943909853E-21"
+        izz="2.18875834242399E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_rotula_chica_servo_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.603921568627451 0.227450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_rotula_chica_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FL_rotula_chica_servo_joint"
+    type="continuous">
+    <origin
+      xyz="-0.0229812330702384 0.00691830373511887 0.0174999999999978"
+      rpy="0 0 0" />
+    <parent
+      link="FL_servo_tibia_link" />
+    <child
+      link="FL_rotula_chica_servo_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="FL_rotula_chica_shoulder_link">
+    <inertial>
+      <origin
+        xyz="0.14007913305668 -0.0363666817231927 -0.0935986498860822"
+        rpy="0 0 0" />
+      <mass
+        value="2.44638584956499" />
+      <inertia
+        ixx="0.0115356914385574"
+        ixy="0.000546449948935328"
+        ixz="1.09216778905136E-06"
+        iyy="0.0374696790390071"
+        iyz="3.64842253551748E-06"
+        izz="0.0306418924734276" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_rotula_chica_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_rotula_chica_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FL_rotula_chica_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="0.0238893499782026 0.0327039593569181 0"
+      rpy="0 0 0" />
+    <parent
+      link="FL_rotula_chica_servo_link" />
+    <child
+      link="FL_rotula_chica_shoulder_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="FL_shoulder_link">
+    <inertial>
+      <origin
+        xyz="0.000631880770417204 0.0161819348753459 0.0131830813033722"
+        rpy="0 0 0" />
+      <mass
+        value="0.0145044228251352" />
+      <inertia
+        ixx="9.29712049629369E-07"
+        ixy="-3.62222484143163E-08"
+        ixz="-4.92972428112983E-09"
+        iyy="8.9946898352409E-07"
+        iyz="2.80535145518241E-08"
+        izz="1.56021776426615E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0 0 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/FL_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="FL_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="0.0267499999999958 0.0102651900000083 0.0200500000000051"
+      rpy="0 1.5707963267949 0" />
+    <parent
+      link="BFL_link" />
+    <child
+      link="FL_shoulder_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="BBL_link">
+    <inertial>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <mass
+        value="0" />
+      <inertia
+        ixx="0"
+        ixy="0"
+        ixz="0"
+        iyy="0"
+        iyz="0"
+        izz="0" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BBL_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BBL_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BBL_joint"
+    type="continuous">
+    <origin
+      xyz="-0.0949999999999865 0.0527499999999996 0.00320000000000006"
+      rpy="1.5707963267949 0 1.57079632679489" />
+    <parent
+      link="chasis_base_link" />
+    <child
+      link="BBL_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="BL_servo_femur_link">
+    <inertial>
+      <origin
+        xyz="0.0261317238002601 -0.0240698674822727 0.0170024541502911"
+        rpy="0 0 0" />
+      <mass
+        value="0.0324890856452215" />
+      <inertia
+        ixx="9.10972316627341E-06"
+        ixy="8.20930248584688E-06"
+        ixz="-4.43505560196269E-07"
+        iyy="1.04593958349957E-05"
+        iyz="4.08107026195167E-07"
+        izz="1.82883924190664E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_servo_femur_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_servo_femur_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BL_servo_femur_joint"
+    type="continuous">
+    <origin
+      xyz="0.026750000000003 0.0102651900000028 -0.0400499999999994"
+      rpy="0 1.5707963267949 0" />
+    <parent
+      link="BBL_link" />
+    <child
+      link="BL_servo_femur_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="BL_tibia_link">
+    <inertial>
+      <origin
+        xyz="-0.0330667096065842 -0.0331967591474435 -0.000995926305342648"
+        rpy="0 0 0" />
+      <mass
+        value="0.0286324562173207" />
+      <inertia
+        ixx="1.14089950905382E-05"
+        ixy="-1.31970344020782E-05"
+        ixz="2.02631681827E-07"
+        iyy="1.80998101514693E-05"
+        iyz="2.00375112861512E-07"
+        izz="2.86846039242029E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BL_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="0.0735503585991155 -0.0677520829933775 0.0222500000000001"
+      rpy="0 0 0" />
+    <parent
+      link="BL_servo_femur_link" />
+    <child
+      link="BL_tibia_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="BL_rotula_grande_tibia_link">
+    <inertial>
+      <origin
+        xyz="-0.0367751792995577 0.0338760414966887 8.10212633095553E-10"
+        rpy="0 0 0" />
+      <mass
+        value="0.0250311017133451" />
+      <inertia
+        ixx="2.19479528395972E-06"
+        ixy="1.85820838337537E-06"
+        ixz="9.04536318999024E-22"
+        iyy="2.50030996841496E-06"
+        iyz="-6.9626198849883E-22"
+        izz="4.51448703938681E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_rotula_grande_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.603921568627451 0.227450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_rotula_grande_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BL_rotula_grande_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="0.0190918830920357 0.0190918830920378 -0.00425000000000003"
+      rpy="0 0 0" />
+    <parent
+      link="BL_tibia_link" />
+    <child
+      link="BL_rotula_grande_tibia_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="BL_rotula_grande_shoulder_link">
+    <inertial>
+      <origin
+        xyz="-0.148204633127379 -0.036366681723196 -0.0970986498860875"
+        rpy="0 0 0" />
+      <mass
+        value="2.44638584956499" />
+      <inertia
+        ixx="0.0115356914385574"
+        ixy="0.000546449948935322"
+        ixz="1.09216778917941E-06"
+        iyy="0.0374696790390071"
+        iyz="3.64842253551749E-06"
+        izz="0.0306418924734276" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_rotula_grande_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_rotula_grande_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BL_rotula_grande_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="-0.0735503585991155 0.0677520829933775 0"
+      rpy="0 0 0" />
+    <parent
+      link="BL_rotula_grande_tibia_link" />
+    <child
+      link="BL_rotula_grande_shoulder_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="BL_servo_tibia_link">
+    <inertial>
+      <origin
+        xyz="-0.0159855888090537 0.00480828941362488 0.0107580265249416"
+        rpy="0 0 0" />
+      <mass
+        value="0.00954146204923296" />
+      <inertia
+        ixx="1.8464826252422E-07"
+        ixy="8.78258016589014E-08"
+        ixz="6.29515453981486E-09"
+        iyy="4.61520652790899E-07"
+        iyz="-1.91373727192363E-09"
+        izz="4.80025352626312E-07" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_servo_tibia_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_servo_tibia_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BL_servo_tibia_joint"
+    type="continuous">
+    <origin
+      xyz="0.0237500000000007 -0.0102651899999983 -0.0200500000000005"
+      rpy="0 1.5707963267949 0" />
+    <parent
+      link="BBL_link" />
+    <child
+      link="BL_servo_tibia_link" />
+    <axis
+      xyz="0 0 -1" />
+  </joint>
+  <link
+    name="BL_rotula_chica_servo_link">
+    <inertial>
+      <origin
+        xyz="0.0119446749891003 0.0163519796784592 3.52406136217009E-09"
+        rpy="0 0 0" />
+      <mass
+        value="0.0212411021610204" />
+      <inertia
+        ixx="1.37894414671632E-06"
+        ixy="-6.94555173328871E-07"
+        ixz="-5.27087474854826E-22"
+        iyy="9.35477325987448E-07"
+        iyz="-3.80397352326544E-22"
+        izz="2.18875834242396E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_rotula_chica_servo_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.603921568627451 0.227450980392157 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_rotula_chica_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BL_rotula_chica_servo_joint"
+    type="continuous">
+    <origin
+      xyz="-0.0229812330702394 0.00691830373511723 0.0175000000000025"
+      rpy="0 0 0" />
+    <parent
+      link="BL_servo_tibia_link" />
+    <child
+      link="BL_rotula_chica_servo_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="BL_rotula_chica_shoulder_link">
+    <inertial>
+      <origin
+        xyz="-0.110020866943305 -0.0363666817231936 -0.0935986498860876"
+        rpy="0 0 0" />
+      <mass
+        value="2.44638584956499" />
+      <inertia
+        ixx="0.0115356914385574"
+        ixy="0.000546449948935318"
+        ixz="1.09216778914763E-06"
+        iyy="0.0374696790390071"
+        iyz="3.64842253552422E-06"
+        izz="0.0306418924734276" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_rotula_chica_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_rotula_chica_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BL_rotula_chica_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="0.0238893499782005 0.0327039593569196 0"
+      rpy="0 0 0" />
+    <parent
+      link="BL_rotula_chica_servo_link" />
+    <child
+      link="BL_rotula_chica_shoulder_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+  <link
+    name="BL_shoulder_link">
+    <inertial>
+      <origin
+        xyz="0.000274227616469135 0.0161255561090124 0.0133503586733235"
+        rpy="0 0 0" />
+      <mass
+        value="0.0142287480697829" />
+      <inertia
+        ixx="9.00193195438381E-07"
+        ixy="-3.62222484143137E-08"
+        ixz="-4.92972428113348E-09"
+        iyy="8.69950129333093E-07"
+        iyz="2.80535145518239E-08"
+        izz="1.55990763016637E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_shoulder_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0 0 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://URDF_MOSAC_V3/meshes/BL_shoulder_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="BL_shoulder_joint"
+    type="continuous">
+    <origin
+      xyz="0.026750000000003 0.0102651900000028 -0.0400499999999994"
+      rpy="0 1.5707963267949 0" />
+    <parent
+      link="BBL_link" />
+    <child
+      link="BL_shoulder_link" />
+    <axis
+      xyz="0 0 1" />
+  </joint>
+</robot>
