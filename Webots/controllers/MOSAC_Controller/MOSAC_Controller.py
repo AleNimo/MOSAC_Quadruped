@@ -16,7 +16,7 @@ import random
 import csv
 
 # CSV output filename
-output_file = "webots_joint_data_PID_Test.csv"
+output_file = "webots_joint_data_PID_policy.csv"
 data = [] 
 
 # Initialize header
@@ -81,7 +81,7 @@ Rx_float_length = 10
 Tx_float_length = "{:010.5f}"
 Tx_Rx_command_length = 5
 
-reset_pos = np.array([0.0, 0.0, 0.17])
+reset_pos = np.array([0.0, 0.0, 0.145])
 
 reset_orientation = np.array([0.0, 0.0, 0.0])
 
@@ -101,7 +101,7 @@ robot_node.getField("translation").setSFVec3f([reset_pos[0],reset_pos[1],reset_p
 robot_node.getField("rotation").setSFRotation(ypr_to_axis_angle(reset_orientation[2],reset_orientation[1],reset_orientation[0]))
 
 # get the time step of the current world.
-timestep = 10
+timestep = int(supervisor.getBasicTimeStep())
 
 acc_std = 0.00001  # 0.002 #Gs
 gyro_std = 0.00001  # 1.2 #°/s
@@ -216,9 +216,9 @@ BL_servo_femur_joint.enableTorqueFeedback(timestep)
 BL_servo_body_joint.enableTorqueFeedback(timestep)
 
 
-bod_llim, bod_ulim = -10.0 * np.pi / 180.0, 15.0 * np.pi / 180.0
-femur_llim, femur_ulim = -30.0 * np.pi / 180.0, 30.0 * np.pi / 180.0
-tibia_llim, tibia_ulim = -15.0 * np.pi / 180.0, 15.0 * np.pi / 180.0
+bod_llim, bod_ulim = -10.0 , 15.0 
+femur_llim, femur_ulim = -30.0 , 30.0 
+tibia_llim, tibia_ulim = -15.0 , 15.0 
 
 jointLowerLimit = np.array(
     [
@@ -347,12 +347,13 @@ error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.floa
 prev_error= np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
 delta_error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
 acum_error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
-WINDOW_SIZE = 20
-TIMER_MEDIAN_FILTER = 5#ms
+WINDOW_SIZE = 40
+TIMER_MEDIAN_FILTER = 0.5#ms
 delay_buffer = np.zeros((12,int((WINDOW_SIZE/2 *  TIMER_MEDIAN_FILTER)/timestep)),dtype=np.float32) #For median filter
-KP = 0.6
+KP = 0.25
 KD = 0.0
-KI = 0.015 / (timestep * 1e-3)
+KI = 0.1
+K_TON = 1000.0 / 140.0
 
 step_complete = 0
 
@@ -537,11 +538,10 @@ COMPARE_MEASURE = 2
 TIMEOUT_STATE = 3
 
 #Parameters of the actuation and time-out algorithm
-DEAD_BANDWIDTH_SERVO = 5 *np.pi/180.0 # Degrees
-MAX_DELTA_ANGLE = 2.5*np.pi/180.0  # Degrees
-MAX_DELTA_SAMPLE = 1.0 *np.pi/180.0 # Degrees
+DEAD_BANDWIDTH_SERVO = 3  # Degrees
+MAX_DELTA_ANGLE = 2  # Degrees
 
-JOINT_MAX_NOISE = 0.5*np.pi/180.0  # degrees
+JOINT_MAX_NOISE = 0.5  # degrees
 
 TIMEOUT = 3000      #miliseconds
 
@@ -749,8 +749,11 @@ def State_Machine_Control():
     repeat = 1
 
   elif state == TX_RASPBERRY:
-    
+
+
+    # if debug_delay == 0:
     SendState()
+      # debug_delay = 3000
     state = RX_RASPBERRY
     repeat = 1
 
@@ -820,15 +823,15 @@ def State_Machine_Control():
         target_joint[i] = ((jointUpperLimit[i]-jointLowerLimit[i])/2.0) * normalized_action[i] + (jointUpperLimit[i]+jointLowerLimit[i])/2.0
 
     # sign = - sign
-    # # target_joint[1] = 5 * sign* np.pi / 180
-    # target_joint[2] = -5 * sign * np.pi / 180
-    # # target_joint[4] = 5 * sign* np.pi / 180
-    # target_joint[5] = -5 * sign * np.pi / 180
-    # # target_joint[7] = 5 * sign * np.pi / 180
-    # target_joint[8] = -5 * sign * np.pi / 180
-    # # target_joint[10] = 5 * sign* np.pi / 180
-    # target_joint[11] = -5 * sign* np.pi / 180
-    # print("Nuevo Target")
+    # # target_joint[1] = 5 * sign
+    # target_joint[2] = -5 * sign
+    # # target_joint[4] = 5 * sign
+    # target_joint[5] = -5 * sign
+    # # target_joint[7] = 5 * sign 
+    # target_joint[8] = -5 * sign 
+    # # target_joint[10] = 5 * sign
+    # target_joint[11] = -5 * sign
+    # # print("Nuevo Target")
 
       state = ACTUATION
       repeat = 1
@@ -842,12 +845,11 @@ def State_Machine_Control():
 
     if step_complete == 1:
       state = TX_RASPBERRY
-      repeat = 1
+
 
     elif step_complete == -1:
       state = TX_RASPBERRY  # ESTADO STOP DE EMERGENCIA EN EL FUTURO
-      # debug_delay = 3000
-      repeat = 1
+    
 
 
 
@@ -877,10 +879,9 @@ def State_Machine_Actuation():
     if joints_finished == ALL_FINISHED :  # Si ninguna articulación se tiene que mover, salteo la actuacion
       print("Salteo paso")
       step_ommited = 1
+      repeat  = 0
       return 1
     else:
-      # if (joints_finished & 0xDB6):
-      #   step_ommited = 1
       state_actuation = DELAY_STATE
       enable_torque_control = 1 
       timeout = TIMEOUT
@@ -902,7 +903,6 @@ def State_Machine_Actuation():
     if(timeout == 0):
       state_actuation = TIMEOUT_STATE
       repeat  = 1
-      #print("Timeout, joints finished",bin(joints_finished))
 
     else:
       for i in range(len(joint)):
@@ -929,6 +929,8 @@ def State_Machine_Actuation():
 
   elif state_actuation == TIMEOUT_STATE:
     print("Step Aborted")
+    print("Joints finished",bin(joints_finished))
+    print("current_time", current_time)
     #enable_torque_control = 0
     state_actuation = RESET_ACTUATION
     repeat  = 1
@@ -1042,7 +1044,7 @@ def computeTorques(target_servo):
     VA = np.clip(VA, -8.4, 8.4)
 
     ####### Not used, only useful to know real back emf, current and torque #######
-    Eb = joint_angular_velocity * KM
+    Eb = joint_angular_velocity_servo * KM
     Ia = (VA - Eb) / RA
     joint_torque = Ia * KM
     ###############################################################################
@@ -1057,9 +1059,9 @@ def computeTorques(target_servo):
 
       joint[i].setTorque(VA[i]*KM/RA - friction_direction*TF)
       #After computing the DC Motor Control, add noise for the rest of the controller 
-      #f_joint_angle[i] = f_joint_angle[i]+ np.random.normal(0,0.5*np.pi/180.0,None)  #!(Optional noise)
+      #f_joint_angle[i] = f_joint_angle[i]+ np.random.normal(0,0.5,None)  #!(Optional noise)
 
-pid_out_debug = 0
+pid_out = 0
 
 def PIDControl():
   global joint, joint_angular_velocity, joint_sensor, f_joint_angle
@@ -1068,48 +1070,48 @@ def PIDControl():
   global pid_sample,step_complete
   global jointUpperLimit,jointLowerLimit
   global delay_buffer
-  global pid_out_debug
+  global pid_out
   
   for i in range(len(joint)):            
-    delay_buffer[i][1:]=  delay_buffer[i][0:-1] 
-    delay_buffer[i][0] = joint_sensor[i].getValue()
     f_joint_angle[i] = delay_buffer[i][-1]
-
-    joint_angular_velocity = (f_joint_angle[i] - prev_joint_angular_position[i]) / (timestep * 1e-3)
-    prev_joint_angular_position[i] = f_joint_angle[i]
     
-  if step_complete == 0:
+  # if step_complete == 0:
 
-    error = target_joint - f_joint_angle
-    delta_error = (error - prev_error) / (timestep * 1e-3)
-    acum_error += error * timestep * 1e-3
-    prev_error = error
+  error = target_joint - f_joint_angle
+  delta_error = (error - prev_error) / (timestep * 1e-3)
+  acum_error += error * timestep * 1e-3
+  prev_error = error
 
-    control_signal = KP * error + KD * delta_error + KI * acum_error 
-        
-    out_of_max_range = (f_joint_angle+control_signal) > jointUpperLimit
+  control_signal = np.round(KP * error + KD * delta_error + KI * acum_error) / K_TON
 
-    out_of_min_range = (f_joint_angle+control_signal) < jointLowerLimit
-
-    # if out_of_max_range.any() or out_of_min_range.any():
-      # print("---------------")
-      # print("fuera de rango maximo: ", out_of_max_range)
-      # print("fuera de rango minimo: ", out_of_min_range)
-      # print("target_joints = ", target_joint)
-      # print("control_signal = ", control_signal)
-      # print("f_joint_angle = ", f_joint_angle)
+  pid_out = pid_out + control_signal
       
-    #If any joint steps out of the range, and the PID
-    pid_out_debug = (f_joint_angle + control_signal) * (1 - (out_of_max_range+out_of_min_range)) + jointUpperLimit * out_of_max_range + jointLowerLimit * out_of_min_range
+  out_of_max_range = pid_out > jointUpperLimit
+
+  out_of_min_range = pid_out < jointLowerLimit
+
+  # if out_of_max_range.any() or out_of_min_range.any():
+    # print("---------------")
+    # print("fuera de rango maximo: ", out_of_max_range)
+    # print("fuera de rango minimo: ", out_of_min_range)
+    # print("target_joints = ", target_joint)
+    # print("control_signal = ", control_signal)
+    # print("f_joint_angle = ", f_joint_angle)
     
-    # print("pid_out_debug = ", pid_out_debug)
+  #If any joint steps out of the range, and the PID
+  pid_out = pid_out * (1 - (out_of_max_range+out_of_min_range)) + jointUpperLimit * out_of_max_range + jointLowerLimit * out_of_min_range
   
-  computeTorques(pid_out_debug)
+  # print("pid_out = ", pid_out)
 
   pid_sample = 1
 
 if __name__ == "__main__":
   repeat = 1
+
+  current_time = 0
+
+  pid_timer = 0
+  median_filter_delay = 0
 
   # debug_delay = 0
   # Main loop:
@@ -1117,7 +1119,19 @@ if __name__ == "__main__":
 
     current_time = supervisor.getTime()
 
-    PIDControl()
+    if median_filter_delay > 0:
+      median_filter_delay-=timestep
+    if median_filter_delay == 0:
+      for i in range(len(joint)):
+        delay_buffer[i][1:]=  delay_buffer[i][0:-1] 
+        delay_buffer[i][0] = joint_sensor[i].getValue() * 180/np.pi
+      median_filter_delay = timestep
+
+    if pid_timer > 0:
+      pid_timer-=timestep    
+    if pid_timer == 0:
+      PIDControl()
+      pid_timer = 10
 
     if timeout >0: 
       timeout-=timestep
@@ -1125,6 +1139,7 @@ if __name__ == "__main__":
     # if debug_delay > 0:
     #   debug_delay-=timestep
 
+    computeTorques(pid_out*np.pi/180)
 
     computeMeasurementsForRewards() 
 
@@ -1143,13 +1158,13 @@ if __name__ == "__main__":
 
     # row = [current_time]  # Start with the timestamp
     # for i in range(12):
-    #   row.append(target_joint[i] * 180 / np.pi)
-    #   row.append(f_joint_angle[i] * 180 / np.pi)
+    #   row.append(target_joint[i] )
+    #   row.append(f_joint_angle[i] )
 
 
     # # Append the row to the data list
     # data.append(row)
-    # if current_time >= 19.0:
+    # if current_time >= 25:
     #   # Write all collected data to CSV
     #   with open(output_file, "w", newline="") as csvfile:
     #       writer = csv.writer(csvfile)
