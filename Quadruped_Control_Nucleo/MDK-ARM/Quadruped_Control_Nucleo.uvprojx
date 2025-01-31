@@ -416,11 +416,6 @@
               <FilePath>..\Core\Inc\calibration_ADC.h</FilePath>
             </File>
             <File>
-              <FileName>median.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Core\Src\median.c</FilePath>
-            </File>
-            <File>
               <FileName>SignalProcessing.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Core\Src\SignalProcessing.c</FilePath>

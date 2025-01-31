@@ -17,9 +17,7 @@ SP_DATATYPE spMedianFilterMedian(spMedianFilter filter);
 // Inserts a new value in the filter's buffer. If the buffer is full the oldest preexisting entry is overwritten.
 SP_DATATYPE spMedianFilterInsert(spMedianFilter filter, SP_DATATYPE value);
 
-
-
-
+//Define to test the filter
 //#define SP_SELF_TEST
 
 struct spFilterElement
