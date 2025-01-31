@@ -27,13 +27,11 @@ class Environment:
 
         # Parameters for forward velocity reward
         self.forward_velocity_reward = 0
-        self.__target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
-        self.__vmax = 4
-        self.__delta_vel = 2 * self.__target_velocity
-        self.__vmin = -6
-        self.__n = -6.5
-        self.__curvature_forward_vel = - 2 * \
-            self.__vmax / (self.__delta_vel * self.__vmin)
+        self.__target_velocity = 0.15 # m/s (In the future it could be a changing velocity)
+        self.__vmax = 3
+        self.__vmin = -10
+        self.__zero_vel_rwd = 0
+        self.__curvature_forward_vel = (self.__vmax - self.__zero_vel_rwd)/(self.__target_velocity * (self.__zero_vel_rwd - self.__vmin))
 
         # Parameters for forward acceleration penalization
         self.forward_acc_penalty = 0
@@ -63,17 +61,19 @@ class Environment:
         self.__target_height = 0.07 #meters
         
         # Reward for not flipping over
-        self.__not_flipping_reward = 1.1
+        self.__not_flipping_reward = 0
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
         # Start position in (0,0) and orientation (in z axis)
-        pos = np.zeros(2)
-        # z_ang = 2*np.random.rand(1) - 1 #vector of 1 rand between -1 and 1, later multiplied by pi
-        z_ang = np.array([0])
+        # radius = np.random.uniform(0, 2.5)
+        # rho = np.random.uniform(0,2*np.pi)
+        # z_ang = np.random.uniform(-1, 1) #vector of 1 rand between -1 and 1, later multiplied by pi
 
         # Join position and angle in one vector
-        pos_angle = np.concatenate((pos, z_ang))
+        # pos_angle = np.array([radius*np.cos(rho), radius*np.sin(rho), z_ang])
+        pos_angle = np.zeros(3)
+        # print("pos_angle = ", pos_angle)
 
         # Reset the simulation environment and obtain the new state
         self.__obs = self.__coppelia.reset(pos_angle)
@@ -122,9 +122,9 @@ class Environment:
 
             '''Reward for forward velocity reaching target velocity'''
             if forward_velocity[i] > 0:
-                self.forward_velocity_reward = (self.__vmax - self.__vmin)/(self.__curvature_forward_vel * np.abs(self.__target_velocity - forward_velocity[i]) + 1) + self.__n
+                self.forward_velocity_reward = (self.__vmax - self.__vmin)/(self.__curvature_forward_vel * np.abs(self.__target_velocity - forward_velocity[i]) + 1) + self.__vmin
             else:
-                self.forward_velocity_reward = self.__vmax / self.__target_velocity * forward_velocity[i] + (self.__vmax-self.__vmin)/(self.__curvature_forward_vel*self.__target_velocity+1)+self.__n
+                self.forward_velocity_reward = (self.__vmax - self.__zero_vel_rwd) / self.__target_velocity * forward_velocity[i] + self.__zero_vel_rwd
             
             # self.forward_velocity_reward = -0.5+15*forward_velocity[i]
 
@@ -199,15 +199,13 @@ class Environment:
             # reward[i, 6] = self.paws_penalty
 
             '''Reward for avoiding critical failure (flipping over)'''
-            if step_omitted[i] == 0:
-                reward[i, 7] = self.__not_flipping_reward
-            else:
+            if step_omitted[i] == 1:
+                reward[i, 7] = -0.5
                 print("Step Omitted")
-
+            
             # If the absolute value of X or Y angle is greater than 50° there is a penalization and the episode ends
             if abs(next_obs[i, 1])*180 >= 50 or abs(next_obs[i, 2])*180 >= 50:                
-                if step_omitted[i] == 0:                    
-                    reward[i, 7] -= self.__not_flipping_reward
+                reward[i, 7] -= self.__not_flipping_reward
                 end[i] = True
 
             elif dist_fin[i] >= self.__end_cond:
