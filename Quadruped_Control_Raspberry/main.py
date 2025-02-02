@@ -108,29 +108,29 @@ if __name__ == '__main__':
                     measured_joints = np.zeros(12,dtype = np.float64)
 
                     # Body  Front   Right
-                    measured_joints[0] = measured_joints_nucleo[0] - 90
+                    measured_joints[0] = measured_joints_nucleo[0]
                     # Femur   Front   Right
-                    measured_joints[1] = measured_joints_nucleo[4] - 90
+                    measured_joints[1] = measured_joints_nucleo[4]
                     # Tibia   Front   Right
-                    measured_joints[2] = measured_joints_nucleo[3] - 90
+                    measured_joints[2] = measured_joints_nucleo[3]
                     # Body  Front   Left
-                    measured_joints[3] = measured_joints_nucleo[5] - 90
+                    measured_joints[3] = measured_joints_nucleo[5]
                     # Femur   Front   Left
-                    measured_joints[4] = 90 - measured_joints_nucleo[6]
+                    measured_joints[4] = - measured_joints_nucleo[6]
                     # Tibia   Front   Left
-                    measured_joints[5] = 90 - measured_joints_nucleo[7]
+                    measured_joints[5] = - measured_joints_nucleo[7]
                     # Body  Back    Right
-                    measured_joints[6] = 90 - measured_joints_nucleo[1]
+                    measured_joints[6] = - measured_joints_nucleo[1]
                     # Femur   Back    Right
-                    measured_joints[7] = measured_joints_nucleo[11] - 90
+                    measured_joints[7] = measured_joints_nucleo[11]
                     # Tibia   Back    Right
-                    measured_joints[8] = measured_joints_nucleo[10] - 90 
+                    measured_joints[8] = measured_joints_nucleo[10]
                     # Body  Back    Left
-                    measured_joints[9] = 90 - measured_joints_nucleo[2]
+                    measured_joints[9] = - measured_joints_nucleo[2]
                     # Femur   Back    Left
-                    measured_joints[10] = 90 - measured_joints_nucleo[8]
+                    measured_joints[10] = - measured_joints_nucleo[8]
                     # Tibia   Back    Left
-                    measured_joints[11] = 90 - measured_joints_nucleo[9]
+                    measured_joints[11] = - measured_joints_nucleo[9]
 
                     #Normalization
                     for i in range(4):
@@ -171,6 +171,8 @@ if __name__ == '__main__':
                 state = np.concatenate((state, measured_joints), axis=0)
                 state = np.expand_dims(state, axis=0)
                 print("state", state)
+                print("Pitch:" , pitch*180/np.pi)
+                print("Roll:" , roll*180/np.pi)
 
                 state = torch.tensor(state).to(P_net.device)
 
