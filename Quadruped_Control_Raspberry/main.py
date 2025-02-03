@@ -69,7 +69,7 @@ body_min, body_max = -10.0, 15.0
 body_mean = (body_min + body_max)/2
 body_range = (body_max - body_min)/2
 
-leg_min, leg_max = -30.0, 30.0
+leg_min, leg_max = -20.0, 30.0
 leg_mean = (leg_min + leg_max)/2
 leg_range = (leg_max - leg_min)/2
 
