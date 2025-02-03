@@ -45,7 +45,7 @@
 #define BODY_RANGE_MAX 15.0
 #define BODY_RANGE_MIN -10.0
 #define FEMUR_RANGE_MAX 30.0
-#define FEMUR_RANGE_MIN -30.0
+#define FEMUR_RANGE_MIN -20.0
 #define TIBIA_RANGE_MAX 15.0
 #define TIBIA_RANGE_MIN -15.0
 // 0PWM_BFR,1PWM_BBR, 2PWM_BBL, 3PWM_TFR, 4PWM_FFR, 5PWM_BFL, 6PWM_FFL, 7PWM_TFL, 8PWM_FBL, 9PWM_TBL, 10PWM_TBR, 11PWM_FBR
@@ -89,7 +89,7 @@
 #define DEAD_BANDWIDTH_SERVO 3	// Degrees
 #define MAX_DELTA_TARGET 2    // Degrees
 
-#define TIMEOUT 500/TIM5_TICK    // miliseconds
+#define TIMEOUT 1000/TIM5_TICK    // miliseconds
 
 #define ALL_FINISHED (uint16_t)0xFFF //(12 ones)
 
@@ -1180,7 +1180,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 
 			f_joint_angle[joint] = adc2angle(median_filteredValue[joint], up_down_vector[joint], calibration_table[joint]);
 			
-			//if (step_complete == 0)
+			if (step_complete == 0)
 			{
 				error = target_joint[joint] - f_joint_angle[joint];
 				error_acum[joint] += error * TIM9_TICK;
