@@ -59,11 +59,6 @@ supervisor = Supervisor()
 root = supervisor.getSelf()
 robot_node = supervisor.getFromDef('MOSAC')
 
-paw_FR = supervisor.getFromDef('PFR')
-paw_FL = supervisor.getFromDef('PFL')
-paw_BR = supervisor.getFromDef('PBR')
-paw_BL = supervisor.getFromDef('PBL')
-
 # Create Socket
 HOST, PORT = "127.0.0.1", 57175
 
@@ -150,7 +145,7 @@ roll = 0
 vel_pitch = 0
 vel_roll = 0
 
-
+#Joint position sensors
 FL_servo_tibia_joint = supervisor.getDevice("FL_servo_tibia_joint")
 FL_servo_femur_joint = supervisor.getDevice("FL_servo_femur_joint")
 FL_servo_body_joint = supervisor.getDevice("BFL_joint")
@@ -166,6 +161,21 @@ BR_servo_body_joint = supervisor.getDevice("BBR_joint")
 BL_servo_tibia_joint = supervisor.getDevice("BL_servo_tibia_joint")
 BL_servo_femur_joint = supervisor.getDevice("BL_servo_femur_joint")
 BL_servo_body_joint = supervisor.getDevice("BBL_joint")
+
+joint = [
+    FR_servo_body_joint,
+    FR_servo_femur_joint,
+    FR_servo_tibia_joint,
+    FL_servo_body_joint,
+    FL_servo_femur_joint,
+    FL_servo_tibia_joint,
+    BR_servo_body_joint,
+    BR_servo_femur_joint,
+    BR_servo_tibia_joint,
+    BL_servo_body_joint,
+    BL_servo_femur_joint,
+    BL_servo_tibia_joint,
+]
 
 FL_servo_tibia_joint_sensor = supervisor.getDevice("FL_servo_tibia_joint_sensor")
 FL_servo_femur_joint_sensor = supervisor.getDevice("FL_servo_femur_joint_sensor")
@@ -215,66 +225,6 @@ BL_servo_tibia_joint.enableTorqueFeedback(timestep)
 BL_servo_femur_joint.enableTorqueFeedback(timestep)
 BL_servo_body_joint.enableTorqueFeedback(timestep)
 
-
-bod_llim, bod_ulim = -10.0 , 15.0 
-femur_llim, femur_ulim = -30.0 , 30.0 
-tibia_llim, tibia_ulim = -15.0 , 15.0 
-
-jointLowerLimit = np.array(
-    [
-        bod_llim,
-        femur_llim,
-        tibia_llim,
-        bod_llim,
-        femur_llim,
-        tibia_llim,
-        bod_llim,
-        femur_llim,
-        tibia_llim,
-        bod_llim,
-        femur_llim,
-        tibia_llim,
-    ]
-)
-jointUpperLimit = np.array(
-    [
-        bod_ulim,
-        femur_ulim,
-        tibia_ulim,
-        bod_ulim,
-        femur_ulim,
-        tibia_ulim,
-        bod_ulim,
-        femur_ulim,
-        tibia_ulim,
-        bod_ulim,
-        femur_ulim,
-        tibia_ulim,
-    ]
-)
-
-
-# Get agent handles
-A2 = np.array([0.0, 0.0])
-A_orth = np.array([0.0, 0.0])
-
-joints_number = 12
-leg_number = 4
-joint = [
-    FR_servo_body_joint,
-    FR_servo_femur_joint,
-    FR_servo_tibia_joint,
-    FL_servo_body_joint,
-    FL_servo_femur_joint,
-    FL_servo_tibia_joint,
-    BR_servo_body_joint,
-    BR_servo_femur_joint,
-    BR_servo_tibia_joint,
-    BL_servo_body_joint,
-    BL_servo_femur_joint,
-    BL_servo_tibia_joint,
-]
-
 joint_sensor = [
     FR_servo_body_joint_sensor,
     FR_servo_femur_joint_sensor,
@@ -290,6 +240,56 @@ joint_sensor = [
     BL_servo_tibia_joint_sensor,
 ]
 
+#Paw touch sensors
+FR_touch_sensor = supervisor.getDevice("touch_FR")
+FL_touch_sensor = supervisor.getDevice("touch_FL")
+BR_touch_sensor = supervisor.getDevice("touch_BR")
+BL_touch_sensor = supervisor.getDevice("touch_BL")
+
+FR_touch_sensor.enable(timestep)
+FL_touch_sensor.enable(timestep)
+BR_touch_sensor.enable(timestep)
+BL_touch_sensor.enable(timestep)
+
+bod_llim, bod_ulim = -10.0 , 15.0 
+femur_llim, femur_ulim = -20.0 , 30.0 
+tibia_llim, tibia_ulim = -15.0 , 15.0 
+
+jointLowerLimit = np.array(
+  [
+      bod_llim,
+      femur_llim,
+      tibia_llim,
+      bod_llim,
+      femur_llim,
+      tibia_llim,
+      bod_llim,
+      femur_llim,
+      tibia_llim,
+      bod_llim,
+      femur_llim,
+      tibia_llim,
+  ]
+)
+jointUpperLimit = np.array(
+  [
+      bod_ulim,
+      femur_ulim,
+      tibia_ulim,
+      bod_ulim,
+      femur_ulim,
+      tibia_ulim,
+      bod_ulim,
+      femur_ulim,
+      tibia_ulim,
+      bod_ulim,
+      femur_ulim,
+      tibia_ulim,
+  ]
+)
+
+A2 = np.array([0.0, 0.0])
+A_orth = np.array([0.0, 0.0])
 
 
 state = 0  # state 0 = idle / 1 = moving to intermediate position / 2 = moving to target position / 3 = reset
@@ -297,12 +297,9 @@ state = 0  # state 0 = idle / 1 = moving to intermediate position / 2 = moving t
 target_step_rotation = np.float32(0.0)
 
 agentCreated = False  # To measure velocity only when there is an agent created (not between episodes where the agent is destroyed)
-reset_measurements = False  # To compute the mean velocities only when each step is completed
 step_ommited = 0
 
 step_counter = 0
-
-
 
 prev_time = 0.0
 prev_forward_velocity = 0.0
@@ -357,17 +354,14 @@ K_TON = 1000.0 / 140.0
 
 step_complete = 0
 
-paws_heights = np.zeros(4, dtype=np.float32)
-paws_up_acum = np.zeros(4, dtype=int)
-paws_down_acum = np.zeros(4, dtype=int)
-paws_ration_down_total = np.zeros(4, dtype=np.float32)
+too_many_paws_up = False
 
-attitude = np.array([0.0,0.0])
-ang_vel = np.array([0.0,0.0])
-reset_orientation = np.array([0.0,0.0,0.0])
+attitude = np.array([0.0, 0.0])
+ang_vel = np.array([0.0, 0.0])
+reset_orientation = np.array([0.0, 0.0, 0.0])
 
-sim_measure_dim = 36
 obs_dim = 17
+sim_measure_dim = 33
 environment_state = np.zeros(sim_measure_dim+obs_dim, dtype=np.float32)
 
 def Kalman_filter():
@@ -543,7 +537,7 @@ MAX_DELTA_ANGLE = 2  # Degrees
 
 JOINT_MAX_NOISE = 0.5  # degrees
 
-TIMEOUT = 3000      #miliseconds
+TIMEOUT = 1000      #miliseconds
 
 ALL_FINISHED = 0xFFF  #(12 ones)
 
@@ -586,7 +580,10 @@ def reset_robot_position_orientation():
       joint[i].setPosition(0)
 
 def SendState():
-  global environment_state, robot_node,Tx_float_length,reset_pos,reset_orientation,mean_forward_velocity,mean_lateral_velocity,max_forward_acc,target_step_rotation,slider,step_counter,attitude,ang_vel,joint_sensor,f_joint_angle,jointUpperLimit,jointLowerLimit,reset_measurements,joint_angular_velocity_servo, paws_up_acum, paws_down_acum,step_ommited
+  global environment_state, robot_node,Tx_float_length,reset_pos,reset_orientation,mean_forward_velocity
+  global mean_lateral_velocity,max_forward_acc,target_step_rotation,slider,step_counter,attitude,ang_vel
+  global joint_sensor,f_joint_angle,jointUpperLimit,jointLowerLimit,joint_angular_velocity_servo
+  global step_ommited, too_many_paws_up
   
   f_joint_angle_norm = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
   
@@ -606,11 +603,9 @@ def SendState():
   #Fill the state array with the observed state and additional measurements:
     #Measurements used for the observation state of the agent
   environment_state[0] = target_step_rotation
-  # environment_state[0] = 0
   environment_state[1:3] = attitude/np.pi
   environment_state[3:5] = ang_vel/np.pi
   environment_state[5:17] = f_joint_angle_norm
-  
 
     #Additional Measurements used to compute the rewards and/ or plots:
   environment_state[17:20] = current_translation
@@ -621,16 +616,11 @@ def SendState():
   environment_state[24:36] = joint_torque
   environment_state[36:48] = joint_angular_velocity_servo
 
-  
-  environment_state[48] = 0#paws_up_acum[0] / (paws_up_acum[0] + paws_down_acum[0])
-  environment_state[49] = 0#paws_up_acum[1] / (paws_up_acum[1] + paws_down_acum[1])
-  environment_state[50] = 0#paws_up_acum[2] / (paws_up_acum[2] + paws_down_acum[2])
-  environment_state[51] = 0#paws_up_acum[3] / (paws_up_acum[3] + paws_down_acum[3])
-  environment_state[52] = step_ommited    
+  environment_state[48] = too_many_paws_up
+  environment_state[49] = step_ommited
 
   client.sendall(environment_state.tobytes())
 
-  reset_measurements = True
   step_ommited = 0
 
 
@@ -653,6 +643,7 @@ def SendState():
         target_step_rotation = 10/180
       elif(step_counter >= 180):
         target_step_rotation = 0
+
   else:
     #Generate next random target step rotation (std = 5?)
     if (step_counter >= 100) and (step_counter % 50 == 0):
@@ -662,71 +653,6 @@ def SendState():
       target_step_rotation = random.gauss(mean, std_dev) #? Cambiar a Uniforme
       #-Clip the target step rotation to + /- 10?
       target_step_rotation = max(-clip_range, min(clip_range, target_step_rotation))
-
-  #Target Rotation for the step
-  #print("target_step_rotation",target_step_rotation)
-  # client.send(Tx_float_length.format(target_step_rotation).encode('utf-8'))
-
-  
-    
-  
-  #Pitch and roll angles of the back(world reference)
-  
-  # client.send(Tx_float_length.format(attitude[0]/np.pi).encode('utf-8')) #pitch angle
-  # client.send(Tx_float_length.format(attitude[1]/np.pi).encode('utf-8'))#roll angle
-  #print("pitch angular_vel",ang_vel[0])
-  #print("roll angular_vel",ang_vel[1])
-  #Pitch and roll angular velocities of the back(world reference)
-  # client.send(Tx_float_length.format(ang_vel[0]/np.pi).encode('utf-8')) #pitch angular_vel
-  # client.send(Tx_float_length.format(ang_vel[1]/np.pi).encode('utf-8')) #roll angular_vel
-
-  #Joints angular positions
-  # for i in range(len(joint)):
-    #without noise in joints for now
-    #added_noise = (math.random() * 2 - 1) * JOINT_MAX_NOISE * math.pi/180   - - [-JOINT_MAX_NOISE;JOINT_MAX_NOISE] in radians
-    #jointPos[i] = (sim.getJointPosition(joint[i]) + added_noise - (jointUpperLimit[i]+jointLowerLimit[i])/2) / ((jointUpperLimit[i]-jointLowerLimit[i])/2)
-    # f_joint_angle[i] = (joint_sensor[i].getValue() - (jointUpperLimit[i] + jointLowerLimit[i])/2.0) / ((jointUpperLimit[i]-jointLowerLimit[i])/2.0)
-    
-    # client.send(Tx_float_length.format(f_joint_angle[i]).encode('utf-8'))    
-  #print("Joints angular positions",f_joint_angle)
-
-  #World position(change the second parameter from -1 to another handle to get a relative position)
-  # current_translation = robot_node.getField("translation").getSFVec3f()
-  #print("World position",current_translation)
-  # client.send(Tx_float_length.format(current_translation[0]).encode('utf-8')) #x
-  # client.send(Tx_float_length.format(current_translation[1]).encode('utf-8')) #y
-  # client.send(Tx_float_length.format(current_translation[2]).encode('utf-8')) #z
-
-  #Mean forward and lateral velocities and peak absolute forward acceleration with reference of the agent
-  #Measured and computed in sysCall_sensing
-  #print("mean_forward_velocity",mean_forward_velocity)
-  #print("mean_lateral_velocity",mean_lateral_velocity)
-  #print("max_forward_acc",max_forward_acc)
-  # client.send(Tx_float_length.format(mean_forward_velocity).encode('utf-8'))
-  # client.send(Tx_float_length.format(mean_lateral_velocity).encode('utf-8'))
-  # client.send(Tx_float_length.format(max_forward_acc).encode('utf-8'))
-
-  # reset_measurements = True
-
-
-  #Object world orientation(change the second parameter from -1 to another handle to get a relative position)
-  #data = sim.getObjectOrientation(agent, -1)
-  # current_rotation = robot_node.getField("rotation").getSFRotation()
-  # Convert axis-angle to a rotation object
-  # rotation = Rotation.from_rotvec(np.array(current_rotation[:3]) * current_rotation[3])
-  # Extract yaw, pitch, and roll (in radians)
-  # current_rotation = rotation.as_euler('zyx', degrees=False)
-  # client.send(Tx_float_length.format(current_rotation[0]).encode('utf-8')) #Yaw angle for the reward
-  
-  #Send torque
-  # print("joint_torque",joint_torque)
-  # for i in range(len(joint)):
-  #   client.send(Tx_float_length.format(joint_torque[i]).encode('utf-8'))
-
-  #Send Angular Velocity
-  #print("prev_joint_angular_position_servo",prev_joint_angular_position_servo)
-  # for i in range(len(joint)):
-  #   client.send(Tx_float_length.format(prev_joint_angular_position_servo[i]).encode('utf-8'))      
   
 def State_Machine_Control():
 
@@ -735,7 +661,7 @@ def State_Machine_Control():
   global enable_torque_control, f_joint_angle
   global joints_finished, target_joint, delta_target, joint
   global prev_forward_velocity,target_step_rotation
-  global prev_lateral_velocity,max_forward_acc,reset_measurements,step_counter
+  global prev_lateral_velocity,max_forward_acc,step_counter
   global mean_forward_velocity,mean_lateral_velocity,max_forward_acc,vel_samples,prev_time
   global prev_joint_angular_position_servo,acum_error_servo,prev_joint_angular_position,acum_error
   global pid_sample,step_complete,delay_buffer
@@ -753,6 +679,8 @@ def State_Machine_Control():
 
     # if debug_delay == 0:
     SendState()
+    # print("too_many_paws_up = ", too_many_paws_up)
+    resetMeasurementsForRewards()
       # debug_delay = 3000
     state = RX_RASPBERRY
     repeat = 1
@@ -801,8 +729,7 @@ def State_Machine_Control():
       max_forward_acc = 0.0
 
       vel_samples = 0.0
-
-      reset_measurements = False 
+ 
       step_complete = 0
 
       target_step_rotation = 0.0
@@ -849,10 +776,6 @@ def State_Machine_Control():
 
     elif step_complete == -1:
       state = TX_RASPBERRY  # ESTADO STOP DE EMERGENCIA EN EL FUTURO
-    
-
-
-
 
 def State_Machine_Actuation():
   global state_actuation,joint,joint_sensor
@@ -939,9 +862,10 @@ def State_Machine_Actuation():
   return 0
 
 def computeMeasurementsForRewards():
-  global supervisor,root,forward_acceleration,forward_velocity,lateral_velocity,mean_forward_velocity,mean_lateral_velocity,lateral_acceleration,max_forward_acc,prev_time,prev_forward_velocity,prev_lateral_velocity,vel_samples,reset_measurements,step_counter,joint,current_position,prev_joint_angular_position_servo,joint_torque, paws_heights, paws_up_acum, paws_down_acum, paw_FR,paw_FL,paw_BR,paw_BL
+  global supervisor,root,forward_acceleration,forward_velocity,lateral_velocity,mean_forward_velocity,mean_lateral_velocity
+  global lateral_acceleration,max_forward_acc,prev_time,prev_forward_velocity,prev_lateral_velocity,vel_samples
+  global step_counter,joint,current_position,prev_joint_angular_position_servo,joint_torque,too_many_paws_up
   world_velocity = root.getVelocity()
-
 
   current_rotation = robot_node.getField("rotation").getSFRotation()
   # Convert axis-angle to a rotation object
@@ -982,39 +906,26 @@ def computeMeasurementsForRewards():
 
   vel_samples = vel_samples + 1.0
   prev_time = time
-    
-  
-  #Paws measurements:
-  # paws_heights[0] = paw_FR.getPosition()[2]
-  # paws_heights[1] = paw_FL.getPosition()[2]
-  # paws_heights[2] = paw_BR.getPosition()[2]
-  # paws_heights[3] = paw_BL.getPosition()[2]
 
-  # for paw in range(len(paws_heights)):
-  #   if(paws_heights[paw] > 0.06) and (paws_heights[paw] < 0.08):
-  #     paws_up_acum[paw] += 1
-  #   else:
-  #     paws_down_acum[paw] += 1
-    
+  if (FR_touch_sensor.getValue() + FL_touch_sensor.getValue() + BR_touch_sensor.getValue() + BL_touch_sensor.getValue()) < 3:
+    too_many_paws_up = True
 
-  if reset_measurements == True:
+def resetMeasurementsForRewards():
+  global step_counter, mean_forward_velocity, mean_lateral_velocity, max_forward_acc, vel_samples, prev_error, acum_error, too_many_paws_up
+  step_counter = step_counter + 1
 
-      step_counter = step_counter + 1
+  mean_forward_velocity = 0.0
+  mean_lateral_velocity = 0.0
 
-      mean_forward_velocity = 0.0
-      mean_lateral_velocity = 0.0
+  max_forward_acc = 0.0
 
-      max_forward_acc = 0.0
+  vel_samples = 0.0
 
-      vel_samples = 0.0
+  prev_error= np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+  acum_error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32)
 
-      paws_up_acum[:] = 0
-      paws_down_acum[:] = 0
+  too_many_paws_up = False
 
-      prev_error= np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
-      acum_error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32)
-
-      reset_measurements = False
 
 def computeTorques(target_servo):
     global joint, joint_angular_velocity_servo, joint_sensor
@@ -1141,7 +1052,7 @@ if __name__ == "__main__":
 
     computeTorques(pid_out*np.pi/180)
 
-    computeMeasurementsForRewards() 
+    computeMeasurementsForRewards()
 
     # print("Debug Delay",debug_delay)
 
@@ -1155,7 +1066,7 @@ if __name__ == "__main__":
       State_Machine_Control()
     repeat = 1
 
-
+    #To record joints in a csv
     # row = [current_time]  # Start with the timestamp
     # for i in range(12):
     #   row.append(target_joint[i] )
