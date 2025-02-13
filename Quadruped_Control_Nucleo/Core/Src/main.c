@@ -93,13 +93,6 @@
 
 #define ALL_FINISHED (uint16_t)0xFFF //(12 ones)
 
-// For IIR Filter EWMA
-#define NUM_STAGE_IIR 1
-#define NUM_ORDER_IIR (NUM_STAGE_IIR * 2)
-#define NUM_STD_COEFS 5 // b0, b1, b2, a1, a2
-#define ALPHA_ANGLE (float32_t)0.1
-#define ALPHA_VEL (float32_t)0.08
-
 //Median Filter
 #define WINDOW_SIZE 80
 /* USER CODE END PD */
@@ -210,7 +203,7 @@ float test_quadruped_nucleo[12] = {MID_POINT_BFR, MID_POINT_BBR, MID_POINT_BBL, 
 // podrían ser locales
 volatile float32_t delta_target = 0;
 volatile float32_t f_joint_angle[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-volatile float32_t f_joint_angle_rpi[JOINTS] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+volatile float32_t spi_transmit_rpi[JOINTS] =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 volatile uint8_t uart_tx_buffer[2 + 12 * 4 + 12 * 4 + 12 * 4 + 12 * 4];
 
 // podrían ser estáticas locales
@@ -342,11 +335,11 @@ int main(void)
     move_servos(joint, angle2ton_us(mid_point_joints[joint]));
   }
 
+  HAL_Delay(5000);
+
   while (HAL_TIM_Base_Start_IT(&htim5) == HAL_BUSY);
   
   while (HAL_TIM_Base_Start_IT(&htim9) == HAL_BUSY);
-
-	HAL_Delay(5000);
   
   while (1)
   {
@@ -1077,7 +1070,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
 		for (uint8_t joint = 0; joint < JOINTS; joint++)
 		
-			//! Cambiar a MID POINT
 			__HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(mid_point_joints[joint]));
 
 
@@ -1273,9 +1265,9 @@ void State_Machine_Control(void)
 				// debug_delay = 3000/TIM5_TICK;
 				
 				for(uint8_t joint = 0; joint<JOINTS ; joint++)
-					f_joint_angle_rpi[joint] = f_joint_angle[joint] - mid_point_joints[joint];
-			
-				HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)f_joint_angle_rpi, 12*2);
+					spi_transmit_rpi[joint] = f_joint_angle[joint] - mid_point_joints[joint];
+        
+				HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)spi_transmit_rpi, (12+1)*2);
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
 				HAL_Delay(1);
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET);
@@ -1363,7 +1355,6 @@ void State_Machine_Control(void)
     case ERROR:
       HAL_Delay(1);
       break;
-		
   }
 }
 
@@ -1456,10 +1447,10 @@ int8_t State_Machine_Actuation(void)
 
     // Reset all joints
     // joints_finished = ALL_FINISHED;
-    for (uint8_t joint = 0; joint < JOINTS; joint++)
-    {
-      //__HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(90));
-    }
+    // for (uint8_t joint = 0; joint < JOINTS; joint++)
+    // {
+    //   __HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], angle2ton_us(90));
+    // }
     return -1;
   }
   return 0;
