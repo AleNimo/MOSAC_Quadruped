@@ -18,7 +18,8 @@ STANDING_HEIGHT = 135.75 #mm
 
 GAIT_PERIOD = 13
 
-PARABOLA_HEIGHT = 30 #mm
+PARABOLA_HEIGHT = 40 #mm
+# PARABOLA_LENGTH = 200 #mm
 PARABOLA_LENGTH = 100 #mm
 
 L_FEMUR = 100 #mm
@@ -31,7 +32,13 @@ C = 28.66176 #mm
 D = 27 #mm
 
 H = np.zeros(4,dtype=np.float32) + STANDING_HEIGHT
-D1 = np.zeros(4,dtype=np.float32)
+D1 =  np.zeros(4,dtype=np.float32)
+# D1 = np.array([1,-2,-1,0],dtype=np.float32)*PARABOLA_LENGTH/4
+
+BL = 0
+FL = 1
+BR = 2
+FR = 3
 
 phi_femur_servo = np.zeros(4,dtype=np.float32)
 phi_tibia_servo = np.zeros(4,dtype=np.float32)
@@ -198,137 +205,147 @@ current_time = 0
 t = 0
 phase = 0
 
+def computeAngles(H,D1):
+
+  for joint in range(4):
+    #*Compute Femur and tibia angles
+    D2_sqrd = H[joint]**2 + D1[joint]**2
+    D2 = np.sqrt(D2_sqrd)
+    
+    phi_femur = np.pi/2 - np.arctan(D1[joint]/H[joint]) - np.arccos((D2_sqrd + L_FEMUR*L_FEMUR-L_TIBIA*L_TIBIA)/(2*L_FEMUR*D2))
+    phi_tibia = np.pi/2 + np.arctan(D1[joint]/H[joint]) - np.arccos((D2_sqrd + L_TIBIA*L_TIBIA-L_FEMUR*L_FEMUR)/(2*L_TIBIA*D2))
+    
+    phi_tibia = phi_tibia + PSI
+
+    #*Translate tibia angle to tibia servo angle
+    W_sqrd = C**2 + D**2 - 2*C*D*np.cos(np.pi+DELTA-EPSILON-phi_tibia)
+    W = np.sqrt(W_sqrd)
+
+    phi_tibia_servo[joint] = np.pi - DELTA - np.arccos((C**2 + W_sqrd - D**2) / (2*C*W)) - np.arccos((A**2 + W_sqrd - B**2) / (2*A*W))
+
+    #*Translate angles used in kinematics equations to calibrated servo values
+    phi_femur_servo[joint] = -phi_femur + MID_POINT_SOLID_FEMUR*np.pi/180
+    phi_tibia_servo[joint] = -phi_tibia_servo[joint] + MID_POINT_SOLID_TIBIA*np.pi/180
+
+    
+  BL_servo_femur_joint.setPosition(-phi_femur_servo[BL])
+  BL_servo_tibia_joint.setPosition(-phi_tibia_servo[BL])
+
+  FL_servo_femur_joint.setPosition(-phi_femur_servo[FL])
+  FL_servo_tibia_joint.setPosition(-phi_tibia_servo[FL])
+
+  BR_servo_femur_joint.setPosition(-phi_femur_servo[BR])
+  BR_servo_tibia_joint.setPosition(-phi_tibia_servo[BR])
+  
+  FR_servo_femur_joint.setPosition(-phi_femur_servo[FR])
+  FR_servo_tibia_joint.setPosition(-phi_tibia_servo[FR])
+
+def prepare_for_parabola(primary_limb,secondary_limb,initial_phase):
+  H[primary_limb] = STANDING_HEIGHT - 40/(1/NUM_STAGES) * (phase - initial_phase)
+  H[secondary_limb] = STANDING_HEIGHT - 10/(1/NUM_STAGES) * (phase - initial_phase)
+
+# def parabola(limb, initial_phase):
+#   H[limb] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*(-(phase-initial_phase)/(1/NUM_STAGES)+0.5)**2 )
+#   D1[limb] = PARABOLA_LENGTH/2 - (phase-initial_phase) * PARABOLA_LENGTH/(1/NUM_STAGES)
+
+def parabola_FL(limb, initial_phase):
+  H[limb] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*(-(phase-initial_phase)/(1/NUM_STAGES)+0.5)**2 )
+  D1[limb] = - (phase-initial_phase) * PARABOLA_LENGTH/(1/NUM_STAGES)
+
+def parabola(limb, initial_phase):
+  H[limb] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*(-(phase-initial_phase)/(1/NUM_STAGES)+0.5)**2 )
+  D1[limb] = PARABOLA_LENGTH - (phase-initial_phase) * PARABOLA_LENGTH/(1/NUM_STAGES)
+
+def restore_assisting_limbs(primary_limb,secondary_limb,initial_phase):
+  H[primary_limb] = STANDING_HEIGHT - 40 + 40/(1/NUM_STAGES) * (phase-initial_phase)
+  H[secondary_limb] = STANDING_HEIGHT - 10 + 10/(1/NUM_STAGES) * (phase-initial_phase)
+
+def move_forward():
+  D1[BL] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH)/(1/NUM_STAGES)
+  D1[FL] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH)/(1/NUM_STAGES)
+  D1[BR] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH)/(1/NUM_STAGES)
+  D1[FR] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH)/(1/NUM_STAGES)
+
 if __name__ == "__main__":
     
-   
+    #Init position
+    computeAngles(H,D1)
+
+    delay_init = 5
+
     while supervisor.step(timestep) != -1:
 
-      # phase = (t % GAIT_PERIOD)/GAIT_PERIOD
-      phase = t/GAIT_PERIOD
+      if delay_init > 0:
+        delay_init-=timestep*1e-3 
+        continue
 
-      # angle_tibia = 10 * np.sin(2 * np.pi * 0.5 * t * 1e-3)
-      # angle_femur = 10 * np.sin(2 * np.pi * 0.5 * t * 1e-3)
-
-      # target_joint[1] = angle_femur * np.pi / 180
-      # target_joint[2] = -angle_tibia * np.pi / 180
-      # target_joint[4] = angle_femur * np.pi / 180
-      # target_joint[5] = -angle_tibia * np.pi / 180
-      # target_joint[7] = angle_femur * np.pi / 180
-      # target_joint[8] = -angle_tibia * np.pi / 180
-      # target_joint[10] = angle_femur * np.pi / 180
-      # target_joint[11] = -angle_tibia * np.pi / 180
-    
+      # print("Start")
+      phase = (t % GAIT_PERIOD)/GAIT_PERIOD
         
       #*Compute H and D1 (0-BL, 1-FL, 2-BR, 3-FR)
       #Stage 0
       if phase >= 0 and phase < 1/NUM_STAGES:
-        H[0] = STANDING_HEIGHT - 10/(1/NUM_STAGES) * phase
-        H[2] = STANDING_HEIGHT - 30/(1/NUM_STAGES) * phase
+        prepare_for_parabola(BR,BL,0)
       
       #Stage 1
       if phase >= 1/NUM_STAGES and phase < 2/NUM_STAGES:
-        H[1] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*(-(phase-1/NUM_STAGES)/(1/NUM_STAGES)+0.5)**2 )
-        D1[1] = -(phase-1/NUM_STAGES) * PARABOLA_LENGTH/(1/NUM_STAGES)
+        parabola_FL(FL, 1/NUM_STAGES)
       
       #Stage 2
       if phase >= 2/NUM_STAGES and phase < 3/NUM_STAGES:
-        H[0] = STANDING_HEIGHT - 10 + 10/(1/NUM_STAGES) * (phase-2/NUM_STAGES)
-        H[2] = STANDING_HEIGHT - 30 + 30/(1/NUM_STAGES) * (phase-2/NUM_STAGES)
+        restore_assisting_limbs(BR,BL,2/NUM_STAGES)
 
       #Stage 3
       if phase >= 3/NUM_STAGES and phase < 4/NUM_STAGES:
-        D1[0] = (phase-3/NUM_STAGES) * 100/(1/NUM_STAGES)
-        D1[1] = -PARABOLA_LENGTH + (phase-3/NUM_STAGES) * 100/(1/NUM_STAGES)
-        D1[2] = (phase-3/NUM_STAGES) * 100/(1/NUM_STAGES)
-        D1[3] = (phase-3/NUM_STAGES) * 100/(1/NUM_STAGES)
+        move_forward()
 
       #Stage 4
       if phase >= 4/NUM_STAGES and phase < 5/NUM_STAGES:
-        H[3] = STANDING_HEIGHT - 10/(1/NUM_STAGES) * (phase-4/NUM_STAGES)
-        H[1] = STANDING_HEIGHT - 30/(1/NUM_STAGES) * (phase-4/NUM_STAGES)
+        prepare_for_parabola(FL,FR,4/NUM_STAGES)
 
       #Stage 5
       if phase >= 5/NUM_STAGES and phase < 6/NUM_STAGES:
         #Parabola forward BR
-        H[2] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*(-(phase-5/NUM_STAGES)/(1/NUM_STAGES)+0.5)**2 )
-        D1[2] = PARABOLA_LENGTH - (phase-5/NUM_STAGES) * PARABOLA_LENGTH/(1/NUM_STAGES)
+        parabola(BR, 5/NUM_STAGES)
       
       #Stage 6
       if phase >= 6/NUM_STAGES and phase < 7/NUM_STAGES:
         #Restore FR and FL
-        H[3] = STANDING_HEIGHT - 10 + 10/(1/NUM_STAGES) * (phase-6/NUM_STAGES)
-        H[1] = STANDING_HEIGHT - 30 + 30/(1/NUM_STAGES) * (phase-6/NUM_STAGES)
+        restore_assisting_limbs(FL,FR,6/NUM_STAGES)
 
       #Stage 7
       if phase >= 7/NUM_STAGES and phase < 8/NUM_STAGES:
         #Lift BL (BR assists)
-        H[0] = STANDING_HEIGHT - 30/(1/NUM_STAGES) * (phase-7/NUM_STAGES)
-        H[2] = STANDING_HEIGHT - 10/(1/NUM_STAGES) * (phase-7/NUM_STAGES)
+        prepare_for_parabola(BL,BR,7/NUM_STAGES)
       
       #Stage 8
       if phase >= 8/NUM_STAGES and phase < 9/NUM_STAGES:
         #Parabola forward FR
-        H[3] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*(-(phase-8/NUM_STAGES)/(1/NUM_STAGES)+0.5)**2 )
-        D1[3] = PARABOLA_LENGTH - (phase-8/NUM_STAGES) * PARABOLA_LENGTH/(1/NUM_STAGES)
+        parabola(FR, 8/NUM_STAGES)
       
       #Stage 9
       if phase >= 9/NUM_STAGES and phase < 10/NUM_STAGES:
         #Restore BL and BR
-        H[2] = STANDING_HEIGHT - 10 + 10/(1/NUM_STAGES) * (phase-9/NUM_STAGES)
-        H[0] = STANDING_HEIGHT - 30 + 30/(1/NUM_STAGES) * (phase-9/NUM_STAGES)
+        restore_assisting_limbs(BL,BR,9/NUM_STAGES)
 
       #Stage 10
       if phase >= 10/NUM_STAGES and phase < 11/NUM_STAGES:
         #Lift FR (FL assists)
-        H[3] = STANDING_HEIGHT - 30/(1/NUM_STAGES) * (phase-10/NUM_STAGES)
-        H[1] = STANDING_HEIGHT - 10/(1/NUM_STAGES) * (phase-10/NUM_STAGES)
-      
+        prepare_for_parabola(FR,FL,10/NUM_STAGES)
+
       #Stage 11
       if phase >= 11/NUM_STAGES and phase < 12/NUM_STAGES:
         #Parabola forward BL
-        H[0] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*(-(phase-11/NUM_STAGES)/(1/NUM_STAGES)+0.5)**2 )
-        D1[0] = PARABOLA_LENGTH - (phase-11/NUM_STAGES) * PARABOLA_LENGTH/(1/NUM_STAGES)
+        parabola(BL, 11/NUM_STAGES)
       
       #Stage 12
       if phase >= 12/NUM_STAGES and phase < 13/NUM_STAGES:
         #Restore FR and FL
-        H[1] = STANDING_HEIGHT - 10 + 10/(1/NUM_STAGES) * (phase-12/NUM_STAGES)
-        H[3] = STANDING_HEIGHT - 30 + 30/(1/NUM_STAGES) * (phase-12/NUM_STAGES)
+        restore_assisting_limbs(FR,FL,12/NUM_STAGES)
 
       t += timestep * 1e-3
 
-      for joint in range(4):
-        #*Compute Femur and tibia angles
-        D2_sqrd = H[joint]**2 + D1[joint]**2
-        D2 = np.sqrt(D2_sqrd)
-        
-        phi_femur = np.pi/2 - np.arctan(D1[joint]/H[joint]) - np.arccos((D2_sqrd + L_FEMUR*L_FEMUR-L_TIBIA*L_TIBIA)/(2*L_FEMUR*D2))
-        phi_tibia = np.pi/2 + np.arctan(D1[joint]/H[joint]) - np.arccos((D2_sqrd + L_TIBIA*L_TIBIA-L_FEMUR*L_FEMUR)/(2*L_TIBIA*D2))
-        
-        phi_tibia = phi_tibia + PSI
-
-        #*Translate tibia angle to tibia servo angle
-        W_sqrd = C**2 + D**2 - 2*C*D*np.cos(np.pi+DELTA-EPSILON-phi_tibia)
-        W = np.sqrt(W_sqrd)
-
-        phi_tibia_servo[joint] = np.pi - DELTA - np.arccos((C**2 + W_sqrd - D**2) / (2*C*W)) - np.arccos((A**2 + W_sqrd - B**2) / (2*A*W))
-
-        #*Translate angles used in kinematics equations to calibrated servo values
-        phi_femur_servo[joint] = -phi_femur + MID_POINT_SOLID_FEMUR*np.pi/180
-        phi_tibia_servo[joint] = -phi_tibia_servo[joint] + MID_POINT_SOLID_TIBIA*np.pi/180
-
-        
-      BL_servo_femur_joint.setPosition(-phi_femur_servo[0])
-      BL_servo_tibia_joint.setPosition(-phi_tibia_servo[0])
-
-      FL_servo_femur_joint.setPosition(-phi_femur_servo[1])
-      FL_servo_tibia_joint.setPosition(-phi_tibia_servo[1])
-
-      BR_servo_femur_joint.setPosition(-phi_femur_servo[2])
-      BR_servo_tibia_joint.setPosition(-phi_tibia_servo[2])
-      
-      FR_servo_femur_joint.setPosition(-phi_femur_servo[3])
-      FR_servo_tibia_joint.setPosition(-phi_tibia_servo[3])
+      computeAngles(H,D1)
         
       # Simulate joint data (replace with actual data collection from your simulation)
       # current_time = supervisor.getTime()  # Convert seconds to milliseconds
