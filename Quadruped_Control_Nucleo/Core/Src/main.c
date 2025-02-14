@@ -49,18 +49,34 @@
 #define TIBIA_RANGE_MAX 15.0
 #define TIBIA_RANGE_MIN -15.0
 // 0PWM_BFR,1PWM_BBR, 2PWM_BBL, 3PWM_TFR, 4PWM_FFR, 5PWM_BFL, 6PWM_FFL, 7PWM_TFL, 8PWM_FBL, 9PWM_TBL, 10PWM_TBR, 11PWM_FBR
-#define MID_POINT_BFR 93
-#define MID_POINT_BBR 81
-#define MID_POINT_BBL 84
-#define MID_POINT_TFR 85
-#define MID_POINT_FFR 82
-#define MID_POINT_BFL 90
-#define MID_POINT_FFL 84
+
+// WITH PID
+// #define MID_POINT_BFR 93
+// #define MID_POINT_BBR 81
+// #define MID_POINT_BBL 84
+// #define MID_POINT_TFR 85
+// #define MID_POINT_FFR 82
+// #define MID_POINT_BFL 90
+// #define MID_POINT_FFL 84
+// #define MID_POINT_TFL 93
+// #define MID_POINT_FBL 91
+// #define MID_POINT_TBL 93
+// #define MID_POINT_TBR 79
+// #define MID_POINT_FBR 81
+
+//WITHOUT PID
+#define MID_POINT_BFR 94
+#define MID_POINT_BBR 87
+#define MID_POINT_BBL 86
+#define MID_POINT_TFR 89
+#define MID_POINT_FFR 87
+#define MID_POINT_BFL 94
+#define MID_POINT_FFL 87
 #define MID_POINT_TFL 93
-#define MID_POINT_FBL 91
-#define MID_POINT_TBL 93
-#define MID_POINT_TBR 79
-#define MID_POINT_FBR 81
+#define MID_POINT_FBL 94
+#define MID_POINT_TBL 96
+#define MID_POINT_TBR 80
+#define MID_POINT_FBR 85
 
 
 // States for Main State Machine
@@ -1171,31 +1187,31 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 
 			f_joint_angle[joint] = adc2angle(median_filteredValue[joint], up_down_vector[joint], calibration_table[joint]);
 			
-			if (step_complete == 0)
-			{
-				error = target_joint[joint] - f_joint_angle[joint];
-				error_acum[joint] += error * TIM9_TICK;
-				error_dif = (error - previous_error[joint]) / TIM9_TICK; //(divido tick de tim9)
+			// if (step_complete == 0)
+			// {
+			// 	error = target_joint[joint] - f_joint_angle[joint];
+			// 	error_acum[joint] += error * TIM9_TICK;
+			// 	error_dif = (error - previous_error[joint]) / TIM9_TICK; //(divido tick de tim9)
 
-				previous_error[joint] = error;
+			// 	previous_error[joint] = error;
         
-				control_signal = kp[joint] * error + ki[joint] * error_acum[joint] + kd[joint] * error_dif; //Delta_angle
-				up_down_vector[joint] = control_signal > 0;
+			// 	control_signal = kp[joint] * error + ki[joint] * error_acum[joint] + kd[joint] * error_dif; //Delta_angle
+			// 	up_down_vector[joint] = control_signal > 0;
 
-        pwm_pid_out[joint] = pwm_pid_out[joint] + __round_int(control_signal);
+      //   pwm_pid_out[joint] = pwm_pid_out[joint] + __round_int(control_signal);
 				
-        //If pid_out is below min range, move to min range
-				if(ton_us2angle(pwm_pid_out[joint]) < (mid_point_joints[joint] + joint_range[joint][0]))
-					move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][0]));
+      //   //If pid_out is below min range, move to min range
+			// 	if(ton_us2angle(pwm_pid_out[joint]) < (mid_point_joints[joint] + joint_range[joint][0]))
+			// 		move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][0]));
 
-        //If pid_out is above max range, move to max range
-				else if(ton_us2angle(pwm_pid_out[joint]) > (mid_point_joints[joint] + joint_range[joint][1]))
-					move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][1]));
+      //   //If pid_out is above max range, move to max range
+			// 	else if(ton_us2angle(pwm_pid_out[joint]) > (mid_point_joints[joint] + joint_range[joint][1]))
+			// 		move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][1]));
         
-        //Else move it to pid_out
-				else
-					move_servos(joint, pwm_pid_out[joint]);
-			}
+      //   //Else move it to pid_out
+			// 	else
+			// 		move_servos(joint, pwm_pid_out[joint]);
+			// }
 		
 		}
     pid_sample = 1;
@@ -1377,7 +1393,7 @@ int8_t State_Machine_Actuation(void)
         joints_finished &= ~(1 << joint); // Set respective bit in 0
 
         //*Solo si no se usa PID
-        //move_servos(joint, angle2ton_us(target_joint[joint]));
+        move_servos(joint, angle2ton_us(target_joint[joint]));
       }
     }
     if (joints_finished == ALL_FINISHED) // If no joint has to move we skip the actuation machine

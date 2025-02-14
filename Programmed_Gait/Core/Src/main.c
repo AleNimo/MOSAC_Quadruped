@@ -49,18 +49,20 @@
 #define TIBIA_RANGE_MAX 40//15.0
 #define TIBIA_RANGE_MIN -96//-15.0
 // 0PWM_BFR,1PWM_BBR, 2PWM_BBL, 3PWM_TFR, 4PWM_FFR, 5PWM_BFL, 6PWM_FFL, 7PWM_TFL, 8PWM_FBL, 9PWM_TBL, 10PWM_TBR, 11PWM_FBR
-#define MID_POINT_BFR 93
-#define MID_POINT_BBR 81
-#define MID_POINT_BBL 84
-#define MID_POINT_TFR 85
-#define MID_POINT_FFR 82
-#define MID_POINT_BFL 90
-#define MID_POINT_FFL 84
+
+//WITHOUT PID
+#define MID_POINT_BFR 94
+#define MID_POINT_BBR 87
+#define MID_POINT_BBL 86
+#define MID_POINT_TFR 89
+#define MID_POINT_FFR 87
+#define MID_POINT_BFL 94
+#define MID_POINT_FFL 87
 #define MID_POINT_TFL 93
-#define MID_POINT_FBL 91
-#define MID_POINT_TBL 93
-#define MID_POINT_TBR 79
-#define MID_POINT_FBR 81
+#define MID_POINT_FBL 94
+#define MID_POINT_TBL 96
+#define MID_POINT_TBR 80
+#define MID_POINT_FBR 85
 
 #define TIM9_TICK (float32_t)0.01 //s
 #define TIM5_TICK (float32_t)0.5 //ms
@@ -1150,13 +1152,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 	}
 }
 
-void prepare_for_parabola(uint8_t primary_limb, uint8_t secondary_limb,float32_t height, float32_t current_phase)
+void prepare_for_parabola(uint8_t primary_limb, uint8_t secondary_limb,float32_t height,float32_t initial_phase , float32_t current_phase)
 { 
   H[primary_limb] = STANDING_HEIGHT - height/(PREPARE_TIME/GAIT_PERIOD) * (current_phase - initial_phase);
   H[secondary_limb] = STANDING_HEIGHT - 10/(PREPARE_TIME/GAIT_PERIOD) * (current_phase - initial_phase);
 }
 
-void parabola(uint8_t limb, float32_t current_phase)
+void parabola(uint8_t limb,float32_t initial_phase ,float32_t current_phase)
 {
   H[limb] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*powf(-(current_phase-initial_phase)/(PARABOLA_TIME/GAIT_PERIOD)+0.5f,2) );
   D1[limb] = PARABOLA_LENGTH/2 - (current_phase-initial_phase) * PARABOLA_LENGTH/(PARABOLA_TIME/GAIT_PERIOD);
