@@ -62,17 +62,6 @@ header.append("TBL_Target")
 header.append("TBL_Filt")
 header.append("TBL_PID_OUT")
 
-#To print touch sensor signals
-# header.append("PBL_sensor")
-# header.append("PFL_sensor")
-# header.append("PBR_sensor")
-# header.append("PFR_sensor")
-
-# header.append("PBL_target")
-# header.append("PFL_target")
-# header.append("PBR_target")
-# header.append("PFR_target")
-
 # slider = False
 programmed_target_rotation = False
 
@@ -331,7 +320,6 @@ step_counter = 0
 
 prev_time = 0.0
 
-prev_velocity_magnitude = 0.0
 prev_forward_velocity = 0.0
 prev_lateral_velocity = 0.0
 
@@ -679,7 +667,7 @@ def State_Machine_Control():
   global reset_pos, reset_orientation
   global enable_torque_control, f_joint_angle
   global joints_finished, target_joint, delta_target, joint
-  global prev_velocity_magnitude, prev_forward_velocity,target_step_rotation
+  global prev_forward_velocity,target_step_rotation
   global prev_lateral_velocity,max_forward_acc,step_counter
   global mean_forward_velocity,mean_lateral_velocity,max_forward_acc,vel_samples,prev_time
   global prev_joint_angular_position_servo,acum_error_servo,prev_joint_angular_position,acum_error
@@ -731,7 +719,6 @@ def State_Machine_Control():
       mean_forward_velocity = 0.0
       mean_lateral_velocity = 0.0
       
-      prev_velocity_magnitude = 0.0
       prev_forward_velocity = 0.0
       prev_lateral_velocity = 0.0
       max_forward_acc = 0.0
@@ -882,7 +869,7 @@ def State_Machine_Actuation():
 
 def computeMeasurementsForRewards():
   global supervisor,root,forward_acceleration,forward_velocity,lateral_velocity,mean_forward_velocity,mean_lateral_velocity
-  global lateral_acceleration,max_forward_acc,prev_time,prev_velocity_magnitude,prev_forward_velocity,prev_lateral_velocity,vel_samples
+  global lateral_acceleration,max_forward_acc,prev_time,prev_forward_velocity,prev_lateral_velocity,vel_samples
   global step_counter,joint,current_position,prev_joint_angular_position_servo
   global prev_error_servo, acum_error_servo
 
@@ -908,30 +895,15 @@ def computeMeasurementsForRewards():
   forward_velocity = world_velocity[0] * A2[0] + world_velocity[1] * A2[1]
   lateral_velocity = world_velocity[0] * A_orth[0] + world_velocity[1] * A_orth[1]
 
-  # velocity_magnitude = np.linalg.norm(world_velocity)
-
-  ##Absolute Velocity of PAWs
-  PFR_velocity = PFR_node.getVelocity()
-  PFL_velocity = PFL_node.getVelocity()
-  PBR_velocity = PBR_node.getVelocity()
-  PBL_velocity = PBL_node.getVelocity()
-
-  PFR_velocity = np.sqrt(PFR_velocity[0]**2 + PFR_velocity[1]**2 + PFR_velocity[2]**2)
-  PFL_velocity = np.sqrt(PFL_velocity[0]**2 + PFL_velocity[1]**2 + PFL_velocity[2]**2)
-  PBR_velocity = np.sqrt(PBR_velocity[0]**2 + PBR_velocity[1]**2 + PBR_velocity[2]**2)
-  PBL_velocity = np.sqrt(PBL_velocity[0]**2 + PBL_velocity[1]**2 + PBL_velocity[2]**2)
-
   time = supervisor.getTime()
 
   if time > 0.0:
-    total_acceleration = (velocity_magnitude - prev_velocity_magnitude)/(time - prev_time)
-    # forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
+    forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
     # lateral_acceleration = (lateral_velocity - prev_lateral_velocity)/(time - prev_time)
 
     if np.abs(forward_acceleration) > max_forward_acc:
         max_forward_acc = np.abs(forward_acceleration)
 
-  # prev_velocity_magnitude = velocity_magnitude
   prev_forward_velocity = forward_velocity
   # prev_lateral_velocity = lateral_velocity
 
@@ -1110,37 +1082,6 @@ if __name__ == "__main__":
     #   row.append(target_joint[i])
     #   row.append(f_joint_angle[i])
     #   row.append(pid_out[i])
-
-    # Touch sensors
-    # row.append(int(BL_touch_sensor.getValue() == True))
-    # row.append(int(FL_touch_sensor.getValue() == True))
-    # row.append(int(BR_touch_sensor.getValue() == True))
-    # row.append(int(FR_touch_sensor.getValue() == True))
-
-    # #target touch values
-    # # BL 
-    # if current_phase > 0.1 and current_phase < 0.3:
-    #   row.append(0)
-    # else:
-    #   row.append(1)
-
-    # # FL 
-    # if current_phase > 0.35 and current_phase < 0.55:
-    #   row.append(0)
-    # else:
-    #   row.append(1)
-    
-    # # BR 
-    # if current_phase > 0.6 and current_phase < 0.8:
-    #   row.append(0)
-    # else:
-    #   row.append(1)
-
-    # # FR 
-    # if current_phase > 0.85 or current_phase < 0.05:
-    #   row.append(0)
-    # else:
-    #   row.append(1)
 
 
     # Append the row to the data list
