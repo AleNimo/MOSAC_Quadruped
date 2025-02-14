@@ -12,14 +12,13 @@ import csv
 from scipy.spatial.transform import Rotation
 
 #*PROGRAMMED GAIT CONSTANTS
-NUM_STAGES = 13
+NUM_STAGES = 16
 
-STANDING_HEIGHT = 135.75 #mm
+STANDING_HEIGHT = 160 #mm
 
-GAIT_PERIOD = 13
+GAIT_PERIOD = 16
 
 PARABOLA_HEIGHT = 40 #mm
-# PARABOLA_LENGTH = 200 #mm
 PARABOLA_LENGTH = 100 #mm
 
 L_FEMUR = 100 #mm
@@ -32,8 +31,8 @@ C = 28.66176 #mm
 D = 27 #mm
 
 H = np.zeros(4,dtype=np.float32) + STANDING_HEIGHT
-D1 =  np.zeros(4,dtype=np.float32)
-# D1 = np.array([1,-2,-1,0],dtype=np.float32)*PARABOLA_LENGTH/4
+# D1 =  np.zeros(4,dtype=np.float32)
+D1 = -np.array([1,-2,-1,0],dtype=np.float32)*PARABOLA_LENGTH/4
 
 BL = 0
 FL = 1
@@ -240,38 +239,30 @@ def computeAngles(H,D1):
   FR_servo_femur_joint.setPosition(-phi_femur_servo[FR])
   FR_servo_tibia_joint.setPosition(-phi_tibia_servo[FR])
 
-def prepare_for_parabola(primary_limb,secondary_limb,initial_phase):
-  H[primary_limb] = STANDING_HEIGHT - 40/(1/NUM_STAGES) * (phase - initial_phase)
+def prepare_for_parabola(primary_limb, secondary_limb, initial_phase):
+  H[primary_limb] = STANDING_HEIGHT - 20/(1/NUM_STAGES) * (phase - initial_phase)
   H[secondary_limb] = STANDING_HEIGHT - 10/(1/NUM_STAGES) * (phase - initial_phase)
-
-# def parabola(limb, initial_phase):
-#   H[limb] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*(-(phase-initial_phase)/(1/NUM_STAGES)+0.5)**2 )
-#   D1[limb] = PARABOLA_LENGTH/2 - (phase-initial_phase) * PARABOLA_LENGTH/(1/NUM_STAGES)
-
-def parabola_FL(limb, initial_phase):
-  H[limb] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*(-(phase-initial_phase)/(1/NUM_STAGES)+0.5)**2 )
-  D1[limb] = - (phase-initial_phase) * PARABOLA_LENGTH/(1/NUM_STAGES)
 
 def parabola(limb, initial_phase):
   H[limb] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*(-(phase-initial_phase)/(1/NUM_STAGES)+0.5)**2 )
-  D1[limb] = PARABOLA_LENGTH - (phase-initial_phase) * PARABOLA_LENGTH/(1/NUM_STAGES)
+  D1[limb] = PARABOLA_LENGTH/2 - (phase-initial_phase) * PARABOLA_LENGTH/(1/NUM_STAGES)
 
-def restore_assisting_limbs(primary_limb,secondary_limb,initial_phase):
-  H[primary_limb] = STANDING_HEIGHT - 40 + 40/(1/NUM_STAGES) * (phase-initial_phase)
+def restore_assisting_limbs(primary_limb, secondary_limb, initial_phase):
+  H[primary_limb] = STANDING_HEIGHT - 20 + 20/(1/NUM_STAGES) * (phase-initial_phase)
   H[secondary_limb] = STANDING_HEIGHT - 10 + 10/(1/NUM_STAGES) * (phase-initial_phase)
 
 def move_forward():
-  D1[BL] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH)/(1/NUM_STAGES)
-  D1[FL] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH)/(1/NUM_STAGES)
-  D1[BR] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH)/(1/NUM_STAGES)
-  D1[FR] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH)/(1/NUM_STAGES)
+  D1[BL] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH/4)/(1/NUM_STAGES)
+  D1[FL] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH/4)/(1/NUM_STAGES)
+  D1[BR] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH/4)/(1/NUM_STAGES)
+  D1[FR] += (timestep*1e-3/GAIT_PERIOD) * (PARABOLA_LENGTH/4)/(1/NUM_STAGES)
 
 if __name__ == "__main__":
     
     #Init position
     computeAngles(H,D1)
 
-    delay_init = 5
+    delay_init = 2
 
     while supervisor.step(timestep) != -1:
 
@@ -289,7 +280,7 @@ if __name__ == "__main__":
       
       #Stage 1
       if phase >= 1/NUM_STAGES and phase < 2/NUM_STAGES:
-        parabola_FL(FL, 1/NUM_STAGES)
+        parabola(FL, 1/NUM_STAGES)
       
       #Stage 2
       if phase >= 2/NUM_STAGES and phase < 3/NUM_STAGES:
@@ -312,40 +303,59 @@ if __name__ == "__main__":
       if phase >= 6/NUM_STAGES and phase < 7/NUM_STAGES:
         #Restore FR and FL
         restore_assisting_limbs(FL,FR,6/NUM_STAGES)
-
+      
       #Stage 7
       if phase >= 7/NUM_STAGES and phase < 8/NUM_STAGES:
-        #Lift BL (BR assists)
-        prepare_for_parabola(BL,BR,7/NUM_STAGES)
-      
+        move_forward()
+
       #Stage 8
       if phase >= 8/NUM_STAGES and phase < 9/NUM_STAGES:
-        #Parabola forward FR
-        parabola(FR, 8/NUM_STAGES)
+        #Lift BL (BR assists)
+        prepare_for_parabola(BL,BR,8/NUM_STAGES)
       
       #Stage 9
       if phase >= 9/NUM_STAGES and phase < 10/NUM_STAGES:
-        #Restore BL and BR
-        restore_assisting_limbs(BL,BR,9/NUM_STAGES)
-
+        #Parabola forward FR
+        parabola(FR, 9/NUM_STAGES)
+      
       #Stage 10
       if phase >= 10/NUM_STAGES and phase < 11/NUM_STAGES:
-        #Lift FR (FL assists)
-        prepare_for_parabola(FR,FL,10/NUM_STAGES)
-
+        #Restore BL and BR
+        restore_assisting_limbs(BL,BR,10/NUM_STAGES)
+      
       #Stage 11
       if phase >= 11/NUM_STAGES and phase < 12/NUM_STAGES:
-        #Parabola forward BL
-        parabola(BL, 11/NUM_STAGES)
-      
+        move_forward()
+
       #Stage 12
       if phase >= 12/NUM_STAGES and phase < 13/NUM_STAGES:
+        #Lift FR (FL assists)
+        prepare_for_parabola(FR,FL,12/NUM_STAGES)
+
+      #Stage 13
+      if phase >= 13/NUM_STAGES and phase < 14/NUM_STAGES:
+        #Parabola forward BL
+        parabola(BL, 13/NUM_STAGES)
+      
+      #Stage 14
+      if phase >= 14/NUM_STAGES and phase < 15/NUM_STAGES:
         #Restore FR and FL
-        restore_assisting_limbs(FR,FL,12/NUM_STAGES)
+        restore_assisting_limbs(FR,FL,14/NUM_STAGES)
+
+      #Stage 15
+      if phase >= 15/NUM_STAGES and phase < 16/NUM_STAGES:
+        move_forward()
 
       t += timestep * 1e-3
 
       computeAngles(H,D1)
+
+      print("H[FL]" , H[FL])
+      print("D1[FL]" ,D1[FL])
+      
+      print("servo_femur" , phi_femur_servo[FL]*180/np.pi)
+      print("servo_tibia" , phi_tibia_servo[FL]*180/np.pi)
+
         
       # Simulate joint data (replace with actual data collection from your simulation)
       # current_time = supervisor.getTime()  # Convert seconds to milliseconds

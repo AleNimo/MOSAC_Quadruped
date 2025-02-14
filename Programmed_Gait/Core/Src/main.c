@@ -44,10 +44,10 @@
 //Ranges for each type of joint
 #define BODY_RANGE_MAX 15.0
 #define BODY_RANGE_MIN -10.0
-#define FEMUR_RANGE_MAX 40.0
-#define FEMUR_RANGE_MIN -40.0
+#define FEMUR_RANGE_MAX 55.0
+#define FEMUR_RANGE_MIN -35.0
 #define TIBIA_RANGE_MAX 40//15.0
-#define TIBIA_RANGE_MIN -40//-15.0
+#define TIBIA_RANGE_MIN -96//-15.0
 // 0PWM_BFR,1PWM_BBR, 2PWM_BBL, 3PWM_TFR, 4PWM_FFR, 5PWM_BFL, 6PWM_FFL, 7PWM_TFL, 8PWM_FBL, 9PWM_TBL, 10PWM_TBR, 11PWM_FBR
 #define MID_POINT_BFR 93
 #define MID_POINT_BBR 81
@@ -62,8 +62,8 @@
 #define MID_POINT_TBR 79
 #define MID_POINT_FBR 81
 
-#define TIM9_TICK 0.01 //s
-#define TIM5_TICK 0.5 //ms
+#define TIM9_TICK (float32_t)0.01 //s
+#define TIM5_TICK (float32_t)0.5 //ms
 
 #define ONE_SECOND 1000/TIM5_TICK  //milliseconds
 
@@ -75,26 +75,34 @@
 #define WINDOW_SIZE 80
 
 //PROGRAMMED GAIT CONSTANTS
-#define NUM_STAGES (float32_t)13
+#define PREPARE_TIME 0.3f //seconds
+#define PARABOLA_TIME 0.2f //seconds
+#define RESTORE_TIME 0.3f //seconds
+#define MOVE_FWD_TIME 0.1f //seconds
 
-#define GAIT_PERIOD (float32_t)10
+#define GAIT_PERIOD (4*PREPARE_TIME+4*PARABOLA_TIME+4*RESTORE_TIME+4*MOVE_FWD_TIME) //seconds
 
-#define STANDING_HEIGHT (float32_t)135.75 //mm
+#define BL 0
+#define FL 1
+#define BR 2
+#define FR 3
 
-#define PARABOLA_HEIGHT (float32_t)40
-#define PARABOLA_LENGTH (float32_t)100
+#define STANDING_HEIGHT (float32_t)160  //mm //135.75 //mm
+
+#define PARABOLA_HEIGHT (float32_t)40		//mm
+#define PARABOLA_LENGTH (float32_t)100  //mm
 
 #define L_FEMUR (float32_t)100 //mm
 #define L_TIBIA (float32_t)100.70866 //mm
-#define PSI (float32_t)(2.51591*M_PI/180) //rad
+#define PSI (float32_t)2.51591*M_PI/180 //rad
 
 #define A (float32_t)24 //mm
 #define B (float32_t)40.5 //mm
 #define C (float32_t)28.66176 //mm
 #define D (float32_t)27 //mm
 
-#define DELTA (float32_t)(0.7984834029) //rad
-#define EPSILON (float32_t)(1.570796327) //rad
+#define DELTA (float32_t)0.7984834029 //rad
+#define EPSILON (float32_t)1.570796327 //rad
 
 #define MID_POINT_SOLID_FEMUR (float32_t)42.65021 //deg
 #define MID_POINT_SOLID_TIBIA (float32_t)16.75397157 //deg
@@ -198,7 +206,8 @@ volatile uint8_t uart_tx_buffer[2 + 12 * 4 + 12 * 4 + 12 * 4 + 12 * 4];
 
 
 volatile float32_t H[4] = {STANDING_HEIGHT,STANDING_HEIGHT,STANDING_HEIGHT,STANDING_HEIGHT};
-volatile float32_t D1[4] = {0,0,0,0};
+volatile float32_t D1[4] = {-PARABOLA_LENGTH/4,PARABOLA_LENGTH/2,PARABOLA_LENGTH/4,0};
+
 
 volatile float32_t phi_femur_servo[4] = {0,0,0,0};
 volatile float32_t phi_tibia_servo[4] = {0,0,0,0};
@@ -217,6 +226,12 @@ static void MX_TIM4_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_TIM9_Init(void);
 /* USER CODE BEGIN PFP */
+void prepare_for_parabola(uint8_t primary_limb, uint8_t secondary_limb,float32_t height, float32_t initial_phase, float32_t current_phase);
+void parabola(uint8_t limb, float32_t initial_phase, float32_t current_phase);
+void restore_assisting_limbs(uint8_t primary_limb, uint8_t secondary_limb,float32_t height, float32_t initial_phase, float32_t current_phase);
+void move_forward(void);
+void compute_angles(void);
+
 float adc2angle(uint16_t adc_value, uint8_t up_down, const float32_t *table_ptr);
 uint16_t angle2ton_us(float);
 float ton_us2angle(uint16_t ton_us);
@@ -320,10 +335,12 @@ int main(void)
   uart_tx_buffer[1] = 0xFF;
 
   // Joints set to default initial angle
-  for (uint8_t joint = 0; joint < JOINTS; joint++)
-  {
-    move_servos(joint, angle2ton_us(mid_point_joints[joint]));
-  }
+  // for (uint8_t joint = 0; joint < JOINTS; joint++)
+  // {
+  //   move_servos(joint, angle2ton_us(mid_point_joints[joint]));
+  // }
+
+  compute_angles();
 
   HAL_Delay(5000);
 
@@ -1024,8 +1041,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 {
   static float32_t t_step = 0;
   static float32_t phase = 0;
-
-	float32_t D2_sqrd, D2, phi_femur,phi_tibia,W,W_sqrd = 0;
 	
   if (timer == &htim5)
   {
@@ -1050,193 +1065,170 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 
     //*Compute H and D1 (0-BL, 1-FL, 2-BR, 3-FR)
     //Stage 0
-    if (phase >= 0 && phase < 1/NUM_STAGES)
-    {
-      H[0] = STANDING_HEIGHT - 10/(1/NUM_STAGES) * phase;
-      H[2] = STANDING_HEIGHT - 40/(1/NUM_STAGES) * phase;
-    }
+    if (phase < PREPARE_TIME/GAIT_PERIOD)
+      //Lift BR (BL assists)
+      prepare_for_parabola(BR,BL,20,0,phase);
 
     //Stage 1
-    if (phase >= 1/NUM_STAGES && phase < 2/NUM_STAGES)
-    {
-      H[1] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*powf(-(phase-1/NUM_STAGES)/(1/NUM_STAGES)+0.5,2) );
-      D1[1] = -(phase-1/NUM_STAGES) * PARABOLA_LENGTH/(1/NUM_STAGES);
-    }
-
+    else if (phase < (PREPARE_TIME+PARABOLA_TIME)/GAIT_PERIOD)
+      //Parabola forward FL
+      parabola(FL, PREPARE_TIME/GAIT_PERIOD,phase);
+    
     //Stage 2
-    if (phase >= 2/NUM_STAGES && phase < 3/NUM_STAGES)
-    {
-      H[0] = STANDING_HEIGHT - 10 + 10/(1/NUM_STAGES) * (phase-2/NUM_STAGES);
-      H[2] = STANDING_HEIGHT - 40 + 40/(1/NUM_STAGES) * (phase-2/NUM_STAGES);
-    }
+    else if (phase < (PREPARE_TIME+PARABOLA_TIME+RESTORE_TIME)/GAIT_PERIOD)
+      //Restore BR and BL
+      restore_assisting_limbs(BR,BL,20,(PREPARE_TIME+PARABOLA_TIME)/GAIT_PERIOD,phase);
 
     //Stage 3
-    if (phase >= 3/NUM_STAGES && phase < 4/NUM_STAGES)
-    {
-      D1[0] = (phase-3/NUM_STAGES) * 100/(1/NUM_STAGES);
-      D1[1] = -PARABOLA_LENGTH + (phase-3/NUM_STAGES) * 100/(1/NUM_STAGES);
-      D1[2] = (phase-3/NUM_STAGES) * 100/(1/NUM_STAGES);
-      D1[3] = (phase-3/NUM_STAGES) * 100/(1/NUM_STAGES);
-    }
-    
+    else if (phase < (PREPARE_TIME+PARABOLA_TIME+RESTORE_TIME+MOVE_FWD_TIME)/GAIT_PERIOD)
+      //Move all limbs backwards to push the body forward
+      move_forward();
+
     //Stage 4
-    if (phase >= 4/NUM_STAGES && phase < 5/NUM_STAGES)
-    {  
-      H[3] = STANDING_HEIGHT - 10/(1/NUM_STAGES) * (phase-4/NUM_STAGES);
-      H[1] = STANDING_HEIGHT - 40/(1/NUM_STAGES) * (phase-4/NUM_STAGES);
-    }
+    else if (phase < (2*PREPARE_TIME+PARABOLA_TIME+RESTORE_TIME+MOVE_FWD_TIME)/GAIT_PERIOD)
+      //Lift FL (FR assists)
+      prepare_for_parabola(FL,FR,20,(PREPARE_TIME+PARABOLA_TIME+RESTORE_TIME+MOVE_FWD_TIME)/GAIT_PERIOD,phase);
 
     //Stage 5
-    if (phase >= 5/NUM_STAGES && phase < 6/NUM_STAGES)
-    {
+    else if (phase < (2*PREPARE_TIME+2*PARABOLA_TIME+RESTORE_TIME+MOVE_FWD_TIME)/GAIT_PERIOD)
       //Parabola forward BR
-      H[2] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*powf(-(phase-5/NUM_STAGES)/(1/NUM_STAGES)+0.5,2) );
-      D1[2] = PARABOLA_LENGTH - (phase-5/NUM_STAGES) * PARABOLA_LENGTH/(1/NUM_STAGES);
-    }
+      parabola(BR, (2*PREPARE_TIME+PARABOLA_TIME+RESTORE_TIME+MOVE_FWD_TIME)/GAIT_PERIOD,phase);
     
     //Stage 6
-    if (phase >= 6/NUM_STAGES && phase < 7/NUM_STAGES)
-    {
+    else if (phase < (2*PREPARE_TIME+2*PARABOLA_TIME+2*RESTORE_TIME+MOVE_FWD_TIME)/GAIT_PERIOD)
       //Restore FR and FL
-      H[3] = STANDING_HEIGHT - 10 + 10/(1/NUM_STAGES) * (phase-6/NUM_STAGES);
-      H[1] = STANDING_HEIGHT - 40 + 40/(1/NUM_STAGES) * (phase-6/NUM_STAGES);
-    }
+      restore_assisting_limbs(FL,FR,20,(2*PREPARE_TIME+2*PARABOLA_TIME+RESTORE_TIME+MOVE_FWD_TIME)/GAIT_PERIOD,phase);
     
     //Stage 7
-    if (phase >= 7/NUM_STAGES && phase < 8/NUM_STAGES)
-    {
-      //Lift BL (BR assists)
-      H[0] = STANDING_HEIGHT - 40/(1/NUM_STAGES) * (phase-7/NUM_STAGES);
-      H[2] = STANDING_HEIGHT - 10/(1/NUM_STAGES) * (phase-7/NUM_STAGES);
-    }
-    
+    else if (phase < (2*PREPARE_TIME+2*PARABOLA_TIME+2*RESTORE_TIME+2*MOVE_FWD_TIME)/GAIT_PERIOD)
+      //Move all limbs backwards to push the body forward
+      move_forward();
+
     //Stage 8
-    if (phase >= 8/NUM_STAGES && phase < 9/NUM_STAGES)
-    {  
-      //Parabola forward FR
-      H[3] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*powf(-(phase-8/NUM_STAGES)/(1/NUM_STAGES)+0.5,2) );
-      D1[3] = PARABOLA_LENGTH - (phase-8/NUM_STAGES) * PARABOLA_LENGTH/(1/NUM_STAGES);
-    }
+    else if (phase < (3*PREPARE_TIME+2*PARABOLA_TIME+2*RESTORE_TIME+2*MOVE_FWD_TIME)/GAIT_PERIOD)
+      //Lift BL (BR assists)
+      prepare_for_parabola(BL,BR,20,(2*PREPARE_TIME+2*PARABOLA_TIME+2*RESTORE_TIME+2*MOVE_FWD_TIME)/GAIT_PERIOD,phase);
     
     //Stage 9
-    if (phase >= 9/NUM_STAGES && phase < 10/NUM_STAGES)
-    {
-      //Restore BL and BR
-      H[2] = STANDING_HEIGHT - 10 + 10/(1/NUM_STAGES) * (phase-9/NUM_STAGES);
-      H[0] = STANDING_HEIGHT - 40 + 40/(1/NUM_STAGES) * (phase-9/NUM_STAGES);
-    }
+    else if (phase < (3*PREPARE_TIME+3*PARABOLA_TIME+2*RESTORE_TIME+2*MOVE_FWD_TIME)/GAIT_PERIOD)
+      //Parabola forward FR
+      parabola(FR, (3*PREPARE_TIME+2*PARABOLA_TIME+2*RESTORE_TIME+2*MOVE_FWD_TIME)/GAIT_PERIOD,phase);
     
     //Stage 10
-    if (phase >= 10/NUM_STAGES && phase < 11/NUM_STAGES)
-    {
-      //Lift FR (FL assists)
-      H[3] = STANDING_HEIGHT - 40/(1/NUM_STAGES) * (phase-10/NUM_STAGES);
-      H[1] = STANDING_HEIGHT - 10/(1/NUM_STAGES) * (phase-10/NUM_STAGES);
-    }
+    else if (phase < (3*PREPARE_TIME+3*PARABOLA_TIME+3*RESTORE_TIME+2*MOVE_FWD_TIME)/GAIT_PERIOD)
+      //Restore BL and BR
+      restore_assisting_limbs(BL,BR,20,(3*PREPARE_TIME+3*PARABOLA_TIME+2*RESTORE_TIME+2*MOVE_FWD_TIME)/GAIT_PERIOD,phase);
     
     //Stage 11
-    if (phase >= 11/NUM_STAGES && phase < 12/NUM_STAGES)
-    {
-      //Parabola forward BL
-      H[0] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*powf(-(phase-11/NUM_STAGES)/(1/NUM_STAGES)+0.5,2) );
-      D1[0] = PARABOLA_LENGTH - (phase-11/NUM_STAGES) * PARABOLA_LENGTH/(1/NUM_STAGES);
-    }
-    
+    else if (phase < (3*PREPARE_TIME+3*PARABOLA_TIME+3*RESTORE_TIME+3*MOVE_FWD_TIME)/GAIT_PERIOD)
+      //Move all limbs backwards to push the body forward
+      move_forward();
+
     //Stage 12
-    if (phase >= 12/NUM_STAGES && phase < 13/NUM_STAGES)
-    {
+    else if (phase < (4*PREPARE_TIME+3*PARABOLA_TIME+3*RESTORE_TIME+3*MOVE_FWD_TIME)/GAIT_PERIOD)
+      //Lift FR (FL assists)
+      prepare_for_parabola(FR,FL,20,(3*PREPARE_TIME+3*PARABOLA_TIME+3*RESTORE_TIME+3*MOVE_FWD_TIME)/GAIT_PERIOD,phase);
+
+    //Stage 13
+    else if (phase < (4*PREPARE_TIME+4*PARABOLA_TIME+3*RESTORE_TIME+3*MOVE_FWD_TIME)/GAIT_PERIOD)
+      //Parabola forward BL
+      parabola(BL, (4*PREPARE_TIME+3*PARABOLA_TIME+3*RESTORE_TIME+3*MOVE_FWD_TIME)/GAIT_PERIOD,phase);
+    
+    //Stage 14
+    else if (phase < (4*PREPARE_TIME+4*PARABOLA_TIME+4*RESTORE_TIME+3*MOVE_FWD_TIME)/GAIT_PERIOD)
       //Restore FR and FL
-      H[1] = STANDING_HEIGHT - 10 + 10/(1/NUM_STAGES) * (phase-12/NUM_STAGES);
-      H[3] = STANDING_HEIGHT - 40 + 40/(1/NUM_STAGES) * (phase-12/NUM_STAGES);
-    }
+      restore_assisting_limbs(FR,FL,20,(4*PREPARE_TIME+4*PARABOLA_TIME+3*RESTORE_TIME+3*MOVE_FWD_TIME)/GAIT_PERIOD,phase);
+
+    //Stage 15
+    else if (phase < (4*PREPARE_TIME+4*PARABOLA_TIME+4*RESTORE_TIME+4*MOVE_FWD_TIME)/GAIT_PERIOD)
+      //Move all limbs backwards to push the body forward
+      move_forward();
 
     t_step +=(float32_t)0.01;
-
-    for (uint8_t limb = 0; limb < 4; limb++)
-    {
-      //*Compute Femur and tibia angles
-      D2_sqrd = H[limb]*H[limb] + D1[limb]*D1[limb];
-      D2 = sqrtf(D2_sqrd);
-      
-      phi_femur = M_PI/2 - atanf(D1[limb]/H[limb]) - acosf((D2_sqrd + L_FEMUR*L_FEMUR-L_TIBIA*L_TIBIA)/(2*L_FEMUR*D2));
-      phi_tibia = M_PI/2 + atanf(D1[limb]/H[limb]) - acosf((D2_sqrd + L_TIBIA*L_TIBIA-L_FEMUR*L_FEMUR)/(2*L_TIBIA*D2));
-      
-      phi_tibia = phi_tibia + PSI;
-
-      //*Translate tibia angle to tibia servo angle
-      W_sqrd = C*C + D*D - 2*C*D*cosf(M_PI+DELTA-EPSILON-phi_tibia);
-      W = sqrtf(W_sqrd);
-
-      phi_tibia_servo[limb] = M_PI - DELTA - acosf((C*C + W_sqrd - D*D) / (2*C*W)) - acosf((A*A + W_sqrd - B*B) / (2*A*W));
-
-      //*Translate angles used in kinematics equations to calibrated servo values
-      phi_femur_servo[limb] = -phi_femur*180/M_PI + MID_POINT_SOLID_FEMUR;
-      phi_tibia_servo[limb] = -phi_tibia_servo[limb] *180/M_PI + MID_POINT_SOLID_TIBIA;
-    }
-    //*Add servo mid points to compute final targets
-    // 0PWM_BFR,1PWM_BBR, 2PWM_BBL, 3PWM_TFR, 4PWM_FFR, 5PWM_BFL, 6PWM_FFL, 7PWM_TFL, 8PWM_FBL, 9PWM_TBL, 10PWM_TBR, 11PWM_FBR
-    target_joint[8] = phi_femur_servo[0] + mid_point_joints[8];     //FBL
-    target_joint[9] = phi_tibia_servo[0] + mid_point_joints[9];     //TBL
-
-    target_joint[6] = phi_femur_servo[1] + mid_point_joints[6];     //FFL
-    target_joint[7] = phi_tibia_servo[1] + mid_point_joints[7];     //TFL
-
-    target_joint[11] = -phi_femur_servo[2] + mid_point_joints[11];  //FBR
-    target_joint[10] = -phi_tibia_servo[2] + mid_point_joints[10];  //TBR
-
-    target_joint[4] = -phi_femur_servo[3] + mid_point_joints[4];    //FFR
-    target_joint[3] = -phi_tibia_servo[3] + mid_point_joints[3];    //TFR
-
-    for(uint8_t joint = 0; joint < 12; joint++)
-    {
-      //If pid_out is below min range, move to min range
-      if(target_joint[joint] < (mid_point_joints[joint] + joint_range[joint][0]))
-				move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][0]));
-
-      //If pid_out is above max range, move to max range
-      else if(target_joint[joint] > (mid_point_joints[joint] + joint_range[joint][1]))
-        move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][1]));
-      
-      //Else move it to pid_out
-      else
-        move_servos(joint, angle2ton_us(target_joint[joint]));
-    }
-		// Move servos
-		// for (uint8_t joint = 0; joint < 12; joint++)
-		// {
-
-		// 	f_joint_angle[joint] = adc2angle(median_filteredValue[joint], up_down_vector[joint], calibration_table[joint]);
-			
-		// 	if (pid_enable)
-		// 	{
-		// 		error = target_joint[joint] - f_joint_angle[joint];
-		// 		error_acum[joint] += error * TIM9_TICK;
-		// 		error_dif = (error - previous_error[joint]) / TIM9_TICK; //(divido tick de tim9)
-
-		// 		previous_error[joint] = error;
-        
-		// 		control_signal = kp[joint] * error + ki[joint] * error_acum[joint] + kd[joint] * error_dif; //Delta_angle
-		// 		up_down_vector[joint] = control_signal > 0;
-
-    //     pwm_pid_out[joint] = pwm_pid_out[joint] + __round_int(control_signal);
-				
-    //     // //If pid_out is below min range, move to min range
-		// 		// if(ton_us2angle(pwm_pid_out[joint]) < (mid_point_joints[joint] + joint_range[joint][0]))
-		// 		// 	move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][0]));
-
-    //     // //If pid_out is above max range, move to max range
-		// 		// else if(ton_us2angle(pwm_pid_out[joint]) > (mid_point_joints[joint] + joint_range[joint][1]))
-		// 		// 	move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][1]));
-        
-    //     // //Else move it to pid_out
-		// 		// else
-		// 		// 	move_servos(joint, pwm_pid_out[joint]);
-					
-		// 	}
-		
-		// }
+		compute_angles();
     send_uart = 1;
 	}
+}
+
+void prepare_for_parabola(uint8_t primary_limb, uint8_t secondary_limb,float32_t height, float32_t current_phase)
+{ 
+  H[primary_limb] = STANDING_HEIGHT - height/(PREPARE_TIME/GAIT_PERIOD) * (current_phase - initial_phase);
+  H[secondary_limb] = STANDING_HEIGHT - 10/(PREPARE_TIME/GAIT_PERIOD) * (current_phase - initial_phase);
+}
+
+void parabola(uint8_t limb, float32_t current_phase)
+{
+  H[limb] = STANDING_HEIGHT - PARABOLA_HEIGHT * ( 1 - 4*powf(-(current_phase-initial_phase)/(PARABOLA_TIME/GAIT_PERIOD)+0.5f,2) );
+  D1[limb] = PARABOLA_LENGTH/2 - (current_phase-initial_phase) * PARABOLA_LENGTH/(PARABOLA_TIME/GAIT_PERIOD);
+}
+
+void restore_assisting_limbs(uint8_t primary_limb, uint8_t secondary_limb,float32_t height, float32_t initial_phase, float32_t current_phase)
+{
+  H[primary_limb] = STANDING_HEIGHT - height + height/(RESTORE_TIME/GAIT_PERIOD) * (current_phase-initial_phase);
+  H[secondary_limb] = STANDING_HEIGHT - 10 + 10/(RESTORE_TIME/GAIT_PERIOD) * (current_phase-initial_phase);
+}
+
+void move_forward(void)
+{
+  D1[BL] += (TIM9_TICK/GAIT_PERIOD) * (PARABOLA_LENGTH/4)/(MOVE_FWD_TIME/GAIT_PERIOD);
+  D1[FL] += (TIM9_TICK/GAIT_PERIOD) * (PARABOLA_LENGTH/4)/(MOVE_FWD_TIME/GAIT_PERIOD);
+  D1[BR] += (TIM9_TICK/GAIT_PERIOD) * (PARABOLA_LENGTH/4)/(MOVE_FWD_TIME/GAIT_PERIOD);
+  D1[FR] += (TIM9_TICK/GAIT_PERIOD) * (PARABOLA_LENGTH/4)/(MOVE_FWD_TIME/GAIT_PERIOD);
+}
+
+void compute_angles(void)
+{
+  float32_t D2_sqrd, D2, phi_femur,phi_tibia,W,W_sqrd = 0;
+
+  for (uint8_t limb = 0; limb < 4; limb++)
+  {
+    //*Compute Femur and tibia angles
+    D2_sqrd = H[limb]*H[limb] + D1[limb]*D1[limb];
+    D2 = sqrtf(D2_sqrd);
+    
+    phi_femur = M_PI/2 - atanf(D1[limb]/H[limb]) - acosf((D2_sqrd + L_FEMUR*L_FEMUR-L_TIBIA*L_TIBIA)/(2*L_FEMUR*D2));
+    phi_tibia = M_PI/2 + atanf(D1[limb]/H[limb]) - acosf((D2_sqrd + L_TIBIA*L_TIBIA-L_FEMUR*L_FEMUR)/(2*L_TIBIA*D2));
+    
+    phi_tibia = phi_tibia + PSI;
+
+    //*Translate tibia angle to tibia servo angle
+    W_sqrd = C*C + D*D - 2*C*D*cosf(M_PI+DELTA-EPSILON-phi_tibia);
+    W = sqrtf(W_sqrd);
+
+    phi_tibia_servo[limb] = M_PI - DELTA - acosf((C*C + W_sqrd - D*D) / (2*C*W)) - acosf((A*A + W_sqrd - B*B) / (2*A*W));
+
+    //*Translate angles used in kinematics equations to calibrated servo values
+    phi_femur_servo[limb] = -phi_femur*180/M_PI + MID_POINT_SOLID_FEMUR;
+    phi_tibia_servo[limb] = -phi_tibia_servo[limb] *180/M_PI + MID_POINT_SOLID_TIBIA;
+  }
+  //*Add servo mid points to compute final targets
+  // 0PWM_BFR,1PWM_BBR, 2PWM_BBL, 3PWM_TFR, 4PWM_FFR, 5PWM_BFL, 6PWM_FFL, 7PWM_TFL, 8PWM_FBL, 9PWM_TBL, 10PWM_TBR, 11PWM_FBR
+  target_joint[8] = phi_femur_servo[0] + mid_point_joints[8];     //FBL
+  target_joint[9] = phi_tibia_servo[0] + mid_point_joints[9];     //TBL
+
+  target_joint[6] = phi_femur_servo[1] + mid_point_joints[6];     //FFL
+  target_joint[7] = phi_tibia_servo[1] + mid_point_joints[7];     //TFL
+
+  target_joint[11] = -phi_femur_servo[2] + mid_point_joints[11];  //FBR
+  target_joint[10] = -phi_tibia_servo[2] + mid_point_joints[10];  //TBR
+
+  target_joint[4] = -phi_femur_servo[3] + mid_point_joints[4];    //FFR
+  target_joint[3] = -phi_tibia_servo[3] + mid_point_joints[3];    //TFR
+
+  for(uint8_t joint = 0; joint < 12; joint++)
+  {
+    //If target_joint is below min range, move to min range
+    if(target_joint[joint] < (mid_point_joints[joint] + joint_range[joint][0]))
+      move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][0]));
+
+    //If target_joint is above max range, move to max range
+    else if(target_joint[joint] > (mid_point_joints[joint] + joint_range[joint][1]))
+      move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][1]));
+    
+    //Else move it to target_joint
+    else
+      move_servos(joint, angle2ton_us(target_joint[joint]));
+  }
 }
 
 // Convert ADC_value of ACCUMULATED measurement to angle in degrees using linear interpolation
