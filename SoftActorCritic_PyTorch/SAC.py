@@ -159,8 +159,8 @@ class SAC_Agent():
         done_flag = torch.tensor(done_flag, dtype=torch.float64).to(self.P_net.device)
 
         #Recompute the total reward based on the random preferences (linear combination)
-        #the "not flipping reward" is not weighted by a preference so its added afterwards
-        reward = torch.sum(pref * partial_rewards[:,:-1], axis=1) + partial_rewards[:,-1]
+        #the "paws", "ommited step" and "not flipping reward" are not weighted by a preference so they are added afterwards
+        reward = torch.sum(pref * partial_rewards[:,:-2], axis=1) + partial_rewards[:,-2] + partial_rewards[:,-1]
 
         if step % self.update_Q == 0:
             #Update Q networks

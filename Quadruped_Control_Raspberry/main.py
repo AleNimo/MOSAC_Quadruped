@@ -59,8 +59,8 @@ obs_dim=17
 act_dim=12
 
 #----Preference vector----#
-#   [vel_forward, acceleration, vel_lateral, orientation, flat_back, energy, paws]
-pref_dim = 7
+#    [vel_forward, acceleration, vel_lateral, orientation, flat_back]
+pref_dim = 5
 
 first_time = 1
 
@@ -69,7 +69,7 @@ body_min, body_max = -10.0, 15.0
 body_mean = (body_min + body_max)/2
 body_range = (body_max - body_min)/2
 
-leg_min, leg_max = -20.0, 30.0
+leg_min, leg_max = -30.0, 30.0
 leg_mean = (leg_min + leg_max)/2
 leg_range = (leg_max - leg_min)/2
 
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     P_net = P_Network(obs_dim, act_dim, pref_dim, hidden1_dim=64, hidden2_dim=32)
     P_net.load_checkpoint()
 
-    pref = torch.tensor([[2, 1, 1, 2, 1, 0, 0]]).to(P_net.device)
+    pref = torch.tensor([[1, 1, 1, 1, 1]]).to(P_net.device)
     
     while True:
 
@@ -101,36 +101,36 @@ if __name__ == '__main__':
                     if bytes_read == 12*4: print("Se leyó todo")
                     else: print("no se leyeron la cantidad de bytes correcta - Nucleo")
 
-                    measured_joints_nucleo = np.frombuffer(bytes(joints_byte_list), dtype='<f4')   #< little endian, > big endian
-                    print("measured_joints_nucleo = ", measured_joints_nucleo)
+                    measurements_nucleo = np.frombuffer(bytes(joints_byte_list), dtype='<f4')   #< little endian, > big endian
+                    print("measurements_nucleo = ", measurements_nucleo)
                     
                     #Change the order from webots to the order the NUCLEO needs based on servo conections to the timers:
                     measured_joints = np.zeros(12,dtype = np.float64)
 
                     # Body  Front   Right
-                    measured_joints[0] = measured_joints_nucleo[0]
+                    measured_joints[0] = measurements_nucleo[0]
                     # Femur   Front   Right
-                    measured_joints[1] = measured_joints_nucleo[4]
+                    measured_joints[1] = measurements_nucleo[4]
                     # Tibia   Front   Right
-                    measured_joints[2] = measured_joints_nucleo[3]
+                    measured_joints[2] = measurements_nucleo[3]
                     # Body  Front   Left
-                    measured_joints[3] = measured_joints_nucleo[5]
+                    measured_joints[3] = measurements_nucleo[5]
                     # Femur   Front   Left
-                    measured_joints[4] = - measured_joints_nucleo[6]
+                    measured_joints[4] = - measurements_nucleo[6]
                     # Tibia   Front   Left
-                    measured_joints[5] = - measured_joints_nucleo[7]
+                    measured_joints[5] = - measurements_nucleo[7]
                     # Body  Back    Right
-                    measured_joints[6] = - measured_joints_nucleo[1]
+                    measured_joints[6] = - measurements_nucleo[1]
                     # Femur   Back    Right
-                    measured_joints[7] = measured_joints_nucleo[11]
+                    measured_joints[7] = measurements_nucleo[11]
                     # Tibia   Back    Right
-                    measured_joints[8] = measured_joints_nucleo[10]
+                    measured_joints[8] = measurements_nucleo[10]
                     # Body  Back    Left
-                    measured_joints[9] = - measured_joints_nucleo[2]
+                    measured_joints[9] = - measurements_nucleo[2]
                     # Femur   Back    Left
-                    measured_joints[10] = - measured_joints_nucleo[8]
+                    measured_joints[10] = - measurements_nucleo[8]
                     # Tibia   Back    Left
-                    measured_joints[11] = - measured_joints_nucleo[9]
+                    measured_joints[11] = - measurements_nucleo[9]
 
                     #Normalization
                     for i in range(4):

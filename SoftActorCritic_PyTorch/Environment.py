@@ -27,15 +27,15 @@ class Environment:
 
         # Parameters for forward velocity reward
         self.forward_velocity_reward = 0
-        self.__target_velocity = 0.15 # m/s (In the future it could be a changing velocity)
+        self.__target_velocity = 0.3 # m/s (In the future it could be a changing velocity)
         self.__vmax = 3
-        self.__vmin = -10
+        self.__vmin = -6
         self.__zero_vel_rwd = 0
         self.__curvature_forward_vel = (self.__vmax - self.__zero_vel_rwd)/(self.__target_velocity * (self.__zero_vel_rwd - self.__vmin))
 
         # Parameters for forward acceleration penalization
         self.forward_acc_penalty = 0
-        self.__max_acc = 12 #m/s^2  (Acceleration at which the penalization is -1)
+        self.__max_acc = 16 #m/s^2  (Acceleration at which the penalization is -1)
 
         # Parameters for lateral velocity penalization
         self.lateral_velocity_penalty = 0
@@ -52,16 +52,18 @@ class Environment:
         self.__vmin_back = -2
         self.__curvature_back = 3
 
-        # Parameters for energy penalization
-        self.energy_penalty = 0.0
+        # Parameters for synchronization penalty
+        # self.__transition_weight = 1.5
+        #     #[-, Lift phase, land phase] - With these values, a "power walk" is generated.
+        #     # 3 legs are always on the floor, and 4 legs in between transitions
+        # self.__ideal_transitions = np.array([[0,0.1,0.3], [0,0.35,0.55], [0,0.6,0.8], [0,0.85,0.05]])   #BL, FL, BR, FR
+        # self.__paw_state_weight = 0.5
 
-        # Parameters for paws penalization
-        self.paws_penalty = 0
-        self.__curvature_paws = 80
-        self.__target_height = 0.07 #meters
+        # Parameters for step ommited penalization
+        self.__step_ommited_penalty = -0.2
         
         # Reward for not flipping over
-        self.__not_flipping_reward = 0
+        self.__not_flipping_reward = 0.2
 
     def reset(self):
         ''' Generates and returns a new observed state for the environment (outside of the termination condition) '''
@@ -103,17 +105,9 @@ class Environment:
 
         max_forward_acceleration = next_obs[:, 17+5]
 
-        torque = next_obs[:,17+7:17+19]
-        angular_velocity = next_obs[:,17+19:17+31]
-
-        total_mech_power = np.dot(torque,np.transpose(angular_velocity))
-
-        paws_up_total_ratio = next_obs[:,17+31:17+35]
-        step_omitted = next_obs[:,17+35]
-
-        #print("Torque",torque)
-        #print("angular_velocity",angular_velocity)
-
+        agent_yaw = next_obs[:, 17+6]
+        agent_previous_yaw = obs[:, 17+6]
+        step_omitted = next_obs[:, 17+7]
 
         # Empty vectors to store reward and end flags for every transition
         reward, end = np.zeros((obs.shape[0], self.rwd_dim)), np.zeros((obs.shape[0], 1))
@@ -121,17 +115,13 @@ class Environment:
         for i in range(obs.shape[0]):
 
             '''Reward for forward velocity reaching target velocity'''
+            
             if forward_velocity[i] > 0:
                 self.forward_velocity_reward = (self.__vmax - self.__vmin)/(self.__curvature_forward_vel * np.abs(self.__target_velocity - forward_velocity[i]) + 1) + self.__vmin
+                # self.forward_velocity_reward = self.__vmax *(1 - np.power((forward_velocity[i]/self.__target_velocity) - 1, 4))
             else:
-                self.forward_velocity_reward = (self.__vmax - self.__zero_vel_rwd) / self.__target_velocity * forward_velocity[i] + self.__zero_vel_rwd
-            
-            # self.forward_velocity_reward = -0.5+15*forward_velocity[i]
+                self.forward_velocity_reward = (self.__vmax*3 - self.__zero_vel_rwd) / self.__target_velocity * forward_velocity[i] + self.__zero_vel_rwd
 
-            # if self.forward_velocity_reward>=2:
-            #     self.forward_velocity_reward = 2
-            # if self.forward_velocity_reward<=-4:
-            #     self.forward_velocity_reward = -4
             reward[i, 0] = self.forward_velocity_reward
 
             '''Penalization for peak abs forward acceleration'''
@@ -149,11 +139,11 @@ class Environment:
 
             '''Penalization for deviating from target step rotation'''
             # compute rotation made in one step:
-            agent_rotation = next_obs[i, 17+6] - obs[i, 17+6]
+            agent_rotation = agent_yaw - agent_previous_yaw
             # correct if there are any discontinuities:
-            if (next_obs[i, 17+6] * obs[i, 17+6] < 0) and (np.abs(next_obs[i, 17+6]) > 100*np.pi/180):
+            if (agent_yaw * agent_previous_yaw < 0) and (np.abs(agent_yaw) > 100*np.pi/180):
 
-                if next_obs[i, 17+6] < 0:
+                if agent_yaw < 0:
                     agent_rotation += 2*np.pi
                 else:
                     agent_rotation -= 2*np.pi
@@ -174,38 +164,44 @@ class Environment:
                 self.flat_back_penalty[j-1] = (-self.__vmin_back/(self.__curvature_back * back_angle + 1) + self.__vmin_back)
 
                 reward[i, 4] += self.flat_back_penalty[j-1]
+ 
+            # '''Penalty for deviating from ideal movement rhythm'''
+            # reward[i,5] = -np.sum((paw_transitions[i] > 0) * self.__transition_weight * np.minimum(np.abs(transition_phase[i] - self.__ideal_transitions[np.arange(4), paw_transitions[i]]), np.abs(transition_phase[i] - (1+self.__ideal_transitions[np.arange(4), paw_transitions[i]]))))
 
-                
-            '''Reward for energy consumption'''
-            self.energy_penalty = -50e-3 * np.abs(total_mech_power) * 100
-            reward[i,5] = self.energy_penalty
+            # ##Extra penalty for having wrong state with respect to phase
+            # for j in range(4):
+            #     # If lift phase < land phase
+            #     if self.__ideal_transitions[j,1] < self.__ideal_transitions[j,2]:
+            #         # If it's supposed to be on the ground: phase < lift phase or phase > land phase (can't fulfill both)
+            #         if (current_phase[i] < self.__ideal_transitions[j,1]) or (current_phase[i] > self.__ideal_transitions[j,2]):
+            #             if paw_on_ground[i,j] == False:
+            #                 reward[i,5] -= self.__paw_state_weight
+            #         # If it's supposed to be lifted up:
+            #         else:
+            #             if paw_on_ground[i,j] == True:
+            #                 reward[i,5] -= self.__paw_state_weight
+            #     # If lift phase > land phase
+            #     else:
+            #         # If it's supposed to be on the ground: land phase < phase < lift phase
+            #         if (current_phase[i] > self.__ideal_transitions[j,2]) and (current_phase[i] < self.__ideal_transitions[j,1]):
+            #             if paw_on_ground[i,j] == False:
+            #                 reward[i,5] -= self.__paw_state_weight
+            #         # If it's supposed to be lifted up:
+            #         else:
+            #             if paw_on_ground[i,j] == True:
+            #                 reward[i,5] -= self.__paw_state_weight
 
-            '''Reward for clearance between floor and paws'''
-            # I keep only the 2 with the highest ratio, the other ones are probably on the floor supporting the robot's body
-            
-            highest_ratio_paws = paws_up_total_ratio[i][np.argpartition(paws_up_total_ratio[i], -2)[-2]]
-
-            if highest_ratio_paws.size == 1 :
-                highest_ratio_paws = np.ones(2) * highest_ratio_paws
-
-            for ratio in highest_ratio_paws:
-                if ratio < 0.6:
-                    reward[i, 6] -= 0.1
-
-            # height_deviation = np.abs(highest_paws - self.__target_height)
-
-            # self.paws_penalty = np.mean(-self.__curvature_paws * np.power(height_deviation, 2))
-
-            # reward[i, 6] = self.paws_penalty
+            '''Penalty for ommiting a step (not moving joints)'''
+            if step_omitted[i] == 1:
+                reward[i, 5] = self.__step_ommited_penalty
+                print("Step Omitted")
 
             '''Reward for avoiding critical failure (flipping over)'''
-            if step_omitted[i] == 1:
-                reward[i, 7] = -0.5
-                print("Step Omitted")
+            reward[i, 6] = self.__not_flipping_reward
             
             # If the absolute value of X or Y angle is greater than 50° there is a penalization and the episode ends
             if abs(next_obs[i, 1])*180 >= 50 or abs(next_obs[i, 2])*180 >= 50:                
-                reward[i, 7] -= self.__not_flipping_reward
+                reward[i, 6] = 0
                 end[i] = True
 
             elif dist_fin[i] >= self.__end_cond:

@@ -93,7 +93,7 @@ def testing_step(agent, pref):
 def SAC_Agent_Training(q):
     global jointLowerLimit, jointUpperLimit
 
-    env = Environment(sim_measurement=36, obs_dim=17, act_dim=12, rwd_dim=8)
+    env = Environment(sim_measurement=8, obs_dim=17, act_dim=12, rwd_dim=7)
 
     # The 24 values from coppelia, in order:
 
@@ -102,16 +102,14 @@ def SAC_Agent_Training(q):
     # pitch and roll of the agent's body
     # pitch and roll angular velocities of the agent's body
     # the 12 joint angles
+    
 
-    # ---- The last 35 not seen by the agent but used in the rewards and/or plots (simulation only measurements)--------
+    # ---- The last 8 not seen by the agent but used in the rewards and/or plots (simulation only measurements)--------
     # position (x,y,z)
     # Mean forward and lateral velocities with the reference frame of the agent
     # Maximum absolute forward acceleration measured during the previous step with the reference frame of the agent
     # yaw of the agent's body
-    # torque of 12 joints
-    # angular velocity of 12 joints
-    # the heights of the 4 paws
-    # step omitted flag
+    # step ommited flag
 
     load_agent = False
     test_agent = False
@@ -119,19 +117,21 @@ def SAC_Agent_Training(q):
 
     episodes = 20000
     episode_steps = 200  # Maximum steps allowed per episode
-    save_period = 500
+    save_period = 100
 
-    # Preference vector maximum and minimum values - [vel_forward, acceleration, vel_lateral, orientation, flat_back, energy,paws]
+    # Preference vector maximum and minimum values - [vel_forward, acceleration, vel_lateral, orientation, flat_back]
     # If pref_min_vector == pref_max_vector then the multi-objective approach is disabled, and constant reward weights
     # equal to pref_max_vector are defined
-    pref_max_vector = np.array([2,0.8, 1, 2, 1, 0, 0])
-    pref_min_vector = np.array([0.5, 0, 0, 0, 0, 0,0])
+    pref_max_vector = np.array([1, 1, 1, 1, 1])
+    pref_min_vector = np.array([0.5, 0, 0, 0, 0])
+    # pref_max_vector = np.array([2, 1, 1, 1, 1, 1])
+    # pref_min_vector = np.array([0.5, 0, 0, 0, 0, 0.5])
 
     pref_dim = pref_max_vector.size
 
     agent = SAC_Agent('Cuadruped', env, pref_max_vector,pref_min_vector, replay_buffer_size=1000000)
 
-    agent.replay_batch_size = 1000
+    agent.replay_batch_size = 10000
 
     agent.update_Q = 1  # The Q function is updated every episode
     agent.update_P = 1  # The policy is updated every 1 episode
@@ -165,9 +165,8 @@ def SAC_Agent_Training(q):
 
         # Testing
         if test_agent:
-            # Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back, energy, paws]
-            pref = np.array([[2, 1, 1, 2, 1, 0, 0]])
-            # pref = np.array([[1, 1, 1, 1, 1, 0]])
+            # Use the user input preference for the test: [vel_forward, acceleration, vel_lateral, orientation, flat_back]
+            pref = np.array([[1, 1, 1, 1, 1]])
             print("Preference vector: ", pref, flush=True)
             for step in range(episode_steps):
 
@@ -209,7 +208,7 @@ def SAC_Agent_Training(q):
             ep_len = step + 1
 
         # Compute total reward from partial rewards and preference of the episode
-        tot_rwd = np.sum(pref * ep_rwd[:, :-1], axis=1) + ep_rwd[:, -1]
+        tot_rwd = np.sum(pref * ep_rwd[:, :-2], axis=1) + ep_rwd[:, -2] + ep_rwd[:, -1]
 
         ######## Compute the real and expected returns, and the root mean square error ##########
         # Real return (undiscounted for testing, discounted for training):
@@ -298,7 +297,7 @@ paw_range = (paw_max - paw_min)/2
 def updatePlot():
     global q, curve_Trajectory, curve_Trajectory_startPoint, curve_ForwardVelocity, curve_LateralVelocity, curve_ForwardAcc, curve_Pitch, \
         curve_Roll, curve_TargetRotation, curve_AgentRotation, curve_Reward, curve_Forward_vel_rwd, curve_Lateral_vel_rwd, curve_Orientation_rwd, curve_Back_rwd, \
-        curve_Acc_rwd,curve_Energy_rwd,curve_Paws_rwd, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy, curve_Std, \
+        curve_Acc_rwd,curve_Ommited_rwd,curve_Not_Flipping_rwd, curve_P_Loss, curve_Q_Loss, curve_Real_Return, curve_Predicted_Return, curve_Return_Error, curve_Alpha, curve_Entropy, curve_Std, \
         curve_FrontBody_right_state, curve_FrontBody_left_state, curve_FrontBody_right_action, curve_FrontBody_left_action, \
         curve_BackBody_right_state, curve_BackBody_left_state, curve_BackBody_right_action, curve_BackBody_left_action, \
         curve_FrontLeg_right_state, curve_FrontLeg_left_state, curve_FrontLeg_right_action, curve_FrontLeg_left_action, \
@@ -371,8 +370,8 @@ def updatePlot():
         lateral_velocity_rwd = results[3][:, 2]
         orientation_rwd = results[3][:, 3]
         back_rwd = results[3][:, 4]
-        energy_rwd = results[3][:, 5]
-        paws_rwd = results[3][:, 6]
+        step_ommited_rwd = results[3][:, 5]
+        not_flipping_rwd = results[3][:, 6]
 
         # Because there is no reward in the first state (step 0)
         rwd_linspace = np.arange(1, len(total_rwd)+1, 1, dtype=int)
@@ -383,8 +382,8 @@ def updatePlot():
         curve_Orientation_rwd.setData(rwd_linspace, orientation_rwd)
         curve_Back_rwd.setData(rwd_linspace, back_rwd)
         curve_Acc_rwd.setData(rwd_linspace, acc_rwd)
-        curve_Energy_rwd.setData(rwd_linspace, energy_rwd)
-        curve_Paws_rwd.setData(rwd_linspace, paws_rwd)
+        curve_Ommited_rwd.setData(rwd_linspace, step_ommited_rwd)
+        curve_Not_Flipping_rwd.setData(rwd_linspace, not_flipping_rwd)
 
         # Body joints update
         body_joints_state = []
@@ -571,8 +570,8 @@ if __name__ == '__main__':
     curve_Orientation_rwd = plot_Rewards.plot(pen=(255, 127, 39), name='Rotation')
     curve_Back_rwd = plot_Rewards.plot(pen=(0, 255, 255), name='Tilt')
     curve_Acc_rwd = plot_Rewards.plot(pen=(255, 255, 255), name='Fwd_Acc')
-    curve_Energy_rwd = plot_Rewards.plot(pen=(100, 255, 255), name='Energy')
-    curve_Paws_rwd = plot_Rewards.plot(pen=(255, 100, 255), name='Paws')
+    curve_Ommited_rwd = plot_Rewards.plot(pen=(100, 255, 255), name='Step Ommited')
+    curve_Not_Flipping_rwd = plot_Rewards.plot(pen=(255, 100, 255), name='Not flipping')
 
     # Front body joints plot
     plot_FrontBody = grid_layout.addPlot(title="Front body joints (°)", row=1, col=0)

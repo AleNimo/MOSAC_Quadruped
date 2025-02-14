@@ -384,17 +384,12 @@ K_TON = 1000.0 / 140.0
 
 step_complete = 0
 
-paw_transitions = np.zeros(4,dtype=np.float32)
-transition_phase = np.zeros(4,dtype=np.float32)
-paw_previous_state = [True, True, True, True]
-paw_transition_enable = [True, True, True, True]
-
 attitude = np.array([0.0, 0.0])
 ang_vel = np.array([0.0, 0.0])
 reset_orientation = np.array([0.0, 0.0, 0.0])
 
 obs_dim = 17
-sim_measure_dim = 21
+sim_measure_dim = 8
 environment_state = np.zeros(sim_measure_dim + obs_dim, dtype=np.float32)
 
 def Kalman_filter():
@@ -616,7 +611,7 @@ def SendState():
   global environment_state, robot_node,Tx_float_length,reset_pos,reset_orientation,mean_forward_velocity
   global mean_lateral_velocity,max_forward_acc,target_step_rotation,slider,step_counter,attitude,ang_vel
   global joint_sensor,f_joint_angle,jointUpperLimit,jointLowerLimit
-  global step_omitted, paw_transitions, transition_phase
+  global step_omitted
   
   f_joint_angle_norm = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
   
@@ -641,19 +636,12 @@ def SendState():
   environment_state[5:17] = f_joint_angle_norm
 
     #Additional Measurements used to compute the rewards and/ or plots:
-  environment_state[17] = current_phase
-  environment_state[18:21] = current_translation
-  environment_state[21] = mean_forward_velocity
-  environment_state[22] = mean_lateral_velocity
-  environment_state[23] = max_forward_acc
-  environment_state[24] = current_rotation[0]
-  environment_state[25:29] = paw_transitions
-  environment_state[29:33] = transition_phase
-  environment_state[33] = BL_touch_sensor.getValue()
-  environment_state[34] = FL_touch_sensor.getValue()
-  environment_state[35] = BR_touch_sensor.getValue()
-  environment_state[36] = FR_touch_sensor.getValue()
-  environment_state[37] = step_omitted
+  environment_state[17:20] = current_translation
+  environment_state[20] = mean_forward_velocity
+  environment_state[21] = mean_lateral_velocity
+  environment_state[22] = max_forward_acc
+  environment_state[23] = current_rotation[0]
+  environment_state[24] = step_omitted
 
   client.sendall(environment_state.tobytes())
 
@@ -696,7 +684,6 @@ def State_Machine_Control():
   global mean_forward_velocity,mean_lateral_velocity,max_forward_acc,vel_samples,prev_time
   global prev_joint_angular_position_servo,acum_error_servo,prev_joint_angular_position,acum_error
   global pid_sample,step_complete,delay_buffer
-  global paw_transitions, transition_phase, paw_previous_state, paw_transition_enable
   global repeat
   # global debug_delay
   global sign
@@ -771,12 +758,6 @@ def State_Machine_Control():
 
       f_joint_angle = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
       target_joint = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-
-      paw_transitions = np.zeros(4,dtype=np.float32)
-      transition_phase = np.zeros(4,dtype=np.float32)
-      
-      paw_previous_state = [BL_touch_sensor.getValue(), FL_touch_sensor.getValue(), BR_touch_sensor.getValue(), FR_touch_sensor.getValue()]
-      paw_transition_enable = [True, True, True, True]
       
       state = RESET
       state_actuation = RESET_ACTUATION
@@ -902,7 +883,7 @@ def State_Machine_Actuation():
 def computeMeasurementsForRewards():
   global supervisor,root,forward_acceleration,forward_velocity,lateral_velocity,mean_forward_velocity,mean_lateral_velocity
   global lateral_acceleration,max_forward_acc,prev_time,prev_velocity_magnitude,prev_forward_velocity,prev_lateral_velocity,vel_samples
-  global step_counter,joint,current_position,prev_joint_angular_position_servo,paw_transitions, transition_phase, paw_previous_state
+  global step_counter,joint,current_position,prev_joint_angular_position_servo
   global prev_error_servo, acum_error_servo
 
   ## Velocity of Robot
@@ -961,45 +942,10 @@ def computeMeasurementsForRewards():
   vel_samples = vel_samples + 1.0
   prev_time = time
 
-  PFR_state = FR_touch_sensor.getValue()
-  PFL_state = FL_touch_sensor.getValue()
-  PBR_state = BR_touch_sensor.getValue()
-  PBL_state = BL_touch_sensor.getValue()
-
-  if paw_transition_enable[0] and (paw_previous_state[0] != PBL_state):
-    paw_transitions[0] = PBL_state + 1
-    transition_phase[0] = current_phase
-    paw_transition_enable[0] = False
-    # print("BL transition = ", paw_transitions[0])
-    # print("current_time = ", current_time)
-  
-  if paw_transition_enable[1] and (paw_previous_state[1] != PFL_state):
-    paw_transitions[1] = PFL_state + 1
-    transition_phase[1] = current_phase
-    paw_transition_enable[1] = False
-    # print("FL transition = ", paw_transitions[1])
-    # print("current_time = ", current_time)
-
-  if paw_transition_enable[2] and (paw_previous_state[2] != PBR_state):
-    paw_transitions[2] = PBR_state + 1
-    transition_phase[2] = current_phase
-    paw_transition_enable[2] = False
-    # print("BR transition = ", paw_transitions[2])
-    # print("current_time = ", current_time)
-  
-  if paw_transition_enable[3] and (paw_previous_state[3] != PFR_state):
-    paw_transitions[3] = PFR_state + 1
-    transition_phase[3] = current_phase
-    paw_transition_enable[3] = False
-    # print("FR transition = ", paw_transitions[3])
-    # print("current_time = ", current_time)
-  
-  paw_previous_state = [PBL_state, PFL_state, PBR_state, PFR_state]
-
 
 def resetMeasurementsForRewards():
   global step_counter, mean_forward_velocity, mean_lateral_velocity, max_forward_acc, vel_samples, prev_error, acum_error
-  global prev_error_servo, acum_error_servo, paw_transitions, transition_phase, paw_previous_state, paw_transition_enable
+  global prev_error_servo, acum_error_servo
   step_counter = step_counter + 1
 
   mean_forward_velocity = 0.0
@@ -1014,12 +960,6 @@ def resetMeasurementsForRewards():
 
   prev_error_servo= np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
   acum_error_servo = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32)
-
-  paw_transitions = np.zeros(4,dtype=np.float32)
-  transition_phase = np.zeros(4,dtype=np.float32)
-  
-  paw_previous_state = [BL_touch_sensor.getValue(), FL_touch_sensor.getValue(), BR_touch_sensor.getValue(), FR_touch_sensor.getValue()]
-  paw_transition_enable = [True, True, True, True]
 
 def computeTorques(target_servo):
     global joint, joint_angular_velocity_servo, joint_sensor
@@ -1113,9 +1053,6 @@ if __name__ == "__main__":
   repeat = 1
 
   current_time = 0
-  current_phase = 0
-
-  GAIT_PERIOD = 2 #sec
 
   pid_timer = 0
   median_filter_delay = 0
@@ -1125,9 +1062,6 @@ if __name__ == "__main__":
   while supervisor.step(timestep) != -1:
 
     current_time = supervisor.getTime()
-
-    #Instantaneous phase, normalized from 0 to 1. Defines the cycle of each paw to walk
-    current_phase = (current_time % GAIT_PERIOD) / GAIT_PERIOD
 
     if median_filter_delay > 0:
       median_filter_delay-=timestep

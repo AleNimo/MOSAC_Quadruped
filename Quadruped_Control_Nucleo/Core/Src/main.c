@@ -76,10 +76,10 @@
 #define COMPARE_MEASURE 2
 #define TIMEOUT_STATE 3
 
-#define TIM9_TICK 0.01 //s
-#define TIM5_TICK 0.5 //ms
+#define TIM9_TICK (float32_t)0.01 //s
+#define TIM5_TICK (float32_t)0.5 //ms
 
-#define ONE_SECOND 1000/TIM5_TICK  //milliseconds
+#define ONE_SECOND (float32_t)1000/TIM5_TICK  //milliseconds
 
 // Parameters to transform Degrees(°) values to PWM (Ton in microseconds)
 #define K_TON (float32_t)(1000.0 / 140.0)
@@ -89,7 +89,7 @@
 #define DEAD_BANDWIDTH_SERVO 3	// Degrees
 #define MAX_DELTA_TARGET 2    // Degrees
 
-#define TIMEOUT 1000/TIM5_TICK    // miliseconds
+#define TIMEOUT (float32_t)1000/TIM5_TICK    // miliseconds
 
 #define ALL_FINISHED (uint16_t)0xFFF //(12 ones)
 
@@ -145,7 +145,7 @@ volatile float32_t error_dif = 0;
 volatile uint16_t pwm_pid_out[JOINTS] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 // PID constants
-float32_t kp[JOINTS] = {0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25,0.25};
+float32_t kp[JOINTS] = {0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5};
 float32_t kd[JOINTS] = {0,0,0,0,0,0,0,0,0,0,0,0};
 float32_t ki[JOINTS] = {0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1};
 
@@ -312,8 +312,7 @@ int main(void)
   }
     
 
-  while (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)raw_angle_ADC, 12 * 2) == HAL_BUSY)
-    ;
+  while (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)raw_angle_ADC, 12 * 2) == HAL_BUSY);
 
   // Initialize htim vector used to set pwm in for loops
   htim[0] = &htim2;
@@ -975,10 +974,10 @@ static void MX_DMA_Init(void)
 
   /* DMA interrupt init */
   /* DMA1_Stream2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 2, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
   /* DMA1_Stream7_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream7_IRQn, 2, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream7_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream7_IRQn);
   /* DMA2_Stream4_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream4_IRQn, 2, 0);
@@ -1267,7 +1266,7 @@ void State_Machine_Control(void)
 				for(uint8_t joint = 0; joint<JOINTS ; joint++)
 					spi_transmit_rpi[joint] = f_joint_angle[joint] - mid_point_joints[joint];
         
-				HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)spi_transmit_rpi, (12+1)*2);
+				HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)spi_transmit_rpi, 12*2);
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_RESET);
 				HAL_Delay(1);
 				HAL_GPIO_WritePin(SPI_Ready_GPIO_Port, SPI_Ready_Pin, GPIO_PIN_SET);
@@ -1321,8 +1320,8 @@ void State_Machine_Control(void)
 				target_joint[joint] = target_joint[joint] + mid_point_joints[joint];
 			}
       
-      HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 0);
-      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0);
+      HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, (GPIO_PinState)0);
+      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState)0);
       
       //*Only for testing without raspberry
 			// sign = - sign;
@@ -1383,8 +1382,8 @@ int8_t State_Machine_Actuation(void)
     }
     if (joints_finished == ALL_FINISHED) // If no joint has to move we skip the actuation machine
     {
-      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0);
-      HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 1);
+      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState)0);
+      HAL_GPIO_WritePin(LD1_GPIO_Port, LD3_Pin, (GPIO_PinState)1);
       return 1;
     }
     else
@@ -1426,8 +1425,8 @@ int8_t State_Machine_Actuation(void)
             if (joints_finished == ALL_FINISHED)
             {
               state_actuation = RESET_ACTUATION;
-              HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 0);
-              HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 1);
+              HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState)0);
+              HAL_GPIO_WritePin(LD1_GPIO_Port, LD3_Pin, (GPIO_PinState)1);
               return 1;
             }
           }
@@ -1442,8 +1441,8 @@ int8_t State_Machine_Actuation(void)
   case TIMEOUT_STATE:
     state_actuation = RESET_ACTUATION;
 
-    HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, 0);
-    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, 1);
+    HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, (GPIO_PinState)0);
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState)1);
 
     // Reset all joints
     // joints_finished = ALL_FINISHED;
