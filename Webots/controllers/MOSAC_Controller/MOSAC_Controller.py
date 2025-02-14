@@ -16,39 +16,62 @@ import random
 import csv
 
 # CSV output filename
-output_file = "webots_joint_data_PID_policy.csv"
+output_file = "webots_sin_pid_test.csv"
 data = [] 
 
 # Initialize header
 header = ["timestamp"]
 
-header.append(f"BFR_Target")
-header.append(f"BFR_Filt")
-header.append(f"FFR_Target")
-header.append(f"FFR_Filt")
-header.append(f"TFR_Target")
-header.append(f"TFR_Filt")
+header.append("BFR_Target")
+header.append("BFR_Filt")
+header.append("BFR_PID_OUT")
+header.append("FFR_Target")
+header.append("FFR_Filt")
+header.append("FFR_PID_OUT")
+header.append("TFR_Target")
+header.append("TFR_Filt")
+header.append("TFR_PID_OUT")
 
-header.append(f"BFL_Target")
-header.append(f"BFL_Filt")
-header.append(f"FFL_Target")
-header.append(f"FFL_Filt")
-header.append(f"TFL_Target")
-header.append(f"TFL_Filt")
+header.append("BFL_Target")
+header.append("BFL_Filt")
+header.append("BFL_PID_OUT")
+header.append("FFL_Target")
+header.append("FFL_Filt")
+header.append("FFL_PID_OUT")
+header.append("TFL_Target")
+header.append("TFL_Filt")
+header.append("TFL_PID_OUT")
 
-header.append(f"BBR_Target")
-header.append(f"BBR_Filt")
-header.append(f"FBR_Target")
-header.append(f"FBR_Filt")
-header.append(f"TBR_Target")
-header.append(f"TBR_Filt")
+header.append("BBR_Target")
+header.append("BBR_Filt")
+header.append("BBR_PID_OUT")
+header.append("FBR_Target")
+header.append("FBR_Filt")
+header.append("FBR_PID_OUT")
+header.append("TBR_Target")
+header.append("TBR_Filt")
+header.append("TBR_PID_OUT")
 
-header.append(f"BBL_Target")
-header.append(f"BBL_Filt")
-header.append(f"FBL_Target")
-header.append(f"FBL_Filt")
-header.append(f"TBL_Target")
-header.append(f"TBL_Filt")
+header.append("BBL_Target")
+header.append("BBL_Filt")
+header.append("BBL_PID_OUT")
+header.append("FBL_Target")
+header.append("FBL_Filt")
+header.append("FBL_PID_OUT")
+header.append("TBL_Target")
+header.append("TBL_Filt")
+header.append("TBL_PID_OUT")
+
+#To print touch sensor signals
+# header.append("PBL_sensor")
+# header.append("PFL_sensor")
+# header.append("PBR_sensor")
+# header.append("PFR_sensor")
+
+# header.append("PBL_target")
+# header.append("PFL_target")
+# header.append("PBR_target")
+# header.append("PFR_target")
 
 # slider = False
 programmed_target_rotation = False
@@ -58,6 +81,11 @@ critical_failure_angle = 50 #Must match angle in environment.py
 supervisor = Supervisor()
 root = supervisor.getSelf()
 robot_node = supervisor.getFromDef('MOSAC')
+
+PFR_node = supervisor.getFromDef('PFR')
+PFL_node = supervisor.getFromDef('PFL')
+PBR_node = supervisor.getFromDef('PBR')
+PBL_node = supervisor.getFromDef('PBL')
 
 # Create Socket
 HOST, PORT = "127.0.0.1", 57175
@@ -76,7 +104,7 @@ Rx_float_length = 10
 Tx_float_length = "{:010.5f}"
 Tx_Rx_command_length = 5
 
-reset_pos = np.array([0.0, 0.0, 0.145])
+reset_pos = np.array([0.0, 0.0, 0.139])
 
 reset_orientation = np.array([0.0, 0.0, 0.0])
 
@@ -257,34 +285,34 @@ tibia_llim, tibia_ulim = -15.0 , 15.0
 
 jointLowerLimit = np.array(
   [
-      bod_llim,
-      femur_llim,
-      tibia_llim,
-      bod_llim,
-      femur_llim,
-      tibia_llim,
-      bod_llim,
-      femur_llim,
-      tibia_llim,
-      bod_llim,
-      femur_llim,
-      tibia_llim,
+    bod_llim,
+    femur_llim,
+    tibia_llim,
+    bod_llim,
+    femur_llim,
+    tibia_llim,
+    bod_llim,
+    femur_llim,
+    tibia_llim,
+    bod_llim,
+    femur_llim,
+    tibia_llim,
   ]
 )
 jointUpperLimit = np.array(
   [
-      bod_ulim,
-      femur_ulim,
-      tibia_ulim,
-      bod_ulim,
-      femur_ulim,
-      tibia_ulim,
-      bod_ulim,
-      femur_ulim,
-      tibia_ulim,
-      bod_ulim,
-      femur_ulim,
-      tibia_ulim,
+    bod_ulim,
+    femur_ulim,
+    tibia_ulim,
+    bod_ulim,
+    femur_ulim,
+    tibia_ulim,
+    bod_ulim,
+    femur_ulim,
+    tibia_ulim,
+    bod_ulim,
+    femur_ulim,
+    tibia_ulim,
   ]
 )
 
@@ -297,11 +325,13 @@ state = 0  # state 0 = idle / 1 = moving to intermediate position / 2 = moving t
 target_step_rotation = np.float32(0.0)
 
 agentCreated = False  # To measure velocity only when there is an agent created (not between episodes where the agent is destroyed)
-step_ommited = 0
+step_omitted = 0
 
 step_counter = 0
 
 prev_time = 0.0
+
+prev_velocity_magnitude = 0.0
 prev_forward_velocity = 0.0
 prev_lateral_velocity = 0.0
 
@@ -347,22 +377,25 @@ acum_error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np
 WINDOW_SIZE = 40
 TIMER_MEDIAN_FILTER = 0.5#ms
 delay_buffer = np.zeros((12,int((WINDOW_SIZE/2 *  TIMER_MEDIAN_FILTER)/timestep)),dtype=np.float32) #For median filter
-KP = 0.25
+KP = 0.5
 KD = 0.0
 KI = 0.1
 K_TON = 1000.0 / 140.0
 
 step_complete = 0
 
-too_many_paws_up = False
+paw_transitions = np.zeros(4,dtype=np.float32)
+transition_phase = np.zeros(4,dtype=np.float32)
+paw_previous_state = [True, True, True, True]
+paw_transition_enable = [True, True, True, True]
 
 attitude = np.array([0.0, 0.0])
 ang_vel = np.array([0.0, 0.0])
 reset_orientation = np.array([0.0, 0.0, 0.0])
 
 obs_dim = 17
-sim_measure_dim = 33
-environment_state = np.zeros(sim_measure_dim+obs_dim, dtype=np.float32)
+sim_measure_dim = 21
+environment_state = np.zeros(sim_measure_dim + obs_dim, dtype=np.float32)
 
 def Kalman_filter():
     global accelerometer,acc_std,ax_vector,ay_vector,az_vector,coef_acc,gyroscope,gyro_std,wx_vector,wy_vector,wz_vector,coef_gyr,pitch,roll,vel_pitch,vel_roll,A,I,X,P,Q,R,K,H,Z
@@ -582,8 +615,8 @@ def reset_robot_position_orientation():
 def SendState():
   global environment_state, robot_node,Tx_float_length,reset_pos,reset_orientation,mean_forward_velocity
   global mean_lateral_velocity,max_forward_acc,target_step_rotation,slider,step_counter,attitude,ang_vel
-  global joint_sensor,f_joint_angle,jointUpperLimit,jointLowerLimit,joint_angular_velocity_servo
-  global step_ommited, too_many_paws_up
+  global joint_sensor,f_joint_angle,jointUpperLimit,jointLowerLimit
+  global step_omitted, paw_transitions, transition_phase
   
   f_joint_angle_norm = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
   
@@ -608,21 +641,23 @@ def SendState():
   environment_state[5:17] = f_joint_angle_norm
 
     #Additional Measurements used to compute the rewards and/ or plots:
-  environment_state[17:20] = current_translation
-  environment_state[20] = mean_forward_velocity
-  environment_state[21] = mean_lateral_velocity
-  environment_state[22] = max_forward_acc
-  environment_state[23] = current_rotation[0]
-  environment_state[24:36] = joint_torque
-  environment_state[36:48] = joint_angular_velocity_servo
-
-  environment_state[48] = too_many_paws_up
-  environment_state[49] = step_ommited
+  environment_state[17] = current_phase
+  environment_state[18:21] = current_translation
+  environment_state[21] = mean_forward_velocity
+  environment_state[22] = mean_lateral_velocity
+  environment_state[23] = max_forward_acc
+  environment_state[24] = current_rotation[0]
+  environment_state[25:29] = paw_transitions
+  environment_state[29:33] = transition_phase
+  environment_state[33] = BL_touch_sensor.getValue()
+  environment_state[34] = FL_touch_sensor.getValue()
+  environment_state[35] = BR_touch_sensor.getValue()
+  environment_state[36] = FR_touch_sensor.getValue()
+  environment_state[37] = step_omitted
 
   client.sendall(environment_state.tobytes())
 
-  step_ommited = 0
-
+  step_omitted = 0
 
   # if slider:
   #   --Use value from slider(converting to radians normalized by pi)
@@ -645,14 +680,10 @@ def SendState():
         target_step_rotation = 0
 
   else:
-    #Generate next random target step rotation (std = 5?)
+    #Generate next random target step rotation (uniform distribution +-10°)
     if (step_counter >= 100) and (step_counter % 50 == 0):
-      mean = 0.0
-      std_dev = 1/36
       clip_range = 1/18
-      target_step_rotation = random.gauss(mean, std_dev) #? Cambiar a Uniforme
-      #-Clip the target step rotation to + /- 10?
-      target_step_rotation = max(-clip_range, min(clip_range, target_step_rotation))
+      target_step_rotation = random.uniform(-clip_range, clip_range)
   
 def State_Machine_Control():
 
@@ -660,11 +691,12 @@ def State_Machine_Control():
   global reset_pos, reset_orientation
   global enable_torque_control, f_joint_angle
   global joints_finished, target_joint, delta_target, joint
-  global prev_forward_velocity,target_step_rotation
+  global prev_velocity_magnitude, prev_forward_velocity,target_step_rotation
   global prev_lateral_velocity,max_forward_acc,step_counter
   global mean_forward_velocity,mean_lateral_velocity,max_forward_acc,vel_samples,prev_time
   global prev_joint_angular_position_servo,acum_error_servo,prev_joint_angular_position,acum_error
   global pid_sample,step_complete,delay_buffer
+  global paw_transitions, transition_phase, paw_previous_state, paw_transition_enable
   global repeat
   # global debug_delay
   global sign
@@ -679,7 +711,6 @@ def State_Machine_Control():
 
     # if debug_delay == 0:
     SendState()
-    # print("too_many_paws_up = ", too_many_paws_up)
     resetMeasurementsForRewards()
       # debug_delay = 3000
     state = RX_RASPBERRY
@@ -712,7 +743,8 @@ def State_Machine_Control():
 
       mean_forward_velocity = 0.0
       mean_lateral_velocity = 0.0
-
+      
+      prev_velocity_magnitude = 0.0
       prev_forward_velocity = 0.0
       prev_lateral_velocity = 0.0
       max_forward_acc = 0.0
@@ -739,6 +771,12 @@ def State_Machine_Control():
 
       f_joint_angle = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
       target_joint = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
+      paw_transitions = np.zeros(4,dtype=np.float32)
+      transition_phase = np.zeros(4,dtype=np.float32)
+      
+      paw_previous_state = [BL_touch_sensor.getValue(), FL_touch_sensor.getValue(), BR_touch_sensor.getValue(), FR_touch_sensor.getValue()]
+      paw_transition_enable = [True, True, True, True]
       
       state = RESET
       state_actuation = RESET_ACTUATION
@@ -781,7 +819,7 @@ def State_Machine_Actuation():
   global state_actuation,joint,joint_sensor
   global f_joint_angle,timeout,joints_finished
   global delta_sample,target_joint,delta_target,joint
-  global step_ommited,enable_torque_control, pid_sample, step_complete
+  global step_omitted,enable_torque_control, pid_sample, step_complete
   global repeat
 
   if state_actuation == RESET_ACTUATION:
@@ -801,7 +839,7 @@ def State_Machine_Actuation():
 
     if joints_finished == ALL_FINISHED :  # Si ninguna articulación se tiene que mover, salteo la actuacion
       print("Salteo paso")
-      step_ommited = 1
+      step_omitted = 1
       repeat  = 0
       return 1
     else:
@@ -863,8 +901,11 @@ def State_Machine_Actuation():
 
 def computeMeasurementsForRewards():
   global supervisor,root,forward_acceleration,forward_velocity,lateral_velocity,mean_forward_velocity,mean_lateral_velocity
-  global lateral_acceleration,max_forward_acc,prev_time,prev_forward_velocity,prev_lateral_velocity,vel_samples
-  global step_counter,joint,current_position,prev_joint_angular_position_servo,joint_torque,too_many_paws_up
+  global lateral_acceleration,max_forward_acc,prev_time,prev_velocity_magnitude,prev_forward_velocity,prev_lateral_velocity,vel_samples
+  global step_counter,joint,current_position,prev_joint_angular_position_servo,paw_transitions, transition_phase, paw_previous_state
+  global prev_error_servo, acum_error_servo
+
+  ## Velocity of Robot
   world_velocity = root.getVelocity()
 
   current_rotation = robot_node.getField("rotation").getSFRotation()
@@ -886,19 +927,32 @@ def computeMeasurementsForRewards():
   forward_velocity = world_velocity[0] * A2[0] + world_velocity[1] * A2[1]
   lateral_velocity = world_velocity[0] * A_orth[0] + world_velocity[1] * A_orth[1]
 
+  # velocity_magnitude = np.linalg.norm(world_velocity)
+
+  ##Absolute Velocity of PAWs
+  PFR_velocity = PFR_node.getVelocity()
+  PFL_velocity = PFL_node.getVelocity()
+  PBR_velocity = PBR_node.getVelocity()
+  PBL_velocity = PBL_node.getVelocity()
+
+  PFR_velocity = np.sqrt(PFR_velocity[0]**2 + PFR_velocity[1]**2 + PFR_velocity[2]**2)
+  PFL_velocity = np.sqrt(PFL_velocity[0]**2 + PFL_velocity[1]**2 + PFL_velocity[2]**2)
+  PBR_velocity = np.sqrt(PBR_velocity[0]**2 + PBR_velocity[1]**2 + PBR_velocity[2]**2)
+  PBL_velocity = np.sqrt(PBL_velocity[0]**2 + PBL_velocity[1]**2 + PBL_velocity[2]**2)
+
   time = supervisor.getTime()
 
   if time > 0.0:
-    forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
-    lateral_acceleration = (lateral_velocity - prev_lateral_velocity)/(time - prev_time)
-    #print(time-prev_time)
+    total_acceleration = (velocity_magnitude - prev_velocity_magnitude)/(time - prev_time)
+    # forward_acceleration = (forward_velocity - prev_forward_velocity)/(time - prev_time)
+    # lateral_acceleration = (lateral_velocity - prev_lateral_velocity)/(time - prev_time)
 
     if np.abs(forward_acceleration) > max_forward_acc:
         max_forward_acc = np.abs(forward_acceleration)
 
-  
+  # prev_velocity_magnitude = velocity_magnitude
   prev_forward_velocity = forward_velocity
-  prev_lateral_velocity = lateral_velocity
+  # prev_lateral_velocity = lateral_velocity
 
   # Compute mean in a recursive manner
   mean_forward_velocity = 1 / (vel_samples + 1.0) * (mean_forward_velocity * vel_samples + forward_velocity)
@@ -907,11 +961,45 @@ def computeMeasurementsForRewards():
   vel_samples = vel_samples + 1.0
   prev_time = time
 
-  if (FR_touch_sensor.getValue() + FL_touch_sensor.getValue() + BR_touch_sensor.getValue() + BL_touch_sensor.getValue()) < 3:
-    too_many_paws_up = True
+  PFR_state = FR_touch_sensor.getValue()
+  PFL_state = FL_touch_sensor.getValue()
+  PBR_state = BR_touch_sensor.getValue()
+  PBL_state = BL_touch_sensor.getValue()
+
+  if paw_transition_enable[0] and (paw_previous_state[0] != PBL_state):
+    paw_transitions[0] = PBL_state + 1
+    transition_phase[0] = current_phase
+    paw_transition_enable[0] = False
+    # print("BL transition = ", paw_transitions[0])
+    # print("current_time = ", current_time)
+  
+  if paw_transition_enable[1] and (paw_previous_state[1] != PFL_state):
+    paw_transitions[1] = PFL_state + 1
+    transition_phase[1] = current_phase
+    paw_transition_enable[1] = False
+    # print("FL transition = ", paw_transitions[1])
+    # print("current_time = ", current_time)
+
+  if paw_transition_enable[2] and (paw_previous_state[2] != PBR_state):
+    paw_transitions[2] = PBR_state + 1
+    transition_phase[2] = current_phase
+    paw_transition_enable[2] = False
+    # print("BR transition = ", paw_transitions[2])
+    # print("current_time = ", current_time)
+  
+  if paw_transition_enable[3] and (paw_previous_state[3] != PFR_state):
+    paw_transitions[3] = PFR_state + 1
+    transition_phase[3] = current_phase
+    paw_transition_enable[3] = False
+    # print("FR transition = ", paw_transitions[3])
+    # print("current_time = ", current_time)
+  
+  paw_previous_state = [PBL_state, PFL_state, PBR_state, PFR_state]
+
 
 def resetMeasurementsForRewards():
-  global step_counter, mean_forward_velocity, mean_lateral_velocity, max_forward_acc, vel_samples, prev_error, acum_error, too_many_paws_up
+  global step_counter, mean_forward_velocity, mean_lateral_velocity, max_forward_acc, vel_samples, prev_error, acum_error
+  global prev_error_servo, acum_error_servo, paw_transitions, transition_phase, paw_previous_state, paw_transition_enable
   step_counter = step_counter + 1
 
   mean_forward_velocity = 0.0
@@ -924,8 +1012,14 @@ def resetMeasurementsForRewards():
   prev_error= np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
   acum_error = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32)
 
-  too_many_paws_up = False
+  prev_error_servo= np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32) 
+  acum_error_servo = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],dtype=np.float32)
 
+  paw_transitions = np.zeros(4,dtype=np.float32)
+  transition_phase = np.zeros(4,dtype=np.float32)
+  
+  paw_previous_state = [BL_touch_sensor.getValue(), FL_touch_sensor.getValue(), BR_touch_sensor.getValue(), FR_touch_sensor.getValue()]
+  paw_transition_enable = [True, True, True, True]
 
 def computeTorques(target_servo):
     global joint, joint_angular_velocity_servo, joint_sensor
@@ -983,8 +1077,7 @@ def PIDControl():
   global delay_buffer
   global pid_out
   
-  for i in range(len(joint)):            
-    f_joint_angle[i] = delay_buffer[i][-1]
+  
     
   # if step_complete == 0:
 
@@ -1014,12 +1107,15 @@ def PIDControl():
   
   # print("pid_out = ", pid_out)
 
-  pid_sample = 1
+  
 
 if __name__ == "__main__":
   repeat = 1
 
   current_time = 0
+  current_phase = 0
+
+  GAIT_PERIOD = 2 #sec
 
   pid_timer = 0
   median_filter_delay = 0
@@ -1029,6 +1125,9 @@ if __name__ == "__main__":
   while supervisor.step(timestep) != -1:
 
     current_time = supervisor.getTime()
+
+    #Instantaneous phase, normalized from 0 to 1. Defines the cycle of each paw to walk
+    current_phase = (current_time % GAIT_PERIOD) / GAIT_PERIOD
 
     if median_filter_delay > 0:
       median_filter_delay-=timestep
@@ -1041,7 +1140,10 @@ if __name__ == "__main__":
     if pid_timer > 0:
       pid_timer-=timestep    
     if pid_timer == 0:
+      for i in range(len(joint)):            
+        f_joint_angle[i] = delay_buffer[i][-1]
       PIDControl()
+      pid_sample = 1
       pid_timer = 10
 
     if timeout >0: 
@@ -1066,14 +1168,48 @@ if __name__ == "__main__":
       State_Machine_Control()
     repeat = 1
 
-    #To record joints in a csv
+    # To record joints in a csv
     # row = [current_time]  # Start with the timestamp
+
+    # # Joints
     # for i in range(12):
-    #   row.append(target_joint[i] )
-    #   row.append(f_joint_angle[i] )
+    #   row.append(target_joint[i])
+    #   row.append(f_joint_angle[i])
+    #   row.append(pid_out[i])
+
+    # Touch sensors
+    # row.append(int(BL_touch_sensor.getValue() == True))
+    # row.append(int(FL_touch_sensor.getValue() == True))
+    # row.append(int(BR_touch_sensor.getValue() == True))
+    # row.append(int(FR_touch_sensor.getValue() == True))
+
+    # #target touch values
+    # # BL 
+    # if current_phase > 0.1 and current_phase < 0.3:
+    #   row.append(0)
+    # else:
+    #   row.append(1)
+
+    # # FL 
+    # if current_phase > 0.35 and current_phase < 0.55:
+    #   row.append(0)
+    # else:
+    #   row.append(1)
+    
+    # # BR 
+    # if current_phase > 0.6 and current_phase < 0.8:
+    #   row.append(0)
+    # else:
+    #   row.append(1)
+
+    # # FR 
+    # if current_phase > 0.85 or current_phase < 0.05:
+    #   row.append(0)
+    # else:
+    #   row.append(1)
 
 
-    # # Append the row to the data list
+    # Append the row to the data list
     # data.append(row)
     # if current_time >= 25:
     #   # Write all collected data to CSV
