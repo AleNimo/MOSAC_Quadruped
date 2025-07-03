@@ -129,7 +129,7 @@ def SAC_Agent_Training(q):
 
     pref_dim = pref_max_vector.size
 
-    agent = SAC_Agent('Cuadruped', env, pref_max_vector,pref_min_vector, replay_buffer_size=1000000)
+    agent = SAC_Agent('Quadruped', env, pref_max_vector,pref_min_vector, replay_buffer_size=1000000)
 
     agent.replay_batch_size = 10000
 
@@ -497,7 +497,7 @@ if __name__ == '__main__':
 
     # Create window
 
-    grid_layout = pg.GraphicsLayoutWidget(title="Cuadruped - Training information")
+    grid_layout = pg.GraphicsLayoutWidget(title="Quadruped - Training information")
     grid_layout.resize(1200, 800)
 
     pg.setConfigOptions(antialias=True)
