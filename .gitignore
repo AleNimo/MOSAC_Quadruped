@@ -13,17 +13,7 @@ Resultados*/
 
 
 ######## Keil projects #######
-# From https://github.com/mrshrdlu/gitignore-keil/blob/master/keil.gitignore
-
-# User-specific uVision files
-*.opt
-*.uvopt
-*.uvoptx
-*.uvgui
-*.uvgui.*
-*.uvguix.*
-*.uvprojx
-
+.gdb_history
 
 # Listing files
 *.cod

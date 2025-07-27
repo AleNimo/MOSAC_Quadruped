@@ -1,0 +1,7 @@
+openocd -f interface/stlink.cfg -f target/stm32f4x.cfg
+
+arm-none-eabi-gdb build/quadruped_control_nucleo.elf -x gdb_script.gdb
+
+gdb-multiarch build/quadruped_control_nucleo.elf -x gdb_script.gdb #para correr gdb-dashboard creo
+
+lsusb # para ver si detecta st-link
