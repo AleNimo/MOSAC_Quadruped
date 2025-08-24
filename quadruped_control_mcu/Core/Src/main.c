@@ -160,7 +160,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  uint8_t joint;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -191,7 +191,6 @@ int main(void)
   MX_TIM5_Init();
   MX_TIM9_Init();
   /* USER CODE BEGIN 2 */
-	while(init_nucleo == 0) HAL_Delay(10);
 
   HAL_TIM_Base_Start(&htim2);
   HAL_TIM_Base_Start(&htim2);
@@ -212,7 +211,7 @@ int main(void)
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
 
-  for (uint8_t joint = 0; joint < 12; joint++)
+  for (joint = 0; joint < JOINTS; joint++)
   {
 		median_filter[joint] = spCreateMedianFilter(WINDOW_SIZE);
 		pwm_pid_out[joint] = angle2ton_us(mid_point_joints[joint]);
@@ -235,6 +234,8 @@ int main(void)
   uart_tx_buffer[0] = 0xFF;
   uart_tx_buffer[1] = 0xFF;
 
+  while(init_nucleo == 0) HAL_Delay(10);
+
   // Joints set to default initial angle
   for (uint8_t joint = 0; joint < JOINTS; joint++)
   {
@@ -246,7 +247,7 @@ int main(void)
   while (HAL_TIM_Base_Start_IT(&htim5) == HAL_BUSY);
   
   while (HAL_TIM_Base_Start_IT(&htim9) == HAL_BUSY);
-  
+ 
   while (1)
   {
     //memcpy(dummy1, &raw_angle_ADC[buffer_to_copy][0], sizeof(dummy1));
@@ -283,12 +284,12 @@ int main(void)
     //     uart_tx_buffer[16 * i + 16] = uart_conv_4.angle_bytes[1];
     //     uart_tx_buffer[16 * i + 17] = uart_conv_4.angle_bytes[0];
     //   }
-		// 	HAL_UART_Transmit(&huart3, (const uint8_t*) uart_tx_buffer, 16 * JOINTS + 2, HAL_MAX_DELAY);
+		//   HAL_UART_Transmit(&huart3, (const uint8_t*) uart_tx_buffer, 16 * JOINTS + 2, HAL_MAX_DELAY);
 
     //   send_uart = 0;
     // }
 		
-    HAL_Delay(1000); // Adjust delay as necessary
+    // HAL_Delay(1000); // Adjust delay as necessary
 
     State_Machine_Control();
   }
@@ -411,17 +412,7 @@ static inline void pid(uint8_t joint)
 
     pwm_pid_out[joint] = pwm_pid_out[joint] + __round_int(control_signal);
     
-    //If pid_out is below min range, move to min range
-    if(ton_us2angle(pwm_pid_out[joint]) < (mid_point_joints[joint] + joint_range[joint][0]))
-      move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][0]));
-
-    //If pid_out is above max range, move to max range
-    else if(ton_us2angle(pwm_pid_out[joint]) > (mid_point_joints[joint] + joint_range[joint][1]))
-      move_servos(joint, angle2ton_us(mid_point_joints[joint] + joint_range[joint][1]));
-    
-    //Else move it to pid_out
-    else
-      move_servos(joint, pwm_pid_out[joint]);
+    move_servos(joint, pwm_pid_out[joint]);
   }
 }
 
@@ -461,7 +452,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 			joint_angle[joint] = adc2angle(median_filteredValue[joint], up_down_vector[joint], joint);
 			
       // Apply the PID controller, and with the final pwm value move the servomotors
-			// pid(joint);
+			pid(joint);
 		
 		}
     pid_sample = 1;
@@ -471,6 +462,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *timer)
 
 void move_servos(uint8_t joint, uint16_t ton)
 {
+  //If ton is below min range, move to min range
+  if(ton_us2angle(ton) < (mid_point_joints[joint] + joint_range[joint][0]))
+    ton = angle2ton_us(mid_point_joints[joint] + joint_range[joint][0]);
+
+  //If ton is above max range, move to max range
+  else if(ton_us2angle(ton) > (mid_point_joints[joint] + joint_range[joint][1]))
+    ton = angle2ton_us(mid_point_joints[joint] + joint_range[joint][1]);
+
   __HAL_TIM_SET_COMPARE(htim[joint / 4], channel[joint % 4], ton);
 }
 
