@@ -93,6 +93,25 @@ void Error_Handler(void);
 #define FEMUR_RANGE_MIN -20.0
 #define TIBIA_RANGE_MAX 15.0
 #define TIBIA_RANGE_MIN -15.0
+
+//delta angle between joint reference position of robot and simulation/solidworks
+#define DELTA_REF_FEMUR 42.65021f
+#define DELTA_REF_TIBIA 18.34979f
+#define DELTA_REF_BODY  0
+
+#define MID_POINT_BFR 96.1285553f
+#define MID_POINT_BBR 80.5f
+#define MID_POINT_BBL 85.4869385f
+#define MID_POINT_TFR (69.0105972f + DELTA_REF_TIBIA)
+#define MID_POINT_FFR (71.9034348f + DELTA_REF_FEMUR)
+#define MID_POINT_BFL 93.9473724f
+#define MID_POINT_FFL (134.817856f - DELTA_REF_FEMUR)
+#define MID_POINT_TFL (120.135033f - DELTA_REF_TIBIA)
+#define MID_POINT_FBL (130.440994f - DELTA_REF_FEMUR)
+#define MID_POINT_TBL (122.615303f - DELTA_REF_TIBIA)
+#define MID_POINT_TBR (55.4315529f + DELTA_REF_TIBIA)
+#define MID_POINT_FBR (55.8714142f + DELTA_REF_FEMUR)
+
 // 0PWM_BFR,1PWM_BBR, 2PWM_BBL, 3PWM_TFR, 4PWM_FFR, 5PWM_BFL, 6PWM_FFL, 7PWM_TFL, 8PWM_FBL, 9PWM_TBL, 10PWM_TBR, 11PWM_FBR
 
 // WITH PID
@@ -109,19 +128,19 @@ void Error_Handler(void);
 // #define MID_POINT_TBR 79
 // #define MID_POINT_FBR 81
 
-//WITHOUT PID
-#define MID_POINT_BFR 94
-#define MID_POINT_BBR 87
-#define MID_POINT_BBL 86
-#define MID_POINT_TFR 89
-#define MID_POINT_FFR 87
-#define MID_POINT_BFL 94
-#define MID_POINT_FFL 87
-#define MID_POINT_TFL 93
-#define MID_POINT_FBL 94
-#define MID_POINT_TBL 96
-#define MID_POINT_TBR 80
-#define MID_POINT_FBR 85
+//WITHOUT PID (comparing with later plastic reference)
+// #define MID_POINT_BFR 94 96.1285553,
+// #define MID_POINT_BBR 87 80.5,
+// #define MID_POINT_BBL 86 85.4869385,
+// #define MID_POINT_TFR 89 87.3603897,
+// #define MID_POINT_FFR 87 114.55365,
+// #define MID_POINT_BFL 94 93.9473724,
+// #define MID_POINT_FFL 87 92.1676483,
+// #define MID_POINT_TFL 93 101.78524,
+// #define MID_POINT_FBL 94 87.7907867,
+// #define MID_POINT_TBL 96 104.265511,
+// #define MID_POINT_TBR 80 73.7813416,
+// #define MID_POINT_FBR 85 98.5216217
 
 
 #define TIM9_TICK (float32_t)0.01 //s
